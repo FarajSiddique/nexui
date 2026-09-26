@@ -16,17 +16,17 @@ The thesis this roadmap exists to test:
 
 The roadmap assumes more than the app has. These gaps set the order of the work.
 
-| Area          | Today                                                                                 | Gap for this roadmap                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Layout        | One `Stack` screen: brand row, Magic Bar at the top, draft preview, "Your items" list | No tabs, no destinations, no zones. The shell has to be built before it can be kept stable.                    |
-| Intents       | `CREATE_TASK`, `CREATE_EVENT`, `CREATE_NOTE`, `SEARCH`, `UNKNOWN`                     | Change intents are designed but not built. No `OPEN_ITEM`, reminders or time blocking.                         |
-| Confirmation  | Preview card, then `DraftSheet` for every draft                                       | Instant saves with Undo are designed. There's no "destination" concept yet.                                    |
-| Highlighter   | Source spans marked in the Magic Bar (`highlight-segments.ts`)                        | No rationale for anything the app shows unprompted.                                                            |
-| Memory        | `intent_events` logs every confirmed or dismissed draft, with raw text                | No record of opens, views, suggestion outcomes or pins. No retention window.                                   |
-| Time          | Wall-clock `date` + `time` + IANA `time_zone`                                         | "Starts in 10 min" can be computed in SQL. Push reminders need a stored instant.                               |
-| People        | `attendees text[]` on events, `person` entity in decisions                            | No people list, so "Follow up with Sarah" has nothing to resolve against.                                      |
-| External data | None (Google is used only for sign-in)                                                | Free/busy, meeting links and email all need integrations. Until then, reasons like "Free at 2 PM" can mislead. |
-| Measurement   | None beyond `intent_events`                                                           | Nothing to validate the thesis with.                                                                           |
+| Area          | Today                                                                                                                                      | Gap for this roadmap                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Layout        | One `Stack` screen: brand row, Magic Bar at the top, draft preview, "Your items" list                                                      | No tabs, no destinations, no zones. The shell has to be built before it can be kept stable.                    |
+| Intents       | `CREATE_TASK`, `CREATE_EVENT`, `CREATE_NOTE`, `SEARCH`, `COMPLETE`, `RESCHEDULE`, `APPEND`, `UNKNOWN`                                      | No `OPEN_ITEM`, reminders or time blocking.                                                                    |
+| Confirmation  | Instant save with Undo when `canCommit`, otherwise `DraftSheet` / `ChangeSheet` ([instant-actions.md](../architecture/instant-actions.md)) | There's no "destination" concept yet.                                                                          |
+| Highlighter   | Source spans marked in the Magic Bar (`highlight-segments.ts`)                                                                             | No rationale for anything the app shows unprompted.                                                            |
+| Memory        | `intent_events` logs every confirmed or dismissed draft, with raw text                                                                     | No record of opens, views, suggestion outcomes or pins. No retention window.                                   |
+| Time          | Wall-clock `date` + `time` + IANA `time_zone`                                                                                              | "Starts in 10 min" can be computed in SQL. Push reminders need a stored instant.                               |
+| People        | `attendees text[]` on events, `person` entity in decisions                                                                                 | No people list, so "Follow up with Sarah" has nothing to resolve against.                                      |
+| External data | None (Google is used only for sign-in). No device permissions                                                                              | Free/busy, meeting links and email all need integrations. Until then, reasons like "Free at 2 PM" can mislead. |
+| Measurement   | None beyond `intent_events`                                                                                                                | Nothing to validate the thesis with.                                                                           |
 
 ## 2. The three layers
 
@@ -218,7 +218,7 @@ Every feature spec and PR that touches Home or the Magic Bar answers these:
 | 8   | User control                          | 1 → 2 | –    |
 | 9   | Activity learning                     | 1 → 2 | –    |
 | 10  | People and follow-ups (new)           | 2     | 1    |
-| 11  | Integrations                          | 3 → 4 | 2–3  |
+| 11  | Integrations and device capabilities  | 2 → 4 | 1–3  |
 | 12  | Home modes (evaluated)                | 2     | –    |
 
 ## 5. Features
@@ -382,7 +382,8 @@ classifier accurate.
 | "what's on tomorrow"                                  | `SEARCH` with `range`, shown as a results list. A question gets a list, never a prose answer.                                                                           | 1     |
 | "show me everything related to architecture"          | `SEARCH`: full-text in Phase 1, meaning-based (pgvector) in Phase 2, results grouped by kind                                                                            | 1 → 2 |
 | "follow up with Sarah next Friday"                    | `CREATE_TASK` with a `person` entity. Not a new intent. The person resolves against §5.10.                                                                              | 1 → 2 |
-| "remind me at 5 to call mom"                          | `CREATE_REMINDER`. Needs a stored instant and push notifications.                                                                                                       | 2     |
+| "remind me at 5 to call mom"                          | `CREATE_REMINDER`. Needs a stored instant and push notifications. [integrations.md](integrations.md) proposes a trigger field on `CREATE_TASK` instead                  | 2     |
+| "get milk at the grocery store"                       | `CREATE_TASK` with a `place` entity and an arrive/leave trigger ([integrations.md](integrations.md#place-reminders))                                                    | 2     |
 | "block two hours tomorrow for deep work"              | `CREATE_EVENT` with a duration and a day but no start. The card offers 2–3 slot chips from a deterministic free-slot finder. Only after a calendar is connected (§3.3). | 3     |
 | "dinner Fri 7 and remind me Thu to book"              | Several actions confirmed as one plan (living interface idea 5)                                                                                                         | 4     |
 
@@ -490,35 +491,39 @@ Pins attach to _items_, not suggestions. A suggestion is short-lived by design, 
 - **AI decides:** whether a name in the text matches a known person (picked from
   candidates, never generated).
 - **AI doesn't decide:** merging two people (the user does that), or contacting anyone (tier 3).
-- **Data:** a `people(user_id, display_name, aliases[], source)` table. Contacts join in Phase 3.
+- **Data:** a `people(user_id, display_name, aliases[], source)` table. Contacts join in Phase 2 ([integrations.md](integrations.md#contacts)).
 - **MVP:** names only, built from Nexui's own data, used for candidates and `FOLLOW_UP`.
 - **Complexity:** M.
 - **Dependencies:** §5.9, intent actions design.
 - **Risks:** two Sarahs. When a match is ambiguous, use the picker from the intent actions design.
 - **Metric:** follow-up suggestion acceptance, and correction rate on the `person` field.
 
-### 5.11 Integrations
+### 5.11 Integrations and device capabilities
+
+Details, permissions and order of work: [integrations.md](integrations.md).
 
 Principle: **Nexui orchestrates existing tools rather than replacing them.** It reads
 enough to rank and resolve, writes only through tier-2 or tier-3 confirmation, and keeps
 the learning itself.
 
-| Category                                | Reads                                                    | Writes                                  | Permission                                                                                                                                                                                                                                                       | Confirmation                                                                   | Stays in Nexui                                                                                                           |
-| --------------------------------------- | -------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| **Google Calendar**, Phase 3 first      | Events and free/busy for the next 14 days; meeting links | Create/move events on a chosen calendar | `calendar.events` is a sensitive scope and needs Google app verification. That needs a verified domain and privacy policy, and Nexui has no domain yet. Background reads need offline access (a server auth code), not just the ID token used for sign-in today. | Tier 2: destination, account, and "Sends invites to…" when there are attendees | Ranking, reasons, the intent log. Cached event IDs, titles and times with a short TTL.                                   |
-| **Apple Calendar / Reminders**, Phase 3 | EventKit, **on the device only**                         | Create/complete through EventKit        | iOS permission prompts; a native module (development build, not Expo Go)                                                                                                                                                                                         | Tier 2                                                                         | The server never sees this data. The phone computes free/busy and sends only the slots or candidates each request needs. |
-| **Contacts**, Phase 3                   | Names and aliases, on the device                         | None                                    | iOS/Android contacts prompt                                                                                                                                                                                                                                      | –                                                                              | Matching happens against §5.10. Contacts aren't uploaded.                                                                |
-| **Gmail**, Phase 4                      | Metadata for threads waiting on the user's reply         | **Drafts only**                         | Read scopes are _restricted_: verification plus an annual third-party security assessment                                                                                                                                                                        | Tier 3. Nexui creates the draft; the user sends it from Gmail                  | "Waiting on you" signals only, not message bodies                                                                        |
-| **Slack**, Phase 4                      | Direct messages and mentions waiting on a reply          | Draft or scheduled message              | Slack app OAuth, user token                                                                                                                                                                                                                                      | Tier 3, never auto-sent                                                        | The same "waiting on you" signals                                                                                        |
-| **Notes apps**                          | –                                                        | –                                       | Apple Notes has no public API. Notion or Google Docs only if users ask                                                                                                                                                                                           | –                                                                              | Nexui notes stay the default                                                                                             |
+| Group                  | Members                                                                       | Phase | Blocker                                                               |
+| ---------------------- | ----------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------- |
+| On-device capabilities | Place reminders (background location), Contacts, Apple Calendar and Reminders | 2     | A development build and permission prompts                            |
+| Capture and surfaces   | Share sheet, Live Activities                                                  | 3     | Native extension targets                                              |
+| Cloud accounts         | Google Calendar (3), Gmail and Slack (4)                                      | 3 → 4 | Google verification needs a domain; Gmail needs a security assessment |
 
 Implications:
 
-- **Write through, read on demand.** Avoid full two-way sync in Phase 3. It causes conflicts.
+- **On-device data stays on the device.** The phone sends only the candidates or signals a
+  request needs (a place ID, a display name, a free window), never coordinates, an address
+  book or a location history.
+- **Ask for a permission when the user's words need it**, never during onboarding. A refusal
+  saves a weaker version of the action, never a dead end.
+- **Write through, read on demand.** Avoid full two-way sync. It causes conflicts.
 - **A destination is set once per kind** in settings, and the confirmation card shows it.
 - **Store external OAuth tokens encrypted on the server.** They never reach the phone or a public env var.
-- The Google domain requirement blocks Phase 3. Buy the domain and publish a privacy policy
-  during Phase 2 so verification doesn't stall the roadmap.
+- The Google domain requirement blocks cloud accounts, not device capabilities. Buy the
+  domain and publish a privacy policy before Phase 3.
 
 ### 5.12 Home modes (evaluated)
 
@@ -536,45 +541,48 @@ UI, it appears only as a reason ("Evening · plan tomorrow").
 
 ## 6. Rejected and reshaped ideas
 
-| Idea                                                      | Problem                                        | Verdict                                                                                             |
-| --------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| One timeline instead of screens (living interface idea 8) | Morphs the layout; removes destinations        | **Reshaped:** tabs stay. Filter-as-you-type lives in search results and in the tab scope chip.      |
-| AI-ranked Recent                                          | Unstable navigation                            | **Reshaped** into Pinned & Recent (§5.5)                                                            |
-| Visible named Home modes                                  | Over-personalization; the app changes identity | **Rejected**, replaced by declared work and quiet hours (§5.12)                                     |
-| Rationales written by the LLM                             | Too much explanation; can be untrue            | **Rejected**, replaced by reason codes (§3.3)                                                       |
-| Instant saves to external tools                           | Autonomous execution                           | **Rejected**: tier 2 and above always confirm (§3.6)                                                |
-| Auto-sent follow-ups, email or Slack replies              | Autonomous and communicative                   | **Rejected**: Nexui drafts, the user sends                                                          |
-| Push notifications for AI suggestions (Phases 1–2)        | Interruption without clear value               | **Deferred.** Push only for reminders the user asked for, and for "starts in 10 min" once opted in. |
-| Re-ranking zones live while visible                       | Instability                                    | **Rejected** (§3.5)                                                                                 |
-| Answering questions in prose in the Magic Bar             | Chatbot-first                                  | **Rejected**: questions map to search or ranges (§5.6)                                              |
-| "Free at 2 PM" before a calendar is connected             | A reason that's often wrong                    | **Deferred** to Phase 3 (§3.3)                                                                      |
-| More Home zones (weather, habits, stats)                  | Too many cards; novelty                        | **Rejected** until a metric shows the need                                                          |
+| Idea                                                      | Problem                                        | Verdict                                                                                                               |
+| --------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| One timeline instead of screens (living interface idea 8) | Morphs the layout; removes destinations        | **Reshaped:** tabs stay. Filter-as-you-type lives in search results and in the tab scope chip.                        |
+| AI-ranked Recent                                          | Unstable navigation                            | **Reshaped** into Pinned & Recent (§5.5)                                                                              |
+| Visible named Home modes                                  | Over-personalization; the app changes identity | **Rejected**, replaced by declared work and quiet hours (§5.12)                                                       |
+| Rationales written by the LLM                             | Too much explanation; can be untrue            | **Rejected**, replaced by reason codes (§3.3)                                                                         |
+| Instant saves to external tools                           | Autonomous execution                           | **Rejected**: tier 2 and above always confirm (§3.6)                                                                  |
+| Auto-sent follow-ups, email or Slack replies              | Autonomous and communicative                   | **Rejected**: Nexui drafts, the user sends                                                                            |
+| Push notifications for AI suggestions (Phases 1–2)        | Interruption without clear value               | **Deferred.** Notify only for reminders the user asked for (time or place), and for "starts in 10 min" once opted in. |
+| Re-ranking zones live while visible                       | Instability                                    | **Rejected** (§3.5)                                                                                                   |
+| Answering questions in prose in the Magic Bar             | Chatbot-first                                  | **Rejected**: questions map to search or ranges (§5.6)                                                                |
+| "Free at 2 PM" before a calendar is connected             | A reason that's often wrong                    | **Deferred** to Phase 3 (§3.3)                                                                                        |
+| More Home zones (weather, habits, stats)                  | Too many cards; novelty                        | **Rejected** until a metric shows the need                                                                            |
 
 ## 7. Prioritization
 
 H/M/L. For complexity, trust risk and dependency burden, lower is better.
 
-| Feature                                    | User value    | Differentiation | Complexity | Trust risk | Dependency burden        | Tests the thesis | Priority                        |
-| ------------------------------------------ | ------------- | --------------- | ---------- | ---------- | ------------------------ | ---------------- | ------------------------------- |
-| 1 Anchored shell                           | H             | L               | M          | L          | L                        | M                | **P1**, enables everything else |
-| 6a Type-switch chips, no dead ends         | H             | M               | L          | L          | L                        | H                | **P1**                          |
-| 7 Confirmation spec and tiers              | H             | M               | L          | Lowers it  | L                        | H                | **P1**                          |
-| 2 Focus card (rules)                       | H             | H               | M          | M          | L                        | H                | **P1**                          |
-| 3 Suggested (rules)                        | H             | H               | M          | M          | M                        | H                | **P1**                          |
-| 4 Rationale and "Why this?"                | M             | H               | L          | Lowers it  | L                        | H                | **P1**                          |
-| 9a Activity logging, metrics views         | L (for users) | –               | M          | M          | L                        | H                | **P1**                          |
-| 5 Pinned & Recent                          | M             | L               | L          | L          | L                        | L                | P1 (cheap)                      |
-| 8 Controls (full set)                      | M             | M               | L          | Lowers it  | L                        | M                | P2                              |
-| 9b Learning                                | M             | M               | M          | M–H        | M                        | M                | P2                              |
-| 10 People and follow-ups                   | M             | M               | M          | M          | M                        | M                | P2                              |
-| 6b Reminders, `OPEN_ITEM`, semantic search | M             | M               | M          | L          | M                        | M                | P2                              |
-| 12 Declared work and quiet hours           | L             | L               | L          | L          | L                        | L                | P2                              |
-| 11 Google / Apple calendar                 | H             | M               | H          | H          | H (verification, domain) | M                | P3                              |
-| 11 Gmail / Slack                           | M             | H               | H          | H          | H (security assessment)  | L                | P4                              |
+| Feature                                    | User value    | Differentiation | Complexity | Trust risk | Dependency burden           | Tests the thesis | Priority                        |
+| ------------------------------------------ | ------------- | --------------- | ---------- | ---------- | --------------------------- | ---------------- | ------------------------------- |
+| 1 Anchored shell                           | H             | L               | M          | L          | L                           | M                | **P1**, enables everything else |
+| 6a Type-switch chips, no dead ends         | H             | M               | L          | L          | L                           | H                | **P1**                          |
+| 7 Confirmation spec and tiers              | H             | M               | L          | Lowers it  | L                           | H                | **P1**                          |
+| 2 Focus card (rules)                       | H             | H               | M          | M          | L                           | H                | **P1**                          |
+| 3 Suggested (rules)                        | H             | H               | M          | M          | M                           | H                | **P1**                          |
+| 4 Rationale and "Why this?"                | M             | H               | L          | Lowers it  | L                           | H                | **P1**                          |
+| 9a Activity logging, metrics views         | L (for users) | –               | M          | M          | L                           | H                | **P1**                          |
+| 5 Pinned & Recent                          | M             | L               | L          | L          | L                           | L                | P1 (cheap)                      |
+| 8 Controls (full set)                      | M             | M               | L          | Lowers it  | L                           | M                | P2                              |
+| 9b Learning                                | M             | M               | M          | M–H        | M                           | M                | P2                              |
+| 10 People and follow-ups                   | M             | M               | M          | M          | M                           | M                | P2                              |
+| 6b Reminders, `OPEN_ITEM`, semantic search | M             | M               | M          | L          | M                           | M                | P2                              |
+| 12 Declared work and quiet hours           | L             | L               | L          | L          | L                           | L                | P2                              |
+| 11 Place reminders, Contacts               | H             | H               | M          | M          | M (dev build, store review) | H                | P2                              |
+| 11 Apple calendar read, Reminders import   | H             | M               | M          | M          | L                           | M                | P2                              |
+| 11 Share sheet, Live Activities            | M             | M               | M          | L          | M (native targets)          | M                | P3                              |
+| 11 Google calendar                         | H             | M               | H          | H          | H (verification, domain)    | M                | P3                              |
+| 11 Gmail / Slack                           | M             | H               | H          | H          | H (security assessment)     | L                | P4                              |
 
 ## 8. Phased roadmap
 
-**Phase 0: in flight.** The [intent actions design](../superpowers/specs/2026-09-24-intent-actions-design.md):
+**Phase 0: shipped.** The [intent actions design](../superpowers/specs/2026-09-24-intent-actions-design.md):
 instant saves with Undo, and `COMPLETE`, `RESCHEDULE`, `APPEND`. Suggested actions reuse all of it.
 
 **Phase 1: core anchored intelligence.** Can the app act first without feeling unstable?
@@ -592,11 +600,14 @@ instant saves with Undo, and `COMPLETE`, `RESCHEDULE`, `APPEND`. Suggested actio
 - Per-kind weights, `USUAL_TIME`, per-user field defaults, and learning from corrections.
 - People and follow-ups, `PLAN_TOMORROW`, `CREATE_REMINDER` with a stored instant and opt-in push, meaning-based search.
 - Declared work and quiet hours. Buy a domain and publish a privacy policy (unblocks Phase 3).
+- On-device capabilities ([integrations.md](integrations.md)): place reminders, Contacts
+  (with People), Apple Calendar read and a Reminders import.
 - _Why here:_ learning needs Phase 1's logs and a few weeks of real use to learn from.
 
 **Phase 3: connected ecosystem.** Can Nexui be right about my _whole_ day?
 
-- Google Calendar read, then write. EventKit on iOS. Contacts on the device.
+- Google Calendar read, then write. Calendar writes through EventKit.
+- Share sheet and Live Activities.
 - The destination picker and tier-2 confirmation. `FREE_WINDOW` reasons and time-blocking.
 - _Why here:_ high value but a heavy dependency burden (verification, native modules). It
   should strengthen a core loop that already works, not rescue one that doesn't.
@@ -604,7 +615,7 @@ instant saves with Undo, and `COMPLETE`, `RESCHEDULE`, `APPEND`. Suggested actio
 **Phase 4: cross-app orchestration.** Can one sentence move work across tools?
 
 - Gmail and Slack "waiting on you" suggestions, with tier-3 drafts.
-- Several actions confirmed as one plan. Voice, share sheet, widgets and App Intents (living interface idea 9).
+- Several actions confirmed as one plan. Voice, widgets and App Intents (living interface idea 9).
 - _Why here:_ the highest trust risk and compliance cost. Worth it only after users trust tiers 1 and 2.
 
 ## 9. Success metrics
@@ -649,4 +660,4 @@ five users, a script of ten tasks, compared with the phone's built-in Reminders 
 - Calendar tab: is an agenda list enough for the MVP, or is a week strip needed?
 - Should the web preview get the tab shell, or stay a single screen for demos?
 - Retention windows: 90 days for `activity_events` is proposed. What about raw text in `intent_events`?
-- When should the domain be bought? It blocks Google verification in Phase 3.
+- When should the domain be bought? It blocks Google verification in Phase 3, but not the on-device capabilities.
