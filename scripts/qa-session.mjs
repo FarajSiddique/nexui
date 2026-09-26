@@ -14,9 +14,9 @@
  * QA_EMAIL (an address nobody uses; no mail is sent) and QA_SUPABASE_REF (the nexui-dev ref).
  *
  * @example
- * node scripts/qa-session.mjs > .qa/anchored-shell/a/session.json
+ * node scripts/qa-session.mjs > .qa/session.json
  * // → {"storageKey":"sb-abcd1234-auth-token","session":{…}}
- * node scripts/qa-session.mjs --revoke .qa/anchored-shell/a/session.json
+ * node scripts/qa-session.mjs --revoke .qa/session.json
  */
 import { readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
