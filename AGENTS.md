@@ -60,12 +60,14 @@ Project subagents live in `.claude/agents/`. Reviewers report findings and never
 - `security-reviewer`: for changes to auth, env, logging, API routes, or the decision engine.
 - `docs-keeper`: after a behavior, contract, env, or command change; it edits docs.
 - `intent-evaluator`: after changes to the decision-engine prompt or model; defaults to the free mock provider.
+- `shell-developer` and `shell-qa`: build and verify slices of `docs/specs/anchored-shell.md`. Start them through `build-slice`, not directly. QA writes the tests and never edits code; the Developer writes code and never edits `tests/`.
 
 ## Claude Code Skills
 
 Project skills live in `.claude/skills/`.
 
 - `add-intent`: add, rename, or remove an intent. It covers all 18 files for a new-item intent (fewer for a change intent that acts on a saved item), in order, and includes a completeness check.
+- `build-slice`: `/build-slice A` (then B, C, D) orchestrates `shell-qa` and `shell-developer` for one spec slice: tests first, implementation, QA verification and reviewers, up to three fix rounds, then one commit per step. It stops after each slice; it never pushes. QA signs in to Expo web with `node scripts/qa-session.mjs`, which needs `QA_EMAIL` and `QA_SUPABASE_REF` in `apps/api/.env.local` and sends no email. Screenshots go to the gitignored `.qa/`.
 
 ## Commit & Pull Request Guidelines
 
