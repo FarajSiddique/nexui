@@ -7,17 +7,18 @@
  * It refuses to run unless `QA_SUPABASE_REF` names the project in both the API's and the
  * mobile app's env, and refuses to sign in to any account it didn't create.
  *
- * `--revoke` signs the QA account out everywhere, so sessions printed earlier stop working.
- * Run it after every smoke test.
+ * `--revoke <file>` signs out only the session saved in that file, then deletes the file, so
+ * QA runs in other worktrees keep their own sessions. Run it after every smoke test.
  *
  * Needs in `apps/api/.env.local`: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY,
  * QA_EMAIL (an address nobody uses; no mail is sent) and QA_SUPABASE_REF (the nexui-dev ref).
  *
  * @example
- * node scripts/qa-session.mjs
+ * node scripts/qa-session.mjs > .qa/anchored-shell/a/session.json
  * // → {"storageKey":"sb-abcd1234-auth-token","session":{…}}
- * node scripts/qa-session.mjs --revoke
+ * node scripts/qa-session.mjs --revoke .qa/anchored-shell/a/session.json
  */
+import { readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
 
@@ -118,20 +119,31 @@ async function signIn(config) {
   return data.session;
 }
 
-async function revokeAll(config, session) {
+function readSessionFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')).session;
+  } catch {
+    fail(`Could not read a session from ${path}.`);
+  }
+}
+
+async function revokeOne(config, sessionFile) {
+  const session = readSessionFile(sessionFile);
   const admin = createClient(config.url, config.secretKey, noPersistence);
-  const { error } = await admin.auth.admin.signOut(session.access_token, 'global');
+  const { error } = await admin.auth.admin.signOut(session.access_token, 'local');
 
   if (error) {
-    fail(`Could not revoke the QA sessions (${error.code ?? error.status}).`);
+    fail(`Could not revoke the QA session (${error.code ?? error.status}).`);
   }
+
+  rmSync(sessionFile);
 }
 
 function readArgs() {
   try {
-    return parseArgs({ options: { revoke: { type: 'boolean', default: false } } }).values;
+    return parseArgs({ options: { revoke: { type: 'string' } } }).values;
   } catch {
-    fail('Usage: node scripts/qa-session.mjs [--revoke]');
+    fail('Usage: node scripts/qa-session.mjs [--revoke <session file>]');
   }
 }
 
@@ -139,12 +151,13 @@ const values = readArgs();
 
 try {
   const config = readConfig();
-  const session = await signIn(config);
 
   if (values.revoke) {
-    await revokeAll(config, session);
-    console.log('[qa-session] Signed the QA account out everywhere.');
+    await revokeOne(config, values.revoke);
+    console.error('[qa-session] Signed out the saved QA session and deleted its file.');
   } else {
+    const session = await signIn(config);
+
     // supabase-js on web stores the session as JSON under this key.
     console.log(JSON.stringify({ storageKey: `sb-${config.projectRef}-auth-token`, session }));
   }

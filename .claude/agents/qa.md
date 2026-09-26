@@ -69,13 +69,18 @@ Check the Developer's work for the unit. The orchestrator runs the code reviewer
 
 ### Smoke test
 
-- Start only what you need, in the background, with the mock engine so no model call is billed: `AI_PROVIDER=mock pnpm dev:api`, and `pnpm dev:web` for UI. If ports 3000 or 8081 are already taken, stop and report it instead of killing anything. Check that `GET http://localhost:3000/api/health` returns `{"status":"ok"}`.
-- Sign in: run `node scripts/qa-session.mjs`. It prints `{ "storageKey": …, "session": … }` for the dedicated QA account.
-  - UI: open `http://localhost:8081`, use `browser_evaluate` to run `localStorage.setItem(storageKey, JSON.stringify(session))`, and reload. Use a phone viewport (`browser_resize` 390×844). Prefer `browser_snapshot` to find elements and check labels; use screenshots as evidence. Check `browser_console_messages` for errors after each flow.
+- Other units may be under QA at the same time in other worktrees, so use the ports the orchestrator gives you (`API_PORT`, `WEB_PORT`), never 3000 or 8081 by default. Start only what you need, in the background, with the mock engine so no model call is billed:
+  - API: `AI_PROVIDER=mock pnpm --filter @nexui/api exec next dev --hostname 0.0.0.0 --port <API_PORT>`
+  - UI: `EXPO_PUBLIC_API_URL=http://localhost:<API_PORT> pnpm --filter @nexui/mobile exec expo start --web --port <WEB_PORT>`
+
+  If a port is already taken, stop and report it instead of killing anything. Check that `GET http://localhost:<API_PORT>/api/health` returns `{"status":"ok"}`.
+
+- Sign in: run `node scripts/qa-session.mjs > <evidence dir>/session.json`. The file holds `{ "storageKey": …, "session": … }` for the dedicated QA account.
+  - UI: open `http://localhost:<WEB_PORT>`, use `browser_evaluate` to run `localStorage.setItem(storageKey, JSON.stringify(session))`, and reload. Use a phone viewport (`browser_resize` 390×844). Prefer `browser_snapshot` to find elements and check labels; use screenshots as evidence. Check `browser_console_messages` for errors after each flow.
   - API: call routes with `curl -H "Authorization: Bearer <session.access_token>"` and check status and shape against the document.
   - Never put the token in your report. If the script fails, report its message and do only the checks that need no sign-in.
 - Test data belongs to the QA account, so create what you need. Don't delete data you didn't create.
-- Finish by running `node scripts/qa-session.mjs --revoke`, which signs the QA account out everywhere so the session you used stops working. Then stop the servers you started.
+- Finish by running `node scripts/qa-session.mjs --revoke <evidence dir>/session.json`, which signs out only the session you used and deletes the file. Never sign the QA account out everywhere: other QA runs share it. Then stop the servers you started.
 - Write temporary files only under the evidence directory, nowhere else in the repo.
 
 ### Verdict
