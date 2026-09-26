@@ -51,6 +51,31 @@ export function displayLocalDate(
   return value.getUTCFullYear() === thisYear ? text : `${text}, ${value.getUTCFullYear()}`;
 }
 
+/**
+ * A wall-clock YYYY-MM-DD as the shell writes days: weekday, day, month.
+ *
+ * @example
+ * displayShortDay('2026-09-26') // 'Sat 26 Sep'
+ */
+export function displayShortDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const value = new Date(Date.UTC(year!, month! - 1, day!));
+
+  return `${WEEKDAYS[value.getUTCDay()]} ${value.getUTCDate()} ${MONTHS[value.getUTCMonth()]}`;
+}
+
+/**
+ * The short weekday of a wall-clock YYYY-MM-DD.
+ *
+ * @example
+ * displayWeekday('2026-09-25') // 'Fri'
+ */
+export function displayWeekday(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+
+  return WEEKDAYS[new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay()]!;
+}
+
 export function displayLocalDateTime(value: LocalDateTime | null): string | null {
   if (!value) {
     return null;

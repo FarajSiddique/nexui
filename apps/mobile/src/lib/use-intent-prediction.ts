@@ -13,10 +13,11 @@ interface PredictionState {
   error: string | null;
 }
 
-export function useIntentPrediction() {
-  const [text, setInputText] = useState('');
+/** Predicts the intent of the bar's text as the user types. `initialText` prefills the bar. */
+export function useIntentPrediction(initialText = '') {
+  const [text, setInputText] = useState(initialText);
   const [prediction, setPrediction] = useState<PredictionState>({
-    text: '',
+    text: initialText,
     decision: null,
     isPredicting: false,
     error: null,

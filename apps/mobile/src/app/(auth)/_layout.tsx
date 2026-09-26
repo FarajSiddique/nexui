@@ -7,7 +7,7 @@ export const unstable_settings = { initialRouteName: 'sign-in' };
 
 export default function AuthLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page } }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}>
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="verify" />
     </Stack>

@@ -4,7 +4,7 @@ import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { ApiError, undoIntentEvent, updateItem } from '@/lib/api';
 import { colors, fonts } from '@/lib/theme';
-import { TIMELINE_KEY } from '@/lib/use-timeline';
+import { ITEMS_KEY } from '@/lib/use-timeline';
 import {
   clearUndo,
   showUndoStatus,
@@ -21,16 +21,17 @@ function runUndo(target: UndoTarget): Promise<unknown> {
     : updateItem(target.task, { completed: false });
 }
 
-// Shows what was just saved or changed, with Undo for 8 seconds.
+// Shows what was just saved or changed, with Undo for 8 seconds. `(app)/_layout.tsx` hosts it
+// above the tab bar, so it outlives the + sheet that caused it.
 export function UndoToast() {
   const queryClient = useQueryClient();
   const toast = useUndoStore((state) => state.toast);
   const undo = useMutation({
     mutationFn: runUndo,
     // A refetch started before Undo could land after it and hide the restored item.
-    onMutate: () => queryClient.cancelQueries({ queryKey: TIMELINE_KEY }),
+    onMutate: () => queryClient.cancelQueries({ queryKey: ITEMS_KEY }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: TIMELINE_KEY });
+      void queryClient.invalidateQueries({ queryKey: ITEMS_KEY });
       showUndoStatus('Undone');
     },
     onError: (error) => {
@@ -86,7 +87,6 @@ export function UndoToast() {
 
 const styles = StyleSheet.create({
   toast: {
-    marginTop: 20,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -96,12 +96,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.ink,
   },
-  message: { flex: 1, fontFamily: fonts.body, fontSize: 15, lineHeight: 20, color: colors.page },
+  message: { flex: 1, fontFamily: fonts.body, fontSize: 15, lineHeight: 20, color: colors.card },
   undo: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center' },
   undoText: {
     fontFamily: fonts.bodyBold,
     fontSize: 15,
-    color: colors.page,
+    color: colors.card,
     textDecorationLine: 'underline',
   },
   dimmed: { opacity: 0.6 },

@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   sheet: {
     maxHeight: '85%',
-    backgroundColor: colors.page,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   submit: { backgroundColor: colors.ink, padding: 16, borderRadius: 999, marginTop: 28 },
-  submitText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.page, textAlign: 'center' },
+  submitText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.card, textAlign: 'center' },
   error: {
     fontFamily: fonts.body,
     color: colors.danger,
@@ -262,6 +262,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'center',
   },
-  segmentTextSelected: { color: colors.page },
+  segmentTextSelected: { color: colors.card },
   pressed: { opacity: 0.7 },
 });
