@@ -1,6 +1,6 @@
 /**
  * Signs the dedicated QA account in to the dev Supabase project without sending email, and
- * prints the session for the shell-qa agent to put in Expo web's localStorage.
+ * prints the session for the qa agent to put in Expo web's localStorage.
  *
  * Creates the account (email already confirmed, `app_metadata.qa = true`) on first run,
  * generates a magic-link token with the admin API, and verifies it with the publishable key.

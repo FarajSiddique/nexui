@@ -15,5 +15,5 @@ apps/mobile/android/
 apps/mobile/ios/
 .vercel
 
-# QA agent evidence (screenshots) from /build-slice
+# QA agent evidence (screenshots) from /build-spec
 .qa/
