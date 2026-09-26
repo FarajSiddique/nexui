@@ -23,11 +23,13 @@ export function MagicBar({
   onChangeText,
   onSubmit,
   highlights,
+  autoFocus = false,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   onSubmit?: () => void;
   highlights?: readonly IntentHighlight[];
+  autoFocus?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const segments = useMemo(() => highlightSegments(value, highlights), [value, highlights]);
@@ -102,6 +104,7 @@ export function MagicBar({
         onChangeText={onChangeText}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        autoFocus={autoFocus}
         onSubmitEditing={onSubmit}
         onKeyPress={Platform.OS === 'web' ? handleWebKeyPress : undefined}
         submitBehavior="submit"
@@ -123,8 +126,9 @@ export function MagicBar({
 
 const styles = StyleSheet.create({
   bar: {
-    marginTop: 28,
+    marginTop: 16,
     borderRadius: 20,
+    backgroundColor: colors.soft,
     borderWidth: 2,
     borderColor: colors.line,
     paddingHorizontal: 18,

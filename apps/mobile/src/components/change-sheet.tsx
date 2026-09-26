@@ -6,7 +6,7 @@ import { ItemFormSheet } from '@/components/item-form-sheet';
 import { ApiError, recordIntentEvent } from '@/lib/api';
 import { localToday } from '@/lib/form-values';
 import { fieldsFromChange, fieldsToChange, type FormFields } from '@/lib/item-fields';
-import { TIMELINE_KEY } from '@/lib/use-timeline';
+import { ITEMS_KEY } from '@/lib/use-timeline';
 
 const CHANGE_COPY = {
   COMPLETE: { heading: 'Mark done', action: 'Mark done' },
@@ -47,7 +47,7 @@ export function ChangeSheet({
       logged.current = true;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: TIMELINE_KEY });
+      void queryClient.invalidateQueries({ queryKey: ITEMS_KEY });
       onSaved();
     },
   });

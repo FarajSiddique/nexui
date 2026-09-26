@@ -14,7 +14,7 @@ import { localToday } from '@/lib/form-values';
 import { displayItemMeta } from '@/lib/intent-display';
 import { fieldsFromDecision, fieldsToAction, type FormFields } from '@/lib/item-fields';
 import { colors, fonts } from '@/lib/theme';
-import { TIMELINE_KEY } from '@/lib/use-timeline';
+import { ITEMS_KEY } from '@/lib/use-timeline';
 
 const DRAFT_COPY = {
   CREATE_EVENT: { heading: 'New event', action: 'Create event' },
@@ -22,6 +22,24 @@ const DRAFT_COPY = {
   CREATE_NOTE: { heading: 'New note', action: 'Create note' },
   SEARCH: { heading: 'Search', action: 'Search' },
 } as const;
+
+// A blank draft (from the + sheet's chips) has no typed text, so its log names the chip
+// and the title the user gave it instead.
+function loggedText(text: string, action: IntentAction): string {
+  if (text.trim()) {
+    return text;
+  }
+
+  const title = 'title' in action ? action.title.trim() : '';
+
+  return `Blank ${BLANK_KINDS[action.kind] ?? 'draft'}: ${title}`;
+}
+
+const BLANK_KINDS: Partial<Record<IntentAction['kind'], string>> = {
+  CREATE_TASK: 'task',
+  CREATE_EVENT: 'event',
+  CREATE_NOTE: 'note',
+};
 
 // Logs the confirmed draft once (saving CREATE_* items); a search then runs against saved
 // items. `logged` flips as soon as the log lands, so a retry after a failed search only
@@ -33,7 +51,13 @@ async function confirmDraft(
   logged: { current: boolean },
 ): Promise<SavedItem[] | null> {
   if (!logged.current) {
-    await recordIntentEvent({ text, decision, outcome: 'confirmed', action, via: 'form' });
+    await recordIntentEvent({
+      text: loggedText(text, action),
+      decision,
+      outcome: 'confirmed',
+      action,
+      via: 'form',
+    });
     logged.current = true;
   }
 
@@ -48,7 +72,8 @@ async function confirmDraft(
 
 /**
  * Reviews a magic-bar draft. Confirming saves and logs it; closing without
- * confirming logs a dismissal so the app can learn from skipped drafts.
+ * confirming logs a dismissal so the app can learn from skipped drafts. A blank draft
+ * (empty `text`) logs no dismissal: nothing was typed to learn from.
  */
 export function DraftSheet({
   decision,
@@ -75,7 +100,7 @@ export function DraftSheet({
         return;
       }
 
-      void queryClient.invalidateQueries({ queryKey: TIMELINE_KEY });
+      void queryClient.invalidateQueries({ queryKey: ITEMS_KEY });
       onSaved();
     },
   });
@@ -104,7 +129,7 @@ export function DraftSheet({
   }
 
   function close() {
-    if (!logged.current) {
+    if (!logged.current && text.trim()) {
       void recordIntentEvent({ text, decision, outcome: 'dismissed' }).catch(() => undefined);
     }
 

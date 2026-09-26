@@ -61,7 +61,7 @@ export default function RootLayout(): ReactElement | null {
       <QueryProvider>
         <StatusBar style="dark" />
         <Stack
-          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page } }}
+          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}
         >
           <Stack.Protected guard={signedIn}>
             <Stack.Screen name="(app)" />

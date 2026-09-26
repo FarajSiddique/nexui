@@ -6,7 +6,7 @@ import { ItemFormSheet } from '@/components/item-form-sheet';
 import { ApiError, updateItem } from '@/lib/api';
 import { localToday } from '@/lib/form-values';
 import { fieldsFromItem, fieldsToPatch, type FormFields } from '@/lib/item-fields';
-import { TIMELINE_KEY } from '@/lib/use-timeline';
+import { ITEMS_KEY } from '@/lib/use-timeline';
 
 const EDIT_COPY = {
   task: { heading: 'Edit task', layout: 'CREATE_TASK' },
@@ -22,7 +22,7 @@ export function EditSheet({ item, onClose }: { item: SavedItem; onClose: () => v
   const save = useMutation({
     mutationFn: (patch: ItemPatch) => updateItem(item, patch),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: TIMELINE_KEY });
+      void queryClient.invalidateQueries({ queryKey: ITEMS_KEY });
       onClose();
     },
   });

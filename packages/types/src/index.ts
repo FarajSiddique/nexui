@@ -432,6 +432,8 @@ export type UndoResponse = z.infer<typeof undoResponseSchema>;
 export const timelineQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().min(1).max(300).optional(),
+  // Only this kind; all kinds when left out.
+  kind: itemKindSchema.optional(),
 });
 
 export type TimelineQuery = z.infer<typeof timelineQuerySchema>;
@@ -460,6 +462,11 @@ export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export const searchResponseSchema = z.object({ items: z.array(savedItemSchema) });
 
 export type SearchResponse = z.infer<typeof searchResponseSchema>;
+
+// `GET /api/tasks`: open tasks, due first, no date last.
+export const tasksResponseSchema = z.object({ items: z.array(savedTaskSchema) });
+
+export type TasksResponse = z.infer<typeof tasksResponseSchema>;
 
 // Edits share one PATCH; each kind accepts only its own fields. Only tasks complete.
 const hasChanges = (patch: object): boolean => Object.keys(patch).length > 0;

@@ -44,15 +44,16 @@ calls `onSubmitEditing` when `blurOnSubmit || !multiline`, so the Magic Bar
 handler that calls the same submit callback on a plain Enter and lets Shift+Enter
 insert a newline as usual.
 
-## Committing (`app/(app)/index.tsx`)
+## Committing (`app/(app)/compose.tsx`)
 
 A single `useMutation(recordIntentEvent)` sends `via: 'instant'`. While it is
-pending the card shows a spinner and ignores further presses. On success the app
-clears the bar (only if the user hasn't typed something new meanwhile), invalidates
-the `['timeline']` query, and shows the Undo card with a message from
-`undoMessage()` (e.g. "Added: Call mom · Tomorrow", "Moved Dentist · Fri 4:00 PM").
-On failure the text stays and the card shows the error, including the server's 409
-message when the target changed underneath the action.
+pending the card shows a spinner and ignores further presses. On success the sheet
+closes (back to the tab that opened it), invalidates the saved item's
+`itemsKey(kind)` query (or every kind under `ITEMS_KEY` when nothing was saved),
+and shows the Undo card with a message from `undoMessage()` (e.g. "Added: Call mom ·
+Tomorrow", "Moved Dentist · Fri 4:00 PM"). On failure the sheet stays open, the text
+stays, and the card shows the error, including the server's 409 message when the
+target changed underneath the action.
 
 Confirming through `DraftSheet` or `ChangeSheet` sends `via: 'form'` instead;
 closing either without confirming logs a `dismissed` event, as before.
@@ -62,23 +63,24 @@ closing either without confirming logs a `dismissed` event, as before.
 `stores/use-undo-store.ts` holds one `{ undo, message, shownAt } | null`. `undo` is
 either `{ type: 'intent', eventId }` for a logged Magic Bar action or
 `{ type: 'completion', task }` for a task completed from its checkbox (`null` for a
-plain status line). `components/undo-toast.tsx` renders it above the Magic Bar and
-announces the message for screen readers; the Undo button has a 44pt touch target.
-The card hides after `UNDO_MS` (8 seconds); a newer commit or completion replaces it
-outright. Pressing Undo calls `POST /api/intent-events/:id/undo` for a logged action,
-or `PATCH /api/items/task/:id` with `{ completed: false }` to reopen a task; either
-way it invalidates `['timeline']` and shows a status line ("Undone", or the server's
-refusal message) for `STATUS_MS` (2.5 seconds). The store is cleared on sign-out,
-next to `queryClient.clear()`.
+plain status line). `components/undo-toast.tsx` renders it above the tab bar
+(`app/(app)/_layout.tsx`) and announces the message for screen readers; the Undo
+button has a 44pt touch target. The card hides after `UNDO_MS` (8 seconds); a newer
+commit or completion replaces it outright. Pressing Undo calls
+`POST /api/intent-events/:id/undo` for a logged action, or
+`PATCH /api/items/task/:id` with `{ completed: false }` to reopen a task; either way
+it invalidates every kind under `ITEMS_KEY` and shows a status line ("Undone", or the
+server's refusal message) for `STATUS_MS` (2.5 seconds). The store is cleared on
+sign-out, next to `queryClient.clear()`.
 
 ## Completing a task from its checkbox
 
 Only tasks have a checkbox (`components/timeline-row.tsx`); events and notes don't.
-Tapping it skips the Magic Bar entirely: `useCompleteTask` (`lib/use-timeline.ts`)
-removes the task from the cached timeline right away, sends
+Tapping it skips the + sheet entirely: `useCompleteTask` (`lib/use-timeline.ts`)
+removes the task from the cached `itemsKey('task')` list right away, sends
 `PATCH /api/items/task/:id` with `{ completed: true }`, and on success shows the
 Undo card via `showCompletionUndo`. A refetch already in flight is cancelled first
-so it can't race the restored task back out after Undo. On failure the timeline
+so it can't race the restored task back out after Undo. On failure the list
 refetch brings the task back, and a status line explains the failure.
 
 ## Finding a change intent's target

@@ -1,12 +1,15 @@
 import type { HighlightField } from '@nexui/types';
 
 export const colors = {
-  page: '#FFFFFF',
+  paper: '#F2F0F6', // screen background
+  card: '#FFFFFF', // cards, sheets, tab bar
   ink: '#1E1A2B',
   muted: '#5B5670',
   faint: '#8A859C',
-  soft: '#F6F4FA',
-  line: '#E2DEEA',
+  soft: '#F6F4FA', // chips, avatar circles, input fill inside white sheets
+  line: '#E4E0EC',
+  accent: '#FFE45C', // main buttons, active tab, suggestion edge
+  accentInk: '#1E1A2B', // text on accent
   success: '#1D7A52',
   danger: '#B3322C',
   scrim: 'rgba(30, 26, 43, 0.38)',
