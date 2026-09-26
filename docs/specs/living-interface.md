@@ -1,6 +1,8 @@
 # Nexui living interface: feature ideas
 
-**Status:** ideas for review, 2026-09-24. Nothing here is scheduled. Revisit after Supabase persistence (tables, reads, writes) lands.
+**Status:** ideas backlog, last updated 2026-09-26. Nothing here is scheduled until the
+[roadmap](anchored-intelligence.md) or a feature spec picks it up. The idea numbers are
+referenced from other specs, so don't renumber them.
 
 > Nexui reimagines the mobile interface around human intent, using AI to surface the right action at the right moment—without making users navigate, prompt, or think like a computer.
 
@@ -14,18 +16,14 @@ This file is now the ideas backlog. The order and the rules for building them li
 | Foundation: `intent_events`       | Shipped with persistence                                                                                          |
 | 1 Personal candidates             | Phase 2, as People and follow-ups (roadmap §5.10)                                                                 |
 | 2 Learn from corrections          | Phase 2, Activity learning (§5.9)                                                                                 |
-| 3 Commit first, undo later        | Designed: `docs/superpowers/specs/2026-09-24-intent-actions-design.md` (roadmap Phase 0)                          |
-| 4 Intents on existing items       | `COMPLETE`/`RESCHEDULE`/`APPEND` designed. `OPEN_ITEM` and meaning-based search in Phases 1–2                     |
+| 3 Commit first, undo later        | Shipped (roadmap Phase 0, [instant-actions.md](../architecture/instant-actions.md))                               |
+| 4 Intents on existing items       | `COMPLETE`/`RESCHEDULE`/`APPEND` shipped. `OPEN_ITEM` and meaning-based search in Phases 1–2                      |
 | 5 Several actions per sentence    | Phase 4                                                                                                           |
 | 6 Home that suggests first        | Replaced by the Focus card and Suggested actions (§5.2, §5.3)                                                     |
 | 7 Items that follow up            | Moved into Suggested kinds (`CAPTURE_NOTES`, `PREP_FOR_EVENT`, `BREAK_DOWN_TASK`). No AI-driven push until later. |
 | 8 One timeline instead of screens | **Rejected**: it removes fixed destinations. Filter-as-you-type moves to search and the tab scope chip.           |
-| 9 Input from anywhere             | Phase 4                                                                                                           |
-| 10 Two-way sync                   | Phase 3 as write-through and read-on-demand, not full sync (§5.11)                                                |
-
-## Context
-
-Today Nexui turns one line of text into a draft task, event, note or search. The engine only gets `now` and `timeZone`. Confirmed drafts are now saved: tasks, events and notes go to their tables, and every confirmed or dismissed draft is logged in `intent_events`. The mission is "the right action at the right moment, without navigating or prompting". To get there, the app needs memory, it needs to act before being asked, and it needs to shrink the steps between an intent and its result. These are ideas to think over, not an implementation plan. They are ordered by how much they depend on each other.
+| 9 Input from anywhere             | Share sheet in Phase 3 ([integrations.md](integrations.md)). Voice, widgets and App Intents in Phase 4            |
+| 10 Two-way sync                   | Apple Calendar read in Phase 2, Google in Phase 3, write-through only ([integrations.md](integrations.md))        |
 
 ## Foundation: log every intent, not just the saved objects
 
@@ -105,10 +103,6 @@ The engine stays the same; only the entry points change.
 ### 10. Sync both ways with where the user's data already lives
 
 Google Calendar and Apple Reminders/Calendar, synced in both directions. This adds conflict detection ("you're at _Offsite_ then — pick 5pm instead?") and the chance to read what the user already has on day one, so the app is useful before they've typed much.
-
-## Suggested order
-
-Foundation → 3 (quick win, easy to feel) → 1 + 2 (personalization) → 4 (makes the saved data useful) → 6 + 7 (the app acts first) → 5, 8, 9, 10 when you want to grow.
 
 ## Validating a feature once it's picked up
 
