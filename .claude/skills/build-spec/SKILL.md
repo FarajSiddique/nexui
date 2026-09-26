@@ -13,18 +13,32 @@ Create a task per step below and keep them updated.
 
 ## 0. Preflight
 
-1. The working tree must be clean (`git status --porcelain` empty). If not, stop and ask.
+1. The working tree must be clean (`git status --porcelain` empty). If not, stop and ask: the unit's worktree starts from committed files only, so uncommitted edits wouldn't reach it.
 2. Read the document and **find its units**: the headings or numbered items it tells you to build in order, such as "Slice A", "Phase 2", "Task 4", "Step 3", or the entries of a "Slices", "Order of work" or "Phases" section (each entry is a unit, and the sections it names are its scope). A document with no units is one unit, "whole document".
    - Unit given: match it to one unit (accept "A", "slice a", "2", "task 2"). If it doesn't match, list the units and ask.
    - Unit not given: list the units with one line each and ask which to build. Suggest the first one that has no `feat/<doc>-<unit>` branch yet.
    - If a unit is too big for one Developer run (more than about 25 files, or several independent subsystems), say so and ask whether to build it as is.
 3. **Order.** If the document says units build in order, check that every earlier unit is merged into the current branch or has its branch. Branch from the latest earlier unit's branch if it isn't merged; otherwise from the current branch.
 4. Names. `<doc>` is the document's file name without extension and date prefix (`anchored-shell`, `integrations`). `<unit>` is the unit in lowercase kebab case (`a`, `phase-2`, `task-4`, `all`).
-5. Create and switch to `feat/<doc>-<unit>`. If it exists, stop and ask whether to resume or start over.
-6. Make the evidence directory `.qa/<doc>/<unit>/` (gitignored).
-7. Tell the owner in one line: document, unit, branch, and that QA is writing tests.
+5. **Worktree.** Each unit builds in its own worktree, so several `/build-spec` sessions can run at once without sharing a checkout. Let `ROOT` be the main checkout (`dirname "$(git rev-parse --path-format=absolute --git-common-dir)"`) and `WT` be `$ROOT/.claude/worktrees/<doc>-<unit>` (gitignored).
+   - If the branch `feat/<doc>-<unit>` or the directory `WT` already exists, stop and ask whether to resume or start over. To resume, enter the existing worktree (add it first with `git worktree add "$WT" feat/<doc>-<unit>` if only the branch exists) and continue from the first step that has no commit yet.
+   - Otherwise run `git worktree add "$WT" -b feat/<doc>-<unit> <base>`, where `<base>` comes from step 3.
+   - Switch this session into it with `EnterWorktree` and `path: WT`. Every command and agent from here on works in `WT`; the main checkout stays on its own branch.
+   - Copy the gitignored env files from the main checkout: `cp "$ROOT/apps/api/.env.local" "$WT/apps/api/.env.local"` and `cp "$ROOT/apps/mobile/.env" "$WT/apps/mobile/.env"`. If either is missing in `ROOT`, say so: QA can then only run checks that need no sign-in.
+   - Run `pnpm install --frozen-lockfile` in `WT`.
+6. **Ports.** Other units' QA may be running dev servers, so pick this unit's pair instead of 3000 and 8081:
 
-Every agent prompt below includes the document path and the unit by its heading in the document.
+   ```
+   off=$(( $(printf '%s' '<doc>-<unit>' | cksum | cut -d' ' -f1) % 90 + 10 ))
+   API_PORT=$((3000 + off)); WEB_PORT=$((8100 + off))
+   ```
+
+   If `lsof -nP -iTCP:<port> -sTCP:LISTEN` shows either port in use, add 1 to `off` and try again. Write the pair to `.qa/<doc>/<unit>/ports` and reuse it when resuming.
+
+7. Make the evidence directory `.qa/<doc>/<unit>/` in `WT` (gitignored).
+8. Tell the owner in one line: document, unit, branch, worktree path, ports, and that QA is writing tests.
+
+Every agent prompt below includes the document path, the unit by its heading in the document, and the worktree path with "work only inside this directory".
 
 ## 1. QA writes the tests
 
@@ -68,7 +82,7 @@ If the Developer report lists test disputes, start `qa` with mode `resolve dispu
 
 Start these in parallel (one message, several Agent calls):
 
-- `qa` with mode `verify`, round number, `TESTS_SHA`, evidence directory `.qa/<doc>/<unit>/round-<n>/`, and the Developer's report.
+- `qa` with mode `verify`, round number, `TESTS_SHA`, evidence directory `.qa/<doc>/<unit>/round-<n>/`, `API_PORT` and `WEB_PORT`, and the Developer's report.
 - `mobile-reviewer` if anything under `apps/mobile` changed.
 - `api-reviewer` if anything under `apps/api` or `packages/types` changed.
 - `security-reviewer` if the change touches auth, env, logging, an API route, a migration or the decision engine.
@@ -99,14 +113,15 @@ Between rounds, tell the owner one line: round number, verdict, how many failure
 
    End the message with the attribution lines from the system reminder, if any.
 
-4. Don't push, open a PR or start the next unit. Report to the owner:
-   - branch and commits (tests commit, implementation commit)
+4. Don't push, open a PR, start the next unit or remove the worktree. Report to the owner:
+   - branch, worktree path and commits (tests commit, implementation commit)
    - rounds taken and what failed along the way
    - migrations to apply with `pnpm db:push`
    - QA's "Check on device" list and "Can't tell" items
    - reviewers' Should-fix and Nit items
    - where the screenshots are (`.qa/<doc>/<unit>/`)
    - the next command, e.g. `/build-spec <path> <next unit>`, once the owner has reviewed
+   - cleanup once the branch is merged: `git worktree remove .claude/worktrees/<doc>-<unit>`
 
 ## Rules for you
 

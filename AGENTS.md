@@ -67,7 +67,7 @@ Project subagents live in `.claude/agents/`. Reviewers report findings and never
 Project skills live in `.claude/skills/`.
 
 - `add-intent`: add, rename, or remove an intent. It covers all 18 files for a new-item intent (fewer for a change intent that acts on a saved item), in order, and includes a completeness check.
-- `build-spec`: `/build-spec <spec or plan path> [unit]` (e.g. `/build-spec docs/specs/anchored-shell.md A`) orchestrates `qa` and `developer` for one unit (slice, phase or task): tests first, implementation, QA verification and reviewers, up to three fix rounds, then a commit for the tests and one for the implementation. It stops after each unit; it never pushes. QA signs in to Expo web with `node scripts/qa-session.mjs`, which needs `QA_EMAIL` and `QA_SUPABASE_REF` in `apps/api/.env.local` and sends no email. Screenshots go to the gitignored `.qa/`.
+- `build-spec`: `/build-spec <spec or plan path> [unit]` (e.g. `/build-spec docs/specs/anchored-shell.md A`) orchestrates `qa` and `developer` for one unit (slice, phase or task): tests first, implementation, QA verification and reviewers, up to three fix rounds, then a commit for the tests and one for the implementation. It stops after each unit; it never pushes. Each unit builds in its own worktree (`.claude/worktrees/<doc>-<unit>`, branch `feat/<doc>-<unit>`) with its own dev-server ports, so several units or specs can run at once from `claude agents`. QA signs in to Expo web with `node scripts/qa-session.mjs`, which needs `QA_EMAIL` and `QA_SUPABASE_REF` in `apps/api/.env.local` and sends no email; `--revoke <file>` signs out only that run's session. Screenshots go to the gitignored `.qa/`.
 
 ## Commit & Pull Request Guidelines
 

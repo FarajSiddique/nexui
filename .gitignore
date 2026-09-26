@@ -17,3 +17,6 @@ apps/mobile/ios/
 
 # QA agent evidence (screenshots) from /build-spec
 .qa/
+
+# Claude Code worktrees (one per /build-spec unit)
+.claude/worktrees/
