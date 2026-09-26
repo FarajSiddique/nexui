@@ -72,7 +72,7 @@ export function PrimaryButton({
       style={({ pressed }) => [styles.primary, (pressed || inactive) && styles.dimmed]}
     >
       {busy ? (
-        <ActivityIndicator color={colors.page} />
+        <ActivityIndicator color={colors.card} />
       ) : (
         <Text style={styles.primaryText}>{label}</Text>
       )}
@@ -134,7 +134,7 @@ export const authStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.page },
+  screen: { flex: 1, backgroundColor: colors.paper },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 36 },
   content: { width: '100%', maxWidth: 440, alignSelf: 'center' },
   brand: { fontFamily: fonts.display, fontSize: 30, letterSpacing: -1, color: colors.ink },
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   primaryText: {
     fontFamily: fonts.bodyBold,
     fontSize: 16,
-    color: colors.page,
+    color: colors.card,
     textAlign: 'center',
   },
   textButton: { alignSelf: 'center', paddingVertical: 12, marginTop: 8 },

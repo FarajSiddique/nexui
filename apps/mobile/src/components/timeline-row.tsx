@@ -5,13 +5,16 @@ import { displayItemMeta } from '@/lib/intent-display';
 import { colors, fonts } from '@/lib/theme';
 
 // One saved item: a tappable body that opens the edit sheet. Tasks also get a checkbox;
-// checking it removes the task from the list (Undo brings it back).
+// checking it removes the task from the list (Undo brings it back). `meta` replaces the
+// default metadata line (the Tasks tab says "Overdue since Fri").
 export function TimelineRow({
   item,
+  meta,
   onComplete,
   onOpen,
 }: {
   item: SavedItem;
+  meta?: string;
   onComplete: () => void;
   onOpen: () => void;
 }) {
@@ -37,7 +40,7 @@ export function TimelineRow({
         <Text numberOfLines={2} style={styles.title}>
           {item.title}
         </Text>
-        <Text style={styles.meta}>{displayItemMeta(item)}</Text>
+        <Text style={styles.meta}>{meta ?? displayItemMeta(item)}</Text>
       </Pressable>
     </View>
   );

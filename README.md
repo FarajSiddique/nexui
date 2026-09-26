@@ -44,10 +44,12 @@ In the Expo terminal, press `i` for iOS, `a` for Android, or `w` for web. You ca
 also run `pnpm dev:web` to launch the browser preview directly. Stop an existing
 Expo process before starting another on port 8081.
 
-The mobile app requests `/api/health`, validates its response with shared Zod,
-and displays **API status: Connected**. It rechecks every 15 seconds and offers a
-manual check. A small example Zustand store remains available for future local UI
-state; health data lives in TanStack Query. Health requests time out after five seconds.
+The mobile app requests `/api/health`, validates its response with shared Zod, and
+shows **Connected** or **Unreachable** on the Account tab. It rechecks every 15
+seconds and offers a manual check; a banner repeats the same status on every other
+tab, but only while unreachable. A small example Zustand store remains available for
+future local UI state; health data lives in TanStack Query. Health requests time out
+after five seconds.
 
 Type a phrase into the Magic Bar. After a short pause, `POST /api/intent` classifies
 it, and Expo renders a preview using the shared Zod contract. A high-confidence draft

@@ -8,6 +8,7 @@ import {
   intentResponseSchema,
   savedItemSchema,
   searchResponseSchema,
+  tasksResponseSchema,
   timelineResponseSchema,
   undoResponseSchema,
   type HealthResponse,
@@ -17,9 +18,11 @@ import {
   type IntentEventRequest,
   type IntentEventResponse,
   type IntentRequest,
+  type ItemKind,
   type ItemPatch,
   type SavedItem,
   type SearchResponse,
+  type TasksResponse,
   type TimelineResponse,
   type UndoResponse,
 } from '@nexui/types';
@@ -188,8 +191,10 @@ export async function recordIntentEvent(
   return response;
 }
 
+/** One page of saved items, newest first; `kind` narrows it to tasks, events or notes. */
 export function getTimelinePage(
   cursor: string | null,
+  kind?: ItemKind,
   signal?: AbortSignal,
 ): Promise<TimelineResponse> {
   const query = new URLSearchParams({ limit: '50' });
@@ -198,7 +203,16 @@ export function getTimelinePage(
     query.set('cursor', cursor);
   }
 
+  if (kind) {
+    query.set('kind', kind);
+  }
+
   return sendJson(`/api/timeline?${query}`, { signal }, timelineResponseSchema);
+}
+
+/** Every open task (up to 300), due first and no date last. */
+export function getTasks(signal?: AbortSignal): Promise<TasksResponse> {
+  return sendJson('/api/tasks', { signal }, tasksResponseSchema);
 }
 
 export function searchItems(

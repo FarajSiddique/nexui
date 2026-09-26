@@ -166,7 +166,7 @@ function CardButtons({
         ]}
       >
         {busy ? (
-          <ActivityIndicator color={tentative ? colors.ink : colors.page} />
+          <ActivityIndicator color={tentative ? colors.ink : colors.card} />
         ) : (
           <Text style={[styles.buttonText, tentative && styles.buttonTextTentative]}>{label}</Text>
         )}
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: colors.ink,
-    backgroundColor: colors.page,
+    backgroundColor: colors.card,
     gap: 12,
   },
   cardTentative: { borderColor: colors.faint, borderStyle: 'dashed' },
@@ -438,8 +438,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.ink,
   },
-  buttonTentative: { backgroundColor: colors.page },
-  buttonText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.page, textAlign: 'center' },
+  buttonTentative: { backgroundColor: colors.card },
+  buttonText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.card, textAlign: 'center' },
   buttonTextTentative: { color: colors.ink },
   pressed: { opacity: 0.7 },
   buttons: { marginTop: 6, gap: 10 },

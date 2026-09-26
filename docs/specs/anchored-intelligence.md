@@ -38,16 +38,12 @@ The roadmap assumes more than the app has. These gaps set the order of the work.
 
 Never moved, hidden, reordered or relabelled by AI.
 
-- Bottom tabs: **Home · Tasks · Calendar · Notes**.
-- The Magic Bar, docked above the tab bar on every tab. The keyboard lifts it and nothing else moves.
+- Bottom tabs: **Home · Tasks · (+) · Calendar · Notes**.
+- The + tab is the only way into the Magic Bar: it opens a sheet holding the bar and, on an
+  empty bar, three fixed chips: **Task · Event · Note**. No tab has a docked bar.
 - Profile/settings, top right of Home.
 - Screen hierarchy: each tab is a plain list of the user's items, ordered by rules the user can
   predict (time or last update), and each list can be filtered.
-
-**Recommendation: no "+" tab.** A "+" next to the Magic Bar gives two ways to create, one with
-AI and one without, side by side. Instead, focusing an empty Magic Bar shows three fixed
-chips: **Task · Event · Note**. Each opens a blank form. The manual path stays one tap away
-and sits where the user already looks to create something.
 
 ### Layer 2: adaptive zones
 
@@ -59,35 +55,33 @@ can change, but whether it exists never does.
 │ nexui                      [Profile] │  fixed
 │ Thursday · Good morning               │  fixed, one line
 ├──────────────────────────────────────┤
-│ ┌──────────────────────────────────┐ │
-│ │ FOCUS                            │ │  adaptive: 1 item or quiet state
-│ │ Resume Architecture notes      → │ │
-│ │ ▌Opened twice today              │ │  ← highlighter reason
-│ └──────────────────────────────────┘ │
-│ COMING UP                            │  rule-based: next 3 by time
+│ TODAY                                │  rule-based: today's items by time
 │  10:30  Team sync                    │
 │  Due    Send invoice                 │
-│ SUGGESTED                            │  adaptive: 0–3 items, quiet row if 0
+│ NEXUI SUGGESTS                       │  adaptive: Focus first, then 0–3 drafts
+│  Resume Architecture notes         → │
+│  ▌Opened twice today                 │  ← highlighter reason
 │  Capture notes from Design review    │
 │  ▌Ended 20 min ago                   │
-│ PINNED & RECENT                      │  pins first, then pure recency
-│  ★ Product roadmap                   │
+│ RECENT                               │  pure recency
+│  Product roadmap                     │
 │  Architecture notes                  │
 ├──────────────────────────────────────┤
-│ ✦ [ What do you want to do?        ] │  fixed Magic Bar
+│ Type anything. Nexui works out     ➜ │  fixed hint row, opens the + sheet
+│ what it is.                          │
 ├──────────────────────────────────────┤
-│  Home    Tasks    Calendar    Notes  │  fixed tabs
+│  Home   Tasks   (+)   Calendar Notes │  fixed tabs
 └──────────────────────────────────────┘
 ```
 
-| Zone            | Who fills it                       | Size | When it's empty                                                          |
-| --------------- | ---------------------------------- | ---- | ------------------------------------------------------------------------ |
-| Focus           | Ranked candidates (§5.2)           | 1    | Quiet state in the same slot: "Nothing pressing · Next: Team sync 10:30" |
-| Coming Up       | **Rules only**: time order         | ≤ 3  | "Nothing scheduled today"                                                |
-| Suggested       | Ranked drafts (§5.3)               | 0–3  | One quiet row: "No suggestions right now". The header stays.             |
-| Pinned & Recent | **Rules only**: pins, then recency | ≤ 5  | Example Magic Bar phrases for new users                                  |
+| Zone           | Who fills it                                          | Size | When it's empty                                          |
+| -------------- | ----------------------------------------------------- | ---- | -------------------------------------------------------- |
+| Today          | **Rules only**: time order                            | ≤ 3  | "Nothing scheduled today"                                |
+| Nexui suggests | Focus (ranked, §5.2) first, then ranked drafts (§5.3) | 1–4  | Quiet row: "No suggestions right now". The header stays. |
+| Recent         | **Rules only**: pure recency                          | ≤ 5  | Example Magic Bar phrases for new users                  |
+| Hint row       | Fixed: opens the + sheet                              | 1    | Always shown                                             |
 
-Coming Up and Recent don't use AI at all, and that's deliberate. Not every zone needs to
+Today and Recent don't use AI at all, and that's deliberate. Not every zone needs to
 adapt, and zones that never change their order give the eye fixed places to land.
 
 ### Layer 3: intent surfaces
@@ -239,12 +233,13 @@ Every feature spec and PR that touches Home or the Magic Bar answers these:
 - **Container:** the shell itself.
 - **AI decides:** nothing.
 - **AI doesn't decide:** tab order, tab visibility, labels, or where the bar sits.
-- **Data:** the existing timeline endpoint with a `kind` filter. Tasks are grouped Overdue /
-  Today / Upcoming / No date / Done. Calendar is an agenda list by day (no month grid in the
+- **Data:** `GET /api/tasks` for tasks, the timeline endpoint with a `kind` filter for notes.
+  Tasks are grouped Today / Upcoming / No date; a completed task leaves every list at once
+  instead of moving to a Done group. Calendar is an agenda list by day (no month grid in the
   MVP). Notes are ordered by last update.
 - **Trust:** the manual path is always one tap away.
-- **MVP:** Expo Router `Tabs`, reusing `TimelineRow`, `EditSheet` and the docked bar. Home
-  shows the zones in their quiet or rules-only state.
+- **MVP:** Expo Router `Tabs`, reusing `TimelineRow` and `EditSheet`. Home shows the zones in
+  their quiet or rules-only state.
 - **Later:** a month grid, home-screen widgets, and a two-column iPad layout with the same
   hierarchy.
 - **Complexity:** M. Docking the bar above the keyboard needs checking on Android and on web.
@@ -262,7 +257,8 @@ Every feature spec and PR that touches Home or the Magic Bar answers these:
   tells me why in a few words.
 - **Flow:** Tap the card to run its action (open the item, or a prebuilt draft through the
   preview card). The overflow menu offers "Not now" and "Why this?".
-- **Container:** a fixed card under the greeting.
+- **Container:** the first slot in the "Nexui suggests" zone, not its own section (see
+  [anchored-shell.md](anchored-shell.md)).
 - **Focus kinds (bounded):**
 
   ```ts
@@ -283,10 +279,11 @@ Every feature spec and PR that touches Home or the Magic Bar answers these:
 - **Data:** open tasks with dates, events in the next 24 hours, `ITEM_OPENED` counts (§5.9),
   and dismissals.
 - **Trust:** one reason code, in the highlighter style.
-- **MVP:** `GET /api/home` returns `{ focus, comingUp, suggested, recent, generatedAt }`,
-  computed on request from bounded, indexed queries. It doesn't scan the whole
-  `timeline_items` union the way pagination does today. The first four kinds plus `NONE`.
-  "Join meeting" becomes "Open event" until calendar integration provides meeting links.
+- **MVP:** `GET /api/home` returns `{ today, suggestions, recent, generatedAt }`, with Focus
+  as the first entry in `suggestions`, computed on request from bounded, indexed queries. It
+  doesn't scan the whole `timeline_items` union the way pagination does today. The first four
+  kinds plus `NONE`. "Join meeting" becomes "Open event" until calendar integration provides
+  meeting links.
 - **Later:** `PLAN_TOMORROW` and `FOLLOW_UP`, per-user weights (§5.9), and a pinned Focus item.
 - **Complexity:** M.
 - **Dependencies:** the shell, and `ITEM_OPENED` logging for `RESUME_ITEM`.
@@ -332,7 +329,9 @@ Every feature spec and PR that touches Home or the Magic Bar answers these:
   control live in one place.
 - **Visual language:** the highlighter means one thing everywhere: _Nexui read this from
   your data_. In the Magic Bar it marks the spans it extracted. On a card it marks the
-  reason. Nothing else on screen uses the highlighter style.
+  reason. Yellow is also the brand accent (main buttons, the active tab, the Return key), so
+  the highlighter stays distinguishable through the marker shape and its label, not color
+  alone (see [anchored-shell.md](anchored-shell.md)).
 - **AI decides:** which reason codes apply.
 - **AI doesn't decide:** the wording (a fixed template per code), or whether to show
   confidence numbers (never, except in a debug build).
@@ -656,8 +655,5 @@ five users, a script of ten tasks, compared with the phone's built-in Reminders 
 
 ## 11. Open questions
 
-- Keep the "+" tab from the original sketch, or use the bar chips as recommended (§2)?
-- Calendar tab: is an agenda list enough for the MVP, or is a week strip needed?
-- Should the web preview get the tab shell, or stay a single screen for demos?
 - Retention windows: 90 days for `activity_events` is proposed. What about raw text in `intent_events`?
 - When should the domain be bought? It blocks Google verification in Phase 3, but not the on-device capabilities.

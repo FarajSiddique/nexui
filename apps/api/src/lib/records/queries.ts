@@ -7,6 +7,7 @@ import type {
   ItemKind,
   ItemPatch,
   SavedItem,
+  SavedTask,
   SearchQuery,
   SearchScope,
   TimelineQuery,
@@ -104,6 +105,7 @@ export async function getTimelinePage(
     page_size: query.limit + 1,
     cursor_sort_at: cursor?.sortAt ?? null,
     cursor_id: cursor?.id ?? null,
+    kind_filter: query.kind ?? null,
   });
 
   if (error) {
@@ -119,6 +121,30 @@ export async function getTimelinePage(
     items: page.map((row) => toSavedItem(row.kind, row.item)),
     nextCursor: hasMore ? encodeCursor({ sortAt: last.sort_at, id: last.id }) : null,
   };
+}
+
+// A prototype limit: the Tasks tab loads every open task in one request, with no cursor.
+export const OPEN_TASKS_LIMIT = 300;
+
+/**
+ * The user's open tasks: due date ascending (no date last), timed before untimed on the
+ * same date, then newest first.
+ */
+export async function getOpenTasks(client: SupabaseClient): Promise<SavedTask[]> {
+  const { data, error } = await client
+    .from(ITEM_TABLES.task)
+    .select()
+    .is('completed_at', null)
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('due_time', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(OPEN_TASKS_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as ItemRow[]).map((row) => toSavedItem('task', row) as SavedTask);
 }
 
 const SCOPE_KINDS = {
