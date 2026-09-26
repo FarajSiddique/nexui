@@ -15,8 +15,8 @@ apps/mobile/android/
 apps/mobile/ios/
 .vercel
 
-# QA agent evidence (screenshots) from /build-spec
+# Smoke-test evidence (screenshots, QA session files)
 .qa/
 
-# Claude Code worktrees (one per /build-spec unit)
+# Claude Code worktrees
 .claude/worktrees/

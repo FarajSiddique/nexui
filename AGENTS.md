@@ -51,6 +51,8 @@ This is a prototype: API and mobile contracts can change together. Do not add ba
 
 `pnpm test` uses Node's built-in runner with TypeScript stripping and runs `tests/*.test.mjs`. No coverage threshold is configured. Test observable behavior at external boundaries; prefer direct imports and explicit dependencies over module-loader mocks. Run tests, lint, typecheck, formatting checks, and relevant builds before submitting. Smoke-test the affected user flow; for networking changes, verify `GET /api/health` returns `{"status":"ok"}` and check Connected, Unreachable, and recovery states in Expo. Auth ownership and native smoke checks are documented in `docs/architecture/authentication.md`.
 
+To smoke-test Expo web as a signed-in user, `node scripts/qa-session.mjs > .qa/session.json` signs in a dedicated QA account without sending email; it needs `QA_EMAIL` and `QA_SUPABASE_REF` in `apps/api/.env.local`. Finish with `--revoke .qa/session.json`, which signs out only that session and deletes the file. Keep screenshots and session files in the gitignored `.qa/`.
+
 ## Claude Code Agents
 
 Project subagents live in `.claude/agents/`. Reviewers report findings and never edit.
@@ -60,14 +62,12 @@ Project subagents live in `.claude/agents/`. Reviewers report findings and never
 - `security-reviewer`: for changes to auth, env, logging, API routes, or the decision engine.
 - `docs-keeper`: after a behavior, contract, env, or command change; it edits docs.
 - `intent-evaluator`: after changes to the decision-engine prompt or model; defaults to the free mock provider.
-- `developer` and `qa`: build and verify one unit of a spec or implementation plan. Start them through `build-spec`, not directly. QA writes the tests and never edits code; the Developer writes code and never edits `tests/`.
 
 ## Claude Code Skills
 
 Project skills live in `.claude/skills/`.
 
 - `add-intent`: add, rename, or remove an intent. It covers all 18 files for a new-item intent (fewer for a change intent that acts on a saved item), in order, and includes a completeness check.
-- `build-spec`: `/build-spec <spec or plan path> [unit]` (e.g. `/build-spec docs/specs/anchored-shell.md A`) orchestrates `qa` and `developer` for one unit (slice, phase or task): tests first, implementation, QA verification and reviewers, up to three fix rounds, then a commit for the tests and one for the implementation. It stops after each unit; it never pushes. Each unit builds in its own worktree (`.claude/worktrees/<doc>-<unit>`, branch `feat/<doc>-<unit>`) with its own dev-server ports, so several units or specs can run at once from `claude agents`. QA signs in to Expo web with `node scripts/qa-session.mjs`, which needs `QA_EMAIL` and `QA_SUPABASE_REF` in `apps/api/.env.local` and sends no email; `--revoke <file>` signs out only that run's session. Screenshots go to the gitignored `.qa/`.
 
 ## Commit & Pull Request Guidelines
 
