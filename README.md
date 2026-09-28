@@ -131,8 +131,8 @@ cross-origin requests for Expo web, and no cookies are involved.
 apps/
   mobile/
     src/app/                  # Root layout (auth guard), (auth) and (app) route groups
-    src/components/           # Intent previews and confirmation form
-    src/lib/                  # Validated API client, prediction hook, thresholds
+    src/components/           # Auth screen, connection banner, tab bar/header, list states
+    src/lib/                  # API client, auth and session, Supabase client, theme, health
     src/stores/               # Zustand stores, including the auth session mirror
   api/
     src/app/api/health/        # GET /api/health
@@ -147,7 +147,8 @@ apps/
 packages/
   types/src/                  # Shared Zod schemas and inferred contracts
   config/                     # Strict TS, shared ESLint, Prettier
-tests/                         # Node tests for contracts, classifier, thresholds
+tests/                         # Node tests: contracts, graph queries/derivations/commit,
+                               # routes, migration static checks, theme tokens, auth
 ```
 
 - Add a kind by adding its Zod schema and a `KIND_REGISTRY` entry in

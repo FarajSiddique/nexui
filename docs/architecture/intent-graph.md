@@ -48,14 +48,14 @@ section C), because AI runs write with the user's token too.
 **Error codes and HTTP mapping** (`apps/api/src/lib/graph/errors.ts#mapRpcError`, used by
 `apps/api/src/lib/graph/respond.ts#graphErrorResponse`):
 
-| Code              | Meaning                                    | HTTP                                     |
-| ----------------- | ------------------------------------------ | ---------------------------------------- |
-| `NXU04`           | Not found, or not the caller's             | 404                                      |
-| `NXU08`           | `expectedUpdatedAt` didn't match           | 409                                      |
-| `NXU09`           | Undo/Redo would leave a link dangling      | 409                                      |
-| `NXU10` / `23505` | Already undone                             | 409                                      |
-| `NXU22`           | Malformed changeset (bad op/origin/source) | 400                                      |
-| anything else     | Unknown                                    | 500, logged, generic message to the user |
+| Code              | Meaning                                                       | HTTP                                     |
+| ----------------- | ------------------------------------------------------------- | ---------------------------------------- |
+| `NXU04`           | Not found, or not the caller's                                | 404                                      |
+| `NXU08`           | `expectedUpdatedAt` didn't match                              | 409                                      |
+| `NXU09`           | A row changed since, or Undo/Redo would leave a link dangling | 409                                      |
+| `NXU10` / `23505` | Already undone                                                | 409                                      |
+| `NXU22`           | Malformed changeset (bad op/origin/source)                    | 400                                      |
+| anything else     | Unknown                                                       | 500, logged, generic message to the user |
 
 ## Kinds
 
