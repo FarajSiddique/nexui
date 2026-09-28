@@ -116,7 +116,7 @@ intents (
   status text not null default 'exploring'
     check (status in ('exploring','active','blocked','completed','archived')),
   context jsonb not null default '{}',            -- validated per template in code
-  summary jsonb not null default '{}',            -- IntentSummary (section D), derived; drives Home cards
+  summary jsonb not null default '{"line":""}',   -- IntentSummary (section D), derived; drives Home cards
   created_at, updated_at, last_activity_at timestamptz not null default now()
 )
 index (user_id, status, last_activity_at desc)
@@ -136,6 +136,8 @@ index (intent_id, kind) where deleted_at is null
 
 relationships (
   id uuid pk, user_id uuid not null default auth.uid(),
+  intent_id uuid not null references intents on delete cascade,  -- owning intent, for loading;
+                                                  -- endpoints may later point into other intents
   source_type text check (source_type in ('object','intent')), source_id uuid not null,
   target_type text check (target_type in ('object','intent')), target_id uuid not null,
   type text not null,                             -- part_of, option_of, leg_from, leg_to …
@@ -185,21 +187,28 @@ the RPC runs. `kind_version` plus per-kind `upgrade` functions in `@nexui/types`
 change shape without a migration. Objects are upgraded as they're read and written back on
 their next save.
 
-**RLS.** Every table is owner-only (`user_id = (select auth.uid())`). Inserts on objects,
-relationships, workspaces and runs also check that the referenced intent or object belongs to
-the caller. FK checks ignore RLS, which is the same problem `intent_events` solved. Clients can
-select from `events` but not write to it; the RPC writes it with `security invoker`, so RLS
-still applies. `objects`, `relationships`, `workspaces` and `runs` are published to Realtime,
-which is scoped by RLS.
+**RLS and writers.** Every table is owner-only for reads (`user_id = (select auth.uid())`).
+Clients get **no direct insert, update or delete** on any of the six tables. All writes go
+through `security definer` functions (`create_intent`, `apply_changeset`, `revert_event`, and
+the run functions in slice 1's intelligence plan). Each of them checks `auth.uid()` and filters
+every statement by the caller's `user_id` and intent. Their shared implementation lives in a
+`private` schema that PostgREST doesn't expose. This keeps the audit log in `events` honest
+(nobody can forge or edit rows), and makes the API the only path that validates `data`.
+Relationship endpoints are checked against the caller's own objects and intents, because FK
+checks ignore RLS. `objects`, `relationships`, `workspaces`, `events` and `runs` are published
+to Realtime, which is scoped by RLS.
 
-**Atomicity.** `apply_changeset(p_intent_id, p_actor, p_run_id, p_ops jsonb) returns events`
-applies inserts, updates, soft deletes, relationship ops and workspace doc replacements. Updates
-check `expected_updated_at` for optimistic concurrency. The function records `before` and
-`after` for each op and inserts one `events` row, all in a single transaction. Undo is
-`apply_changeset(inverse(ops))` with `reverts_event_id` set. It refuses to run if a later event
-has changed the same rows since (409 with a readable message). Redo, shown on undone rows in
-Changes, reverts the Undo event under the same conflict rule. Derived ops are reverted together
-with the edit that caused them and can't be undone on their own.
+**Atomicity.** `apply_changeset(p_intent_id, p_actor, p_run_id, p_ops jsonb) returns jsonb`
+applies inserts, updates, soft deletes, relationship ops, workspace doc replacements and intent
+updates. An update may carry `expectedUpdatedAt` for optimistic concurrency. The function
+records `before` and `after` for each op and inserts one `events` row, all in a single
+transaction. A row may appear only once per changeset; the API merges ops per row before
+calling it. `revert_event(p_event_id)` writes each row's `before` back, newest first, as a new
+`changeset` event with `reverts_event_id` set. It refuses (409 with a readable message) if a
+row has changed since, or if the event was already reverted. **Redo** is `revert_event` on the
+Undo event, so one Undo route serves both. Derived ops are reverted together with the edit
+that caused them and can't be undone on their own. `get_intent_snapshot(p_intent_id)` returns
+the intent, its workspace and its live objects and relationships in one call.
 
 ## D. Workspace contract
 
@@ -210,7 +219,6 @@ the UI.
 type Ref = 'intent' | { objectId: string };
 
 type GraphQuery =
-  | { from: 'intent' }
   | {
       from: 'objects';
       kind?: KindName | KindName[];
@@ -229,6 +237,7 @@ type FieldFilter = {
 
 interface WorkspaceDoc {
   version: number;
+  anchorId: string; // the template's anchor object (the trip); DerivedKeys read its data.derived
   sections: Section[]; // ordered; changed only by explicit workspace ops
 }
 
@@ -333,7 +342,13 @@ changeset (versioned and undoable). The shell is not in the doc and cannot chang
 | `thing`    | `fields: {label, value}[]`                                                                                                                                       |
 
 Relationships: `part_of` (place, stay or decision to the trip), `option_of` (option to decision),
-`leg_from` / `leg_to` (leg to place).
+`leg_from` / `leg_to` (leg to place). Every object that belongs to the trip, legs included, is
+`part_of` it; options hang off their decision instead.
+
+The trip's calculated figures are stored on the trip itself as `data.derived`
+(`{ totalDays, allocatedDays, unallocatedDays, estCost, costIncomplete }`), written only by
+`derive.trip`. Storing them lets Changes show "unallocated 0 → 1" from the event's before and
+after values, and lets metrics render without recomputing.
 
 **Derivations (`derive.trip`, code only):**
 
@@ -443,9 +458,9 @@ ExternalEvent (slice 2) ─► Jev: material? affects which intent? surface? ─
 
 ## G. Migration plan
 
-| Keep as is                                                                                                                                                                                                                                                                             | Refactor                                                                                                                                                                                                                                                                                                                                                 | Replace                                                                                                                                                                                                                                                                                                                                                                           | Remove                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth (sign-in, verify, session lifecycle, secure storage, `api/account`), `lib/http`, `lib/supabase`, `api/health` + `connection-banner` + `use-health`, `query-provider`, fonts, `packages/config`, format hook, `scripts/qa-session.mjs`, test setup, reviewer agents, `docs-keeper` | Jev client → `lib/perception`. `getDecisionEngine` → provider factory for perception + cognition. `tab-bar-items`, `tab-header`, `list-states`, `undo-toast`, `use-undo-store` → new shell. `scripts/eval-intent.mjs` → `eval-travel.mjs`. `intent-evaluator` agent → the travel evals. `docs/architecture/{persistence,instant-actions}.md` → rewritten | `@nexui/types` domain contracts, the migrations, the routes (`/api/intents`, `/api/intents/[id]`, `/api/intents/[id]/changesets`, `/api/intents/[id]/ask`, `/api/runs/[id]`, `/api/runs/[id]/cancel`, `/api/events/[id]/undo`, `/api/events/[id]/redo`, `/api/changes`), the tab layout and screens, and `theme.ts` (light-only constants → light and dark token sets, section I) | `lib/decision-engine/*` except the Jev transport, `lib/records/*`, `chrono-node`, the `intent`, `intent-events`, `tasks`, `timeline`, `search` and `items` routes, the compose, draft, change, edit and item-form sheets, `intent-previews`, `magic-bar`, `item-fields`, `form-values`, `task-groups`, `timeline-*`, `highlight-segments`, `intent-display`, `intent-confidence`, `commit-label`, `compose-context`, `change-actions`, `submit-decision`, `use-intent-prediction`, `use-demo-store`, the `add-intent` skill, `evals/*.json`, their tests, all of `docs/specs/`, the 2026-09-24 superpowers specs and plans |
+| Keep as is                                                                                                                                                                                                                                                                             | Refactor                                                                                                                                                                                                                                                                                                                                                 | Replace                                                                                                                                                                                                                                                                                                                                                                                 | Remove                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth (sign-in, verify, session lifecycle, secure storage, `api/account`), `lib/http`, `lib/supabase`, `api/health` + `connection-banner` + `use-health`, `query-provider`, fonts, `packages/config`, format hook, `scripts/qa-session.mjs`, test setup, reviewer agents, `docs-keeper` | Jev client → `lib/perception`. `getDecisionEngine` → provider factory for perception + cognition. `tab-bar-items`, `tab-header`, `list-states`, `undo-toast`, `use-undo-store` → new shell. `scripts/eval-intent.mjs` → `eval-travel.mjs`. `intent-evaluator` agent → the travel evals. `docs/architecture/{persistence,instant-actions}.md` → rewritten | `@nexui/types` domain contracts, the migrations, the routes (`/api/intents`, `/api/intents/[id]`, `/api/intents/[id]/changesets`, `/api/intents/[id]/ask`, `/api/runs/[id]`, `/api/runs/[id]/cancel`, `/api/events/[id]/undo` (also Redo, on the Undo event), `/api/changes`), the tab layout and screens, and `theme.ts` (light-only constants → light and dark token sets, section I) | `lib/decision-engine/*` except the Jev transport, `lib/records/*`, `chrono-node`, the `intent`, `intent-events`, `tasks`, `timeline`, `search` and `items` routes, the compose, draft, change, edit and item-form sheets, `intent-previews`, `magic-bar`, `item-fields`, `form-values`, `task-groups`, `timeline-*`, `highlight-segments`, `intent-display`, `intent-confidence`, `commit-label`, `compose-context`, `change-actions`, `submit-decision`, `use-intent-prediction`, `use-demo-store`, the `add-intent` skill, `evals/*.json`, their tests, all of `docs/specs/`, the 2026-09-24 superpowers specs and plans |
 
 ## H. Prototype plan
 
