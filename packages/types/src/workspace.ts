@@ -1,0 +1,131 @@
+import { z } from 'zod';
+
+import { kindNameSchema } from './kinds/registry.ts';
+import { idSchema, relTypeSchema } from './primitives.ts';
+
+/** Figures a metric or allocation reads from the anchor object's `data.derived`. */
+export const derivedKeySchema = z.enum(['trip.totalDays', 'trip.unallocatedDays', 'trip.estCost']);
+
+export type DerivedKey = z.infer<typeof derivedKeySchema>;
+
+// Top-level columns, or one key inside `data`.
+const fieldPathSchema = z
+  .string()
+  .regex(/^(title|status|position|createdAt|updatedAt|data\.[A-Za-z][A-Za-z0-9]{0,39})$/);
+
+export const refSchema = z.union([z.literal('intent'), z.strictObject({ objectId: idSchema })]);
+
+export const fieldFilterSchema = z.strictObject({
+  field: fieldPathSchema,
+  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in']),
+  value: z.json(),
+});
+
+export type FieldFilter = z.infer<typeof fieldFilterSchema>;
+
+export const graphQuerySchema = z.discriminatedUnion('from', [
+  z.strictObject({
+    from: z.literal('objects'),
+    kind: z.union([kindNameSchema, z.array(kindNameSchema).min(1).max(8)]).optional(),
+    related: z
+      .strictObject({ type: relTypeSchema, to: refSchema, direction: z.enum(['out', 'in']) })
+      .optional(),
+    where: z.array(fieldFilterSchema).max(8).optional(),
+    sort: z
+      .union([
+        z.literal('position'),
+        z.strictObject({ field: fieldPathSchema, dir: z.enum(['asc', 'desc']) }),
+      ])
+      .optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+  }),
+  z.strictObject({ from: z.literal('object'), id: idSchema }),
+]);
+
+export type GraphQuery = z.infer<typeof graphQuerySchema>;
+
+const sectionBase = {
+  id: z.string().regex(/^[a-z0-9-]{1,60}$/),
+  title: z.string().max(60).optional(),
+  collapsed: z.boolean().optional(),
+  // Lifted into the Open band while unresolved (spec section D).
+  pin: z.literal('open').optional(),
+};
+
+const fieldSpecSchema = z.strictObject({
+  field: fieldPathSchema,
+  label: z.string().min(1).max(30),
+  format: z.enum(['currency', 'days', 'hours', 'text']).optional(),
+});
+
+const metricSpecSchema = z.strictObject({
+  label: z.string().min(1).max(30),
+  derived: derivedKeySchema,
+  format: z.enum(['days', 'currency', 'count']),
+  emphasis: z.literal('whenPositive').optional(),
+});
+
+export const sectionSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('map'),
+    places: graphQuerySchema,
+    legs: graphQuerySchema.optional(),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('route'),
+    query: graphQuerySchema,
+    editable: z.array(z.enum(['days', 'order'])).max(2),
+    showUnallocated: z.boolean().optional(),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('metric'),
+    metrics: z.array(metricSpecSchema).min(1).max(4),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('allocation'),
+    parts: graphQuerySchema,
+    valueField: fieldPathSchema,
+    labelField: fieldPathSchema,
+    total: derivedKeySchema,
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('objectList'),
+    query: graphQuerySchema,
+    card: z.enum(['compact', 'rich']),
+    empty: z.string().max(120).optional(),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('comparison'),
+    query: graphQuerySchema,
+    fields: z.array(fieldSpecSchema).min(1).max(6),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('decision'),
+    decisionId: idSchema,
+    fields: z.array(fieldSpecSchema).max(6),
+  }),
+  z.strictObject({ ...sectionBase, type: z.literal('insight'), query: graphQuerySchema }),
+]);
+
+export type Section = z.infer<typeof sectionSchema>;
+
+// `version` is the doc format (1); the `workspaces.version` column counts revisions.
+export const workspaceDocSchema = z
+  .strictObject({
+    version: z.literal(1),
+    anchorId: idSchema,
+    sections: z.array(sectionSchema).max(30),
+  })
+  .refine((doc) => new Set(doc.sections.map((s) => s.id)).size === doc.sections.length, {
+    message: 'Section ids must be unique',
+    path: ['sections'],
+  });
+
+export type WorkspaceDoc = z.infer<typeof workspaceDocSchema>;
