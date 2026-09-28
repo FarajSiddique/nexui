@@ -1,18 +1,21 @@
 import { router } from 'expo-router';
 import { useState, type ReactElement } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormError, PrimaryButton, TextButton } from '@/components/auth-screen';
 import { deleteAccount } from '@/lib/api';
 import { clearDeletedAccount, signOut } from '@/lib/auth';
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles, useColors } from '@/lib/use-theme';
 import { useHealth } from '@/lib/use-health';
 import { useSessionStore } from '@/stores/use-session-store';
 
 type Pending = 'signOut' | 'delete' | null;
 
 export default function AccountScreen(): ReactElement {
+  const styles = useStyles();
+  const colors = useColors();
   const email = useSessionStore((state) => state.session?.user.email);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
@@ -130,7 +133,7 @@ export default function AccountScreen(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.paper },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 36 },
   content: { width: '100%', maxWidth: 440, alignSelf: 'center' },
@@ -170,4 +173,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dimmed: { opacity: 0.6 },
-});
+}));

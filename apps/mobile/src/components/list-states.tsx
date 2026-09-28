@@ -1,10 +1,13 @@
 import type { ReactElement } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles } from '@/lib/use-theme';
 
 /** Placeholder rows in the shape of the list while it loads (no spinner). */
 export function SkeletonRows({ count = 5 }: { count?: number }): ReactElement {
+  const styles = useStyles();
+
   return (
     <View accessibilityLabel="Loading" accessibilityRole="progressbar" style={styles.skeleton}>
       {Array.from({ length: count }, (_, index) => (
@@ -22,6 +25,8 @@ export function SkeletonRows({ count = 5 }: { count?: number }): ReactElement {
 
 /** What failed, and a way to try again. */
 export function ListError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const styles = useStyles();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -37,6 +42,8 @@ export function ListError({ message, onRetry }: { message: string; onRetry: () =
 
 /** An empty list's invitation. */
 export function ListEmpty({ text }: { text: string }): ReactElement {
+  const styles = useStyles();
+
   return (
     <View style={styles.box}>
       <Text style={styles.empty}>{text}</Text>
@@ -44,7 +51,7 @@ export function ListEmpty({ text }: { text: string }): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   skeleton: { marginTop: 8 },
   skeletonRow: { flexDirection: 'row', gap: 14, paddingVertical: 14 },
   skeletonCheck: { width: 24, height: 24, borderRadius: 8, backgroundColor: colors.line },
@@ -62,4 +69,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   error: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.danger },
   empty: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.muted },
-});
+}));

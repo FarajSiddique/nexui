@@ -14,7 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryProvider, queryClient } from '@/lib/query-provider';
 import { startSessionLifecycle } from '@/lib/session-lifecycle';
 import { supabase } from '@/lib/supabase';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/use-theme';
 import { updateSession, useSessionStore } from '@/stores/use-session-store';
 
 // Signing out or deleting the account drops the cache so the next user never sees these items.
@@ -27,6 +27,8 @@ function showSession(session: Session | null): void {
 }
 
 export default function RootLayout(): ReactElement | null {
+  const colors = useColors();
+
   useEffect(() => {
     const nativeAppState = Platform.OS === 'web' ? undefined : AppState;
 
@@ -57,7 +59,7 @@ export default function RootLayout(): ReactElement | null {
   return (
     <SafeAreaProvider>
       <QueryProvider>
-        <StatusBar style="dark" />
+        <StatusBar style="auto" />
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}
         >

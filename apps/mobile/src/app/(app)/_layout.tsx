@@ -1,24 +1,27 @@
 import { Stack } from 'expo-router';
 import type { ReactElement } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
-import { colors } from '@/lib/theme';
-
-// The + sheet rises over everything, tab bar included. iOS gets a form sheet sized to its
-// content; Android and web get a modal, which keeps the keyboard behavior predictable.
-const composeOptions =
-  Platform.OS === 'ios'
-    ? ({
-        presentation: 'formSheet',
-        sheetAllowedDetents: 'fitToContents',
-        sheetGrabberVisible: true,
-        sheetCornerRadius: 26,
-        contentStyle: { backgroundColor: colors.card },
-      } as const)
-    : ({ presentation: 'modal', contentStyle: { backgroundColor: colors.card } } as const);
+import { createThemedStyles, useColors } from '@/lib/use-theme';
 
 // The signed-in shell: the tabs, the + sheet and Account.
 export default function AppLayout(): ReactElement {
+  const styles = useStyles();
+  const colors = useColors();
+
+  // The + sheet rises over everything, tab bar included. iOS gets a form sheet sized to its
+  // content; Android and web get a modal, which keeps the keyboard behavior predictable.
+  const composeOptions =
+    Platform.OS === 'ios'
+      ? ({
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          sheetCornerRadius: 26,
+          contentStyle: { backgroundColor: colors.card },
+        } as const)
+      : ({ presentation: 'modal', contentStyle: { backgroundColor: colors.card } } as const);
+
   return (
     <View style={styles.shell}>
       <Stack
@@ -32,6 +35,6 @@ export default function AppLayout(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   shell: { flex: 1, backgroundColor: colors.paper },
-});
+}));

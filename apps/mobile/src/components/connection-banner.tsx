@@ -1,11 +1,13 @@
 import type { ReactElement } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles } from '@/lib/use-theme';
 import { useHealth } from '@/lib/use-health';
 
 // Shown under a tab's header only while the server is unreachable; it goes on recovery.
 export function ConnectionBanner(): ReactElement | null {
+  const styles = useStyles();
   const health = useHealth();
 
   if (!health.isError) {
@@ -30,7 +32,7 @@ export function ConnectionBanner(): ReactElement | null {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   banner: {
     marginTop: 12,
     padding: 16,
@@ -49,4 +51,4 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   dimmed: { opacity: 0.6 },
-});
+}));

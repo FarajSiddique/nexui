@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import type { ReactElement } from 'react';
-import { Pressable, StyleSheet, View, type ColorValue } from 'react-native';
+import { Pressable, View, type ColorValue } from 'react-native';
 
-import { colors } from '@/lib/theme';
+import { createThemedStyles } from '@/lib/use-theme';
 
 /** The tab bar's height above the bottom safe area. */
 export const TAB_BAR_HEIGHT = 64;
@@ -11,6 +11,7 @@ export type TabIconName = 'home' | 'changes';
 
 // Line icons drawn with views (the app ships no icon font), on a 22-point grid.
 function Glyph({ name, color }: { name: TabIconName; color: ColorValue }): ReactElement {
+  const styles = useStyles();
   const stroke = { borderColor: color };
   const fill = { backgroundColor: color };
 
@@ -38,6 +39,8 @@ function Glyph({ name, color }: { name: TabIconName; color: ColorValue }): React
 
 /** A tab's icon; the active tab is shown by its tint and bold label. */
 export function TabIcon({ name, color }: { name: TabIconName; color: ColorValue }): ReactElement {
+  const styles = useStyles();
+
   return (
     <View style={styles.iconSlot}>
       <Glyph name={name} color={color} />
@@ -47,6 +50,8 @@ export function TabIcon({ name, color }: { name: TabIconName; color: ColorValue 
 
 /** The + in the middle of the tab bar. It opens the + sheet over the current screen. */
 export function PlusTabButton(): ReactElement {
+  const styles = useStyles();
+
   return (
     <View style={styles.plusSlot}>
       <Pressable
@@ -62,7 +67,7 @@ export function PlusTabButton(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   iconSlot: { width: 46, height: 30, alignItems: 'center', justifyContent: 'center' },
   glyph: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   roof: {
@@ -129,4 +134,4 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.accentInk,
   },
-});
+}));

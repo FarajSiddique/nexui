@@ -1,15 +1,19 @@
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import { router } from 'expo-router';
 import { useState, type ReactElement } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
 
-import { AuthScreen, authStyles, FormError, PrimaryButton } from '@/components/auth-screen';
+import { AuthScreen, FormError, PrimaryButton, useAuthStyles } from '@/components/auth-screen';
 import { AuthActionError, sendEmailCode, signInWithGoogle } from '@/lib/auth';
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles, useColors } from '@/lib/use-theme';
 
 type Pending = 'email' | 'google' | null;
 
 export default function SignInScreen(): ReactElement {
+  const styles = useStyles();
+  const authStyles = useAuthStyles();
+  const colors = useColors();
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,10 +106,10 @@ export default function SignInScreen(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   providers: { gap: 12 },
   providerButton: { width: '100%', height: 52 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
   rule: { flex: 1, height: 1, backgroundColor: colors.line },
   dividerText: { fontFamily: fonts.body, fontSize: 14, color: colors.faint },
-});
+}));

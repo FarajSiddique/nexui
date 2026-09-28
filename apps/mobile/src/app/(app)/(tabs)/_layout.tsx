@@ -3,11 +3,13 @@ import type { ReactElement } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlusTabButton, TAB_BAR_HEIGHT, TabIcon } from '@/components/tab-bar-items';
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { useColors } from '@/lib/use-theme';
 
 // Home · (+) · Changes. The order and the + button never move.
 export default function TabsLayout(): ReactElement {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
 
   return (
     <Tabs

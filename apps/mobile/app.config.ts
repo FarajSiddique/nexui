@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: '1.0.0',
   scheme: 'nexui',
   orientation: 'portrait',
-  userInterfaceStyle: 'light',
+  userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: appId,
   },
