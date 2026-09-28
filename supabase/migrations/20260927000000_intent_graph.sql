@@ -197,7 +197,9 @@ end;
 $$;
 
 -- Applies one changeset for p_user and logs it. The callers have already locked the intent
--- and checked that p_user owns it. A row may appear only once per changeset.
+-- and checked that p_user owns it. A row may appear only once per changeset. A clash with an
+-- existing row (a reused id, a second live copy of a link) is NXU11; a missing or out-of-range
+-- column is NXU22, so no constraint name or row detail reaches the client.
 create function private.apply_ops(
   p_user uuid,
   p_intent_id uuid,
@@ -229,165 +231,172 @@ begin
     raise exception 'A changeset needs at least one change' using errcode = 'NXU22';
   end if;
 
-  for op in select value from jsonb_array_elements(p_ops) loop
-    op_kind := op ->> 'op';
-    patch := op -> 'patch';
-    before_row := null;
-    after_row := null;
+  begin
+    for op in select value from jsonb_array_elements(p_ops) loop
+      op_kind := op ->> 'op';
+      patch := op -> 'patch';
+      before_row := null;
+      after_row := null;
 
-    if op ? 'origin' and coalesce(op ->> 'origin', '') not in ('direct', 'derived') then
-      raise exception 'Invalid origin' using errcode = 'NXU22';
-    end if;
+      if op ? 'origin' and coalesce(op ->> 'origin', '') not in ('direct', 'derived') then
+        raise exception 'Invalid origin' using errcode = 'NXU22';
+      end if;
 
-    target_table := case
-      when op_kind in ('insert_object', 'update_object', 'delete_object') then 'objects'
-      when op_kind in ('insert_relationship', 'delete_relationship') then 'relationships'
-      when op_kind = 'set_workspace' then 'workspaces'
-      when op_kind = 'update_intent' then 'intents'
-    end;
+      target_table := case
+        when op_kind in ('insert_object', 'update_object', 'delete_object') then 'objects'
+        when op_kind in ('insert_relationship', 'delete_relationship') then 'relationships'
+        when op_kind = 'set_workspace' then 'workspaces'
+        when op_kind = 'update_intent' then 'intents'
+      end;
 
-    if target_table is null then
-      raise exception 'Unknown change' using errcode = 'NXU22';
-    end if;
+      if target_table is null then
+        raise exception 'Unknown change' using errcode = 'NXU22';
+      end if;
 
-    row_id := case
-      when target_table in ('workspaces', 'intents') then p_intent_id
-      else (op ->> 'id')::uuid
-    end;
+      row_id := case
+        when target_table in ('workspaces', 'intents') then p_intent_id
+        else (op ->> 'id')::uuid
+      end;
 
-    if (target_table || ':' || row_id) = any (touched) then
-      raise exception 'A row can change only once per changeset' using errcode = 'NXU22';
-    end if;
+      if (target_table || ':' || row_id) = any (touched) then
+        raise exception 'A row can change only once per changeset' using errcode = 'NXU22';
+      end if;
 
-    touched := touched || (target_table || ':' || row_id);
+      touched := touched || (target_table || ':' || row_id);
 
-    case op_kind
-      when 'insert_object' then
-        perform private.check_source(op -> 'source');
+      case op_kind
+        when 'insert_object' then
+          perform private.check_source(op -> 'source');
 
-        insert into public.objects as o
-          (id, user_id, intent_id, kind, kind_version, title, status, data, source, position)
-        values (
-          row_id,
-          p_user,
-          p_intent_id,
-          op ->> 'kind',
-          coalesce((op ->> 'kindVersion')::integer, 1),
-          op ->> 'title',
-          op ->> 'status',
-          op -> 'data',
-          nullif(op -> 'source', 'null'::jsonb),
-          (op ->> 'position')::double precision
-        )
-        returning to_jsonb(o.*) into after_row;
-
-      when 'update_object', 'delete_object' then
-        select to_jsonb(o.*) into before_row
-        from public.objects o
-        where o.id = row_id and o.user_id = p_user and o.intent_id = p_intent_id
-          and o.deleted_at is null
-        for update;
-
-        if before_row is null then
-          raise exception 'That item no longer exists' using errcode = 'NXU04';
-        end if;
-
-        if op_kind = 'delete_object' then
-          update public.objects o set deleted_at = now()
-          where o.id = row_id
+          insert into public.objects as o
+            (id, user_id, intent_id, kind, kind_version, title, status, data, source, position)
+          values (
+            row_id,
+            p_user,
+            p_intent_id,
+            op ->> 'kind',
+            coalesce((op ->> 'kindVersion')::integer, 1),
+            op ->> 'title',
+            op ->> 'status',
+            op -> 'data',
+            nullif(op -> 'source', 'null'::jsonb),
+            (op ->> 'position')::double precision
+          )
           returning to_jsonb(o.*) into after_row;
-        else
-          if patch ? 'source' then
-            perform private.check_source(patch -> 'source');
+
+        when 'update_object', 'delete_object' then
+          select to_jsonb(o.*) into before_row
+          from public.objects o
+          where o.id = row_id and o.user_id = p_user and o.intent_id = p_intent_id
+            and o.deleted_at is null
+          for update;
+
+          if before_row is null then
+            raise exception 'That item no longer exists' using errcode = 'NXU04';
           end if;
 
-          if op ? 'expectedUpdatedAt'
-            and (before_row ->> 'updated_at')::timestamptz <> (op ->> 'expectedUpdatedAt')::timestamptz
-          then
-            raise exception 'This changed while you were editing' using errcode = 'NXU08';
+          if op_kind = 'delete_object' then
+            update public.objects o set deleted_at = now()
+            where o.id = row_id
+            returning to_jsonb(o.*) into after_row;
+          else
+            if patch ? 'source' then
+              perform private.check_source(patch -> 'source');
+            end if;
+
+            if op ? 'expectedUpdatedAt'
+              and (before_row ->> 'updated_at')::timestamptz <> (op ->> 'expectedUpdatedAt')::timestamptz
+            then
+              raise exception 'This changed while you were editing' using errcode = 'NXU08';
+            end if;
+
+            update public.objects o set
+              title = case when patch ? 'title' then patch ->> 'title' else o.title end,
+              status = case when patch ? 'status' then patch ->> 'status' else o.status end,
+              data = case when patch ? 'data' then patch -> 'data' else o.data end,
+              source = case when patch ? 'source' then nullif(patch -> 'source', 'null'::jsonb) else o.source end,
+              position = case
+                when patch ? 'position' then (patch ->> 'position')::double precision
+                else o.position
+              end
+            where o.id = row_id
+            returning to_jsonb(o.*) into after_row;
           end if;
 
-          update public.objects o set
-            title = case when patch ? 'title' then patch ->> 'title' else o.title end,
-            status = case when patch ? 'status' then patch ->> 'status' else o.status end,
-            data = case when patch ? 'data' then patch -> 'data' else o.data end,
-            source = case when patch ? 'source' then nullif(patch -> 'source', 'null'::jsonb) else o.source end,
-            position = case
-              when patch ? 'position' then (patch ->> 'position')::double precision
-              else o.position
-            end
-          where o.id = row_id
-          returning to_jsonb(o.*) into after_row;
-        end if;
+        when 'insert_relationship' then
+          perform private.check_endpoint(p_user, op ->> 'sourceType', (op ->> 'sourceId')::uuid);
+          perform private.check_endpoint(p_user, op ->> 'targetType', (op ->> 'targetId')::uuid);
 
-      when 'insert_relationship' then
-        perform private.check_endpoint(p_user, op ->> 'sourceType', (op ->> 'sourceId')::uuid);
-        perform private.check_endpoint(p_user, op ->> 'targetType', (op ->> 'targetId')::uuid);
+          insert into public.relationships as r
+            (id, user_id, intent_id, source_type, source_id, target_type, target_id, type, metadata)
+          values (
+            row_id,
+            p_user,
+            p_intent_id,
+            op ->> 'sourceType',
+            (op ->> 'sourceId')::uuid,
+            op ->> 'targetType',
+            (op ->> 'targetId')::uuid,
+            op ->> 'type',
+            nullif(op -> 'metadata', 'null'::jsonb)
+          )
+          returning to_jsonb(r.*) into after_row;
 
-        insert into public.relationships as r
-          (id, user_id, intent_id, source_type, source_id, target_type, target_id, type, metadata)
-        values (
-          row_id,
-          p_user,
-          p_intent_id,
-          op ->> 'sourceType',
-          (op ->> 'sourceId')::uuid,
-          op ->> 'targetType',
-          (op ->> 'targetId')::uuid,
-          op ->> 'type',
-          nullif(op -> 'metadata', 'null'::jsonb)
-        )
-        returning to_jsonb(r.*) into after_row;
+        when 'delete_relationship' then
+          select to_jsonb(r.*) into before_row
+          from public.relationships r
+          where r.id = row_id and r.user_id = p_user and r.intent_id = p_intent_id
+            and r.deleted_at is null
+          for update;
 
-      when 'delete_relationship' then
-        select to_jsonb(r.*) into before_row
-        from public.relationships r
-        where r.id = row_id and r.user_id = p_user and r.intent_id = p_intent_id
-          and r.deleted_at is null
-        for update;
+          if before_row is null then
+            raise exception 'That link no longer exists' using errcode = 'NXU04';
+          end if;
 
-        if before_row is null then
-          raise exception 'That link no longer exists' using errcode = 'NXU04';
-        end if;
+          update public.relationships r set deleted_at = now()
+          where r.id = row_id
+          returning to_jsonb(r.*) into after_row;
 
-        update public.relationships r set deleted_at = now()
-        where r.id = row_id
-        returning to_jsonb(r.*) into after_row;
+        when 'set_workspace' then
+          select to_jsonb(w.*) into before_row
+          from public.workspaces w
+          where w.intent_id = p_intent_id and w.user_id = p_user
+          for update;
 
-      when 'set_workspace' then
-        select to_jsonb(w.*) into before_row
-        from public.workspaces w
-        where w.intent_id = p_intent_id and w.user_id = p_user
-        for update;
+          insert into public.workspaces as w (intent_id, user_id, doc)
+          values (p_intent_id, p_user, op -> 'doc')
+          on conflict (intent_id) do update set doc = excluded.doc, version = w.version + 1
+          returning to_jsonb(w.*) into after_row;
 
-        insert into public.workspaces as w (intent_id, user_id, doc)
-        values (p_intent_id, p_user, op -> 'doc')
-        on conflict (intent_id) do update set doc = excluded.doc, version = w.version + 1
-        returning to_jsonb(w.*) into after_row;
+        when 'update_intent' then
+          select to_jsonb(i.*) into before_row
+          from public.intents i
+          where i.id = p_intent_id and i.user_id = p_user
+          for update;
 
-      when 'update_intent' then
-        select to_jsonb(i.*) into before_row
-        from public.intents i
-        where i.id = p_intent_id and i.user_id = p_user
-        for update;
+          update public.intents i set
+            status = case when patch ? 'status' then patch ->> 'status' else i.status end,
+            summary = case when patch ? 'summary' then patch -> 'summary' else i.summary end,
+            context = case when patch ? 'context' then patch -> 'context' else i.context end
+          where i.id = p_intent_id
+          returning to_jsonb(i.*) into after_row;
+      end case;
 
-        update public.intents i set
-          status = case when patch ? 'status' then patch ->> 'status' else i.status end,
-          summary = case when patch ? 'summary' then patch -> 'summary' else i.summary end,
-          context = case when patch ? 'context' then patch -> 'context' else i.context end
-        where i.id = p_intent_id
-        returning to_jsonb(i.*) into after_row;
-    end case;
-
-    stored := stored || jsonb_build_array(jsonb_build_object(
-      'op', op_kind,
-      'table', target_table,
-      'id', row_id,
-      'before', before_row,
-      'after', after_row,
-      'origin', coalesce(op ->> 'origin', 'direct')
-    ));
-  end loop;
+      stored := stored || jsonb_build_array(jsonb_build_object(
+        'op', op_kind,
+        'table', target_table,
+        'id', row_id,
+        'before', before_row,
+        'after', after_row,
+        'origin', coalesce(op ->> 'origin', 'direct')
+      ));
+    end loop;
+  exception
+    when unique_violation then
+      raise exception 'Already exists' using errcode = 'NXU11';
+    when not_null_violation or check_violation then
+      raise exception 'That change is not valid' using errcode = 'NXU22';
+  end;
 
   insert into public.events (user_id, intent_id, type, actor, run_id, ops)
   values (p_user, p_intent_id, 'changeset', p_actor, p_run_id, stored)
@@ -420,8 +429,17 @@ begin
 end;
 $$;
 
--- Applies a changeset to one of the caller's intents and logs it (spec section C).
-create function public.apply_changeset(p_intent_id uuid, p_actor text, p_run_id uuid, p_ops jsonb)
+-- Applies a changeset to one of the caller's intents and logs it (spec section C). The API
+-- derives its changes from a snapshot, so it passes that snapshot's last_activity_at: if any
+-- changeset or Undo landed since, the derived values are stale and this raises NXU08. A run id,
+-- when given, must be one of the caller's runs.
+create function public.apply_changeset(
+  p_intent_id uuid,
+  p_actor text,
+  p_run_id uuid,
+  p_ops jsonb,
+  p_expected_activity_at timestamptz default null
+)
 returns jsonb
 language plpgsql
 security definer
@@ -429,15 +447,29 @@ set search_path = ''
 as $$
 declare
   caller uuid := auth.uid();
+  activity_at timestamptz;
 begin
   if caller is null then
     raise exception 'Sign in to continue' using errcode = 'NXU04';
   end if;
 
-  perform 1 from public.intents where id = p_intent_id and user_id = caller for update;
+  select i.last_activity_at into activity_at
+  from public.intents i
+  where i.id = p_intent_id and i.user_id = caller
+  for update;
 
   if not found then
     raise exception 'Not found' using errcode = 'NXU04';
+  end if;
+
+  if p_expected_activity_at is not null and activity_at <> p_expected_activity_at then
+    raise exception 'This changed while you were editing' using errcode = 'NXU08';
+  end if;
+
+  if p_run_id is not null
+    and not exists (select 1 from public.runs r where r.id = p_run_id and r.user_id = caller)
+  then
+    raise exception 'Unknown run' using errcode = 'NXU22';
   end if;
 
   return private.apply_ops(caller, p_intent_id, p_actor, p_run_id, p_ops);
@@ -643,9 +675,14 @@ begin
     raise exception 'Changed since' using errcode = 'NXU09';
   end if;
 
-  insert into public.events (user_id, intent_id, type, actor, reverts_event_id, ops)
-  values (caller, original.intent_id, 'changeset', 'user', p_event_id, stored)
-  returning * into logged;
+  -- The unique index on reverts_event_id is the backstop for two Undos racing.
+  begin
+    insert into public.events (user_id, intent_id, type, actor, reverts_event_id, ops)
+    values (caller, original.intent_id, 'changeset', 'user', p_event_id, stored)
+    returning * into logged;
+  exception when unique_violation then
+    raise exception 'Already undone' using errcode = 'NXU10';
+  end;
 
   update public.intents set last_activity_at = now() where id = original.intent_id;
 
@@ -711,11 +748,15 @@ $$;
 
 revoke execute on function public.create_intent(uuid, text, text, jsonb) from public, anon;
 grant execute on function public.create_intent(uuid, text, text, jsonb) to authenticated;
-revoke execute on function public.apply_changeset(uuid, text, uuid, jsonb) from public, anon;
-grant execute on function public.apply_changeset(uuid, text, uuid, jsonb) to authenticated;
+revoke execute on function public.apply_changeset(uuid, text, uuid, jsonb, timestamptz) from public, anon;
+grant execute on function public.apply_changeset(uuid, text, uuid, jsonb, timestamptz) to authenticated;
 revoke execute on function public.revert_event(uuid) from public, anon;
 grant execute on function public.revert_event(uuid) to authenticated;
 revoke execute on function public.get_intent_snapshot(uuid) from public, anon;
 grant execute on function public.get_intent_snapshot(uuid) to authenticated;
 revoke execute on function public.changes_page(integer, bigint, uuid) from public, anon;
 grant execute on function public.changes_page(integer, bigint, uuid) to authenticated;
+
+-- The private helpers run only inside the definer functions above (as their owner). New
+-- functions default to EXECUTE for PUBLIC, so take it back from every client role.
+revoke execute on all functions in schema private from public, anon, authenticated;

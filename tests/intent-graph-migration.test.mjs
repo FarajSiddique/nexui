@@ -70,3 +70,28 @@ test('Realtime publishes the tables the app subscribes to', () => {
     /alter publication supabase_realtime add table\s+public\.objects, public\.relationships, public\.workspaces, public\.events, public\.runs;/,
   );
 });
+
+test('private helpers are not callable by any client role', () => {
+  const revoke = sql.indexOf(
+    'revoke execute on all functions in schema private from public, anon, authenticated;',
+  );
+
+  assert.ok(revoke > -1, 'private functions are revoked');
+  assert.ok(revoke > sql.lastIndexOf('create function private.'), 'after every private function');
+});
+
+test('apply_changeset takes the expected activity time, with no older overload', () => {
+  assert.match(
+    sql,
+    /create function public\.apply_changeset\(\s*p_intent_id uuid,\s*p_actor text,\s*p_run_id uuid,\s*p_ops jsonb,\s*p_expected_activity_at timestamptz default null\s*\)/,
+  );
+  assert.equal(sql.match(/create function public\.apply_changeset\(/g).length, 1);
+
+  const privileges = sql.match(/(grant|revoke) execute on function public\.apply_changeset\([^)]*\)/g);
+
+  assert.equal(privileges.length, 2);
+
+  for (const statement of privileges) {
+    assert.match(statement, /\(uuid, text, uuid, jsonb, timestamptz\)$/, statement);
+  }
+});

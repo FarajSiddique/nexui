@@ -90,6 +90,38 @@ begin
   end;
 
   begin
+    perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+      jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+        'patch', jsonb_build_object('summary', '{"line":"stale"}'::jsonb))),
+      '2000-01-01T00:00:00Z');
+    assert false, 'a stale expected activity time must fail';
+  exception when sqlstate 'NXU08' then
+    null;
+  end;
+
+  begin
+    perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user',
+      '10000000-0000-4000-8000-0000000000ff',
+      jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+        'patch', jsonb_build_object('summary', '{"line":"someone else''s run"}'::jsonb))));
+    assert false, 'a run id the caller does not own must fail';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+
+  begin
+    perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+      jsonb_build_array(jsonb_build_object('op', 'insert_relationship',
+        'id', '10000000-0000-4000-8000-000000000004',
+        'sourceType', 'object', 'sourceId', '10000000-0000-4000-8000-000000000002',
+        'targetType', 'object', 'targetId', '10000000-0000-4000-8000-000000000003',
+        'type', 'near', 'metadata', null, 'origin', 'direct')));
+    assert false, 'reusing an existing id must fail';
+  exception when sqlstate 'NXU11' then
+    null;
+  end;
+
+  begin
     insert into public.objects (intent_id, kind, data)
     values ('10000000-0000-4000-8000-000000000001', 'thing', '{}');
     assert false, 'clients must not insert directly';
