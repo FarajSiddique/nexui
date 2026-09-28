@@ -10,7 +10,7 @@ import { colors, fonts } from '@/lib/theme';
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
 
-// Placeholder until the Home zones arrive (anchored-shell.md, slice D). The gear opens Account.
+// Placeholder until the intent cards arrive (intent graph plan 3). The gear opens Account.
 export default function HomeScreen(): ReactElement {
   const today = new Date().toLocaleDateString('en-GB', DATE_FORMAT);
 
@@ -19,7 +19,7 @@ export default function HomeScreen(): ReactElement {
       <ScrollView style={styles.list} contentContainerStyle={styles.content}>
         <Text style={styles.date}>{today}</Text>
         <TabHeader
-          title="Home"
+          title="Plans"
           tools={
             <HeaderButton label="Account" onPress={() => router.push('/account')}>
               <GearGlyph />
@@ -27,7 +27,7 @@ export default function HomeScreen(): ReactElement {
           }
         />
         <ConnectionBanner />
-        <ListEmpty text="Your day will show here soon. Tap + to add a task, event or note." />
+        <ListEmpty text="Your plans will show here. Tap + and say what you're trying to do." />
       </ScrollView>
     </SafeAreaView>
   );

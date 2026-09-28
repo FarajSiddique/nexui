@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlusTabButton, TAB_BAR_HEIGHT, TabIcon } from '@/components/tab-bar-items';
 import { colors, fonts } from '@/lib/theme';
 
-// Home · Tasks · (+) · Calendar · Notes. The order and the + button never move.
+// Home · (+) · Changes. The order and the + button never move.
 export default function TabsLayout(): ReactElement {
   const insets = useSafeAreaInsets();
 
@@ -37,37 +37,15 @@ export default function TabsLayout(): ReactElement {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="home" focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="tasks"
-        options={{
-          title: 'Tasks',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="tasks" focused={focused} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <TabIcon name="home" color={color} />,
         }}
       />
       <Tabs.Screen name="plus" options={{ title: 'New', tabBarButton: () => <PlusTabButton /> }} />
       <Tabs.Screen
-        name="calendar"
+        name="changes"
         options={{
-          title: 'Calendar',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="calendar" focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="notes"
-        options={{
-          title: 'Notes',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="notes" focused={focused} color={color} />
-          ),
+          title: 'Changes',
+          tabBarIcon: ({ color }) => <TabIcon name="changes" color={color} />,
         }}
       />
     </Tabs>

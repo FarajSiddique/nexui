@@ -2,19 +2,17 @@ import type { ReactElement } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ConnectionBanner } from '@/components/connection-banner';
 import { ListEmpty } from '@/components/list-states';
 import { TabHeader } from '@/components/tab-header';
 import { colors } from '@/lib/theme';
 
-// Placeholder until the week strip and agenda arrive (anchored-shell.md, slice C).
-export default function CalendarScreen(): ReactElement {
+// Placeholder until the Changes feed arrives (intent graph plan 3).
+export default function ChangesScreen(): ReactElement {
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
       <ScrollView style={styles.list} contentContainerStyle={styles.content}>
-        <TabHeader title="Calendar" />
-        <ConnectionBanner />
-        <ListEmpty text="Your week will show here soon. Events you add with + are saved in the meantime." />
+        <TabHeader title="Changes" />
+        <ListEmpty text="Every change you or Nexui make will show here, with Undo." />
       </ScrollView>
     </SafeAreaView>
   );

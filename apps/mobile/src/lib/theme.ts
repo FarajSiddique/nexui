@@ -1,5 +1,3 @@
-import type { HighlightField } from '@nexui/types';
-
 export const colors = {
   paper: '#F2F0F6', // screen background
   card: '#FFFFFF', // cards, sheets, tab bar
@@ -16,6 +14,8 @@ export const colors = {
 } as const;
 
 // One marker color per kind of detail, used on the input and on the draft alike.
+type HighlightField = 'when' | 'range' | 'attendees' | 'location' | 'duration' | 'priority';
+
 export const markers: Record<HighlightField, string> = {
   when: '#FFE45C',
   range: '#FFE45C',

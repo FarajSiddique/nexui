@@ -16,7 +16,6 @@
     "fix": "pnpm lint:fix && pnpm format",
     "typecheck": "turbo run typecheck",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "eval:intent": "node --experimental-strip-types scripts/eval-intent.mjs",
     "db:new": "supabase migration new",
     "db:push": "supabase db push",
     "format": "prettier --write .",
