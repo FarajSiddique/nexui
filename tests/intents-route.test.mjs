@@ -51,6 +51,19 @@ test('Home lists intents, most recent first', async (t) => {
   assert.equal(asked.searchParams.get('order'), 'last_activity_at.desc');
 });
 
+test('creating a plan requires a token', async (t) => {
+  const upstream = mockSupabaseAuth(t);
+
+  const response = await POST(
+    new Request(url, { method: 'POST', body: JSON.stringify({ goal: 'Plan Japan' }) }),
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.equal(typeof body.error, 'string');
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
 test('creating an intent seeds the trip in one call and returns the snapshot', async (t) => {
   let created;
 

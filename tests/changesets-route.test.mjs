@@ -28,6 +28,20 @@ function send(ops) {
   return POST(authed(url, { method: 'POST', body: JSON.stringify({ ops }) }), context);
 }
 
+test('committing a changeset requires a token', async (t) => {
+  const upstream = mockSupabaseAuth(t);
+
+  const response = await POST(
+    new Request(url, { method: 'POST', body: JSON.stringify({ ops: [shorten] }) }),
+    context,
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.equal(typeof body.error, 'string');
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
 test('an edit commits with its derived ops and returns the event and snapshot', async (t) => {
   let applied;
 

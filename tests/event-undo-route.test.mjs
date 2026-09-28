@@ -19,6 +19,20 @@ function undo(id = EVENT_ID) {
   return POST(authed(`http://localhost/api/events/${id}/undo`, { method: 'POST' }), context(id));
 }
 
+test('undo requires a token', async (t) => {
+  const upstream = mockSupabaseAuth(t);
+
+  const response = await POST(
+    new Request(`http://localhost/api/events/${EVENT_ID}/undo`, { method: 'POST' }),
+    context(EVENT_ID),
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.equal(typeof body.error, 'string');
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
 test('undo reverts the event and returns the new event and snapshot', async (t) => {
   let asked;
 
