@@ -132,9 +132,13 @@ alter table public.events enable row level security;
 alter table public.workspaces enable row level security;
 alter table public.runs enable row level security;
 
-revoke insert, update, delete, truncate on
+revoke all on
   public.intents, public.objects, public.relationships, public.events, public.workspaces, public.runs
   from anon, authenticated;
+
+grant select on
+  public.intents, public.objects, public.relationships, public.events, public.workspaces, public.runs
+  to authenticated;
 
 create policy "Owners read intents" on public.intents for select to authenticated
   using (user_id = (select auth.uid()));
@@ -169,6 +173,25 @@ begin
 
   if not found then
     raise exception 'That item no longer exists' using errcode = 'NXU04';
+  end if;
+end;
+$$;
+
+-- A provided `source` must be JSON null or an object naming who made the change.
+create function private.check_source(p_source jsonb)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if p_source is null or jsonb_typeof(p_source) = 'null' then
+    return;
+  end if;
+
+  if jsonb_typeof(p_source) <> 'object'
+    or (p_source ->> 'type') not in ('user', 'ai', 'derived', 'external')
+  then
+    raise exception 'Invalid source' using errcode = 'NXU22';
   end if;
 end;
 $$;
@@ -211,6 +234,11 @@ begin
     patch := op -> 'patch';
     before_row := null;
     after_row := null;
+
+    if op ? 'origin' and (op ->> 'origin') not in ('direct', 'derived') then
+      raise exception 'Invalid origin' using errcode = 'NXU22';
+    end if;
+
     target_table := case
       when op_kind in ('insert_object', 'update_object', 'delete_object') then 'objects'
       when op_kind in ('insert_relationship', 'delete_relationship') then 'relationships'
@@ -235,6 +263,8 @@ begin
 
     case op_kind
       when 'insert_object' then
+        perform private.check_source(op -> 'source');
+
         insert into public.objects as o
           (id, user_id, intent_id, kind, kind_version, title, status, data, source, position)
         values (
@@ -267,6 +297,10 @@ begin
           where o.id = row_id
           returning to_jsonb(o.*) into after_row;
         else
+          if patch ? 'source' then
+            perform private.check_source(patch -> 'source');
+          end if;
+
           if op ? 'expectedUpdatedAt'
             and (before_row ->> 'updated_at')::timestamptz <> (op ->> 'expectedUpdatedAt')::timestamptz
           then
@@ -440,6 +474,10 @@ begin
     raise exception 'Not found' using errcode = 'NXU04';
   end if;
 
+  if original.actor = 'system' then
+    raise exception 'That can''t be undone' using errcode = 'NXU22';
+  end if;
+
   perform 1 from public.intents where id = original.intent_id and user_id = caller for update;
 
   if exists (select 1 from public.events where reverts_event_id = p_event_id) then
@@ -461,7 +499,9 @@ begin
         select to_jsonb(o.*) into current_row
         from public.objects o where o.id = row_id and o.user_id = caller for update;
 
-        if current_row -> 'updated_at' is distinct from later -> 'updated_at' then
+        if (current_row ->> 'updated_at')::timestamptz
+          is distinct from (later ->> 'updated_at')::timestamptz
+        then
           raise exception 'Changed since' using errcode = 'NXU09';
         end if;
 
@@ -484,14 +524,33 @@ begin
         select to_jsonb(r.*) into current_row
         from public.relationships r where r.id = row_id and r.user_id = caller for update;
 
-        if current_row is null or current_row -> 'deleted_at' is distinct from later -> 'deleted_at' then
+        if current_row is null
+          or (current_row ->> 'deleted_at')::timestamptz
+            is distinct from (later ->> 'deleted_at')::timestamptz
+        then
           raise exception 'Changed since' using errcode = 'NXU09';
         end if;
 
-        update public.relationships r set
-          deleted_at = case when prior is null then now() else (prior ->> 'deleted_at')::timestamptz end,
-          metadata = case when prior is null then r.metadata else nullif(prior -> 'metadata', 'null'::jsonb) end
-        where r.id = row_id returning to_jsonb(r.*) into restored;
+        -- Reviving a link: both endpoints must still be live, or this revert can't be applied.
+        if prior is not null and prior ->> 'deleted_at' is null then
+          begin
+            perform private.check_endpoint(
+              caller, current_row ->> 'source_type', (current_row ->> 'source_id')::uuid);
+            perform private.check_endpoint(
+              caller, current_row ->> 'target_type', (current_row ->> 'target_id')::uuid);
+          exception when sqlstate 'NXU04' then
+            raise exception 'Changed since' using errcode = 'NXU09';
+          end;
+        end if;
+
+        begin
+          update public.relationships r set
+            deleted_at = case when prior is null then now() else (prior ->> 'deleted_at')::timestamptz end,
+            metadata = case when prior is null then r.metadata else nullif(prior -> 'metadata', 'null'::jsonb) end
+          where r.id = row_id returning to_jsonb(r.*) into restored;
+        exception when unique_violation then
+          raise exception 'Changed since' using errcode = 'NXU09';
+        end;
 
       when 'workspaces' then
         select to_jsonb(w.*) into current_row
@@ -537,6 +596,19 @@ begin
       'origin', coalesce(item ->> 'origin', 'direct')
     ));
   end loop;
+
+  -- A restored soft-delete must not leave a live link dangling onto it.
+  if exists (
+    select 1
+    from public.relationships r
+    join public.objects o on
+      (r.source_type = 'object' and r.source_id = o.id)
+      or (r.target_type = 'object' and r.target_id = o.id)
+    where r.user_id = caller and r.intent_id = original.intent_id
+      and r.deleted_at is null and o.deleted_at is not null
+  ) then
+    raise exception 'Changed since' using errcode = 'NXU09';
+  end if;
 
   insert into public.events (user_id, intent_id, type, actor, reverts_event_id, ops)
   values (caller, original.intent_id, 'changeset', 'user', p_event_id, stored)

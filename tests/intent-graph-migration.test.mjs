@@ -19,7 +19,11 @@ test('all six tables exist with RLS on', () => {
 test('clients cannot write any graph table directly', () => {
   assert.match(
     sql,
-    /revoke insert, update, delete, truncate on\s+public\.intents, public\.objects, public\.relationships, public\.events, public\.workspaces, public\.runs\s+from anon, authenticated;/,
+    /revoke all on\s+public\.intents, public\.objects, public\.relationships, public\.events, public\.workspaces, public\.runs\s+from anon, authenticated;/,
+  );
+  assert.match(
+    sql,
+    /grant select on\s+public\.intents, public\.objects, public\.relationships, public\.events, public\.workspaces, public\.runs\s+to authenticated;/,
   );
   assert.doesNotMatch(sql, /grant (insert|update|delete)/i);
   assert.doesNotMatch(sql, /for (insert|update|delete|all) to/i);

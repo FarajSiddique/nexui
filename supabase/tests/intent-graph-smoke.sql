@@ -35,13 +35,20 @@ select public.create_intent(
 do $$
 declare
   snapshot jsonb := public.get_intent_snapshot('10000000-0000-4000-8000-000000000001');
+  create_event_id uuid := (
+    select id from public.events
+    where intent_id = '10000000-0000-4000-8000-000000000001' and actor = 'system'
+  );
   changed jsonb;
   undone jsonb;
   redone jsonb;
+  e1 jsonb;
+  e2 jsonb;
+  e3 jsonb;
 begin
   assert jsonb_array_length(snapshot -> 'objects') = 2, 'owner sees the trip and the place';
   assert jsonb_array_length(snapshot -> 'relationships') = 1, 'owner sees the link';
-  assert snapshot -> 'workspace' is not null, 'the workspace exists';
+  assert jsonb_typeof(snapshot -> 'workspace') = 'object', 'the workspace exists';
 
   changed := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
     jsonb_build_array(jsonb_build_object('op', 'update_object',
@@ -85,8 +92,62 @@ begin
     null;
   end;
 
-  assert jsonb_array_length(public.changes_page(10)) = 4,
-    'Changes lists create, change, undo and redo';
+  begin
+    perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+      jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'forged',
+        'patch', jsonb_build_object('summary', '{"line":"forged"}'::jsonb))));
+    assert false, 'a forged origin must be rejected';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+
+  -- A revert must fail once the row it would restore has moved on (NXU09), without waiting on
+  -- the clock: two update_intent changesets in a row, then Undo the older one.
+  e1 := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+      'patch', jsonb_build_object('summary', '{"line":"a"}'::jsonb))));
+  e2 := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+      'patch', jsonb_build_object('summary', '{"line":"b"}'::jsonb))));
+
+  begin
+    perform public.revert_event((e1 ->> 'id')::uuid);
+    assert false, 'reverting a stale intent change must fail';
+  exception when sqlstate 'NXU09' then
+    null;
+  end;
+
+  -- Undoing an insert must not leave a live relationship pointing at the now-deleted object.
+  e3 := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'insert_object',
+      'id', '10000000-0000-4000-8000-000000000005',
+      'kind', 'place', 'kindVersion', 1, 'title', 'Wrigley Field', 'status', null,
+      'data', '{"name":"Wrigley Field","country":"US","placeType":"poi","lat":41.95,"lng":-87.66,"days":1}'::jsonb,
+      'source', '{"type":"user"}'::jsonb, 'position', 2, 'origin', 'direct')));
+
+  perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'insert_relationship',
+      'id', '10000000-0000-4000-8000-000000000006',
+      'sourceType', 'object', 'sourceId', '10000000-0000-4000-8000-000000000003',
+      'targetType', 'object', 'targetId', '10000000-0000-4000-8000-000000000005',
+      'type', 'part_of', 'metadata', null, 'origin', 'direct')));
+
+  begin
+    perform public.revert_event((e3 ->> 'id')::uuid);
+    assert false, 'reverting an insert with a live link onto it must fail';
+  exception when sqlstate 'NXU09' then
+    null;
+  end;
+
+  begin
+    perform public.revert_event(create_event_id);
+    assert false, 'reverting the create event must fail';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+
+  assert jsonb_array_length(public.changes_page(10)) = 8,
+    'Changes lists create, change, undo, redo, both intent edits, and both graph inserts';
 end;
 $$;
 
