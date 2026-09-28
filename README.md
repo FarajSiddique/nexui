@@ -1,11 +1,11 @@
 # nexui
 
-A small, typed foundation for an AI-native productivity app. The first product
-slice proves **natural-language input → typed intent → deterministic mobile UI**.
-Intent classification can use either a local mock or Jev through Vercel AI Gateway.
-Users sign in with Supabase Auth (emailed 6-digit code or native Google). Setup
-steps are in `docs/specs/auth.md`.
-For the current auth flow and ownership boundaries, see
+Nexui turns what you're trying to accomplish into a persistent object graph, rendered as a
+workspace made of registered primitives. The first slice is travel: describe a trip, and Nexui
+keeps a graph of places, legs and decisions that every edit — yours or Nexui's — changes as one
+undoable changeset. See [Intent graph](docs/architecture/intent-graph.md) for how it works.
+Users sign in with Supabase Auth (emailed 6-digit code or native Google). Setup steps are in
+`docs/specs/auth.md`. For the current auth flow and ownership boundaries, see
 [Authentication](docs/architecture/authentication.md).
 
 ## Requirements
@@ -51,34 +51,23 @@ tab, but only while unreachable. A small example Zustand store remains available
 future local UI state; health data lives in TanStack Query. Health requests time out
 after five seconds.
 
-Type a phrase into the Magic Bar. After a short pause, `POST /api/intent` classifies
-it, and Expo renders a preview using the shared Zod contract. A high-confidence draft
-saves at once when you press return or tap the card's button, and an Undo card offers
-to reverse it for 8 seconds. A less certain draft opens **Continue**, a prefilled form
-whose final button saves it. Try:
+## API
 
-| Phrase                                        | Preview        |
-| --------------------------------------------- | -------------- |
-| `meet Sarah tomorrow at 2`                    | Schedule Event |
-| `remind me to submit my application tomorrow` | Create Task    |
-| `write down idea about AI sports coach`       | Create Note    |
-| `find my architecture notes`                  | Search         |
-| `done with call mom`                          | Mark done      |
-| `push the dentist to friday at 4`             | Move           |
-| `add 'bring charger' to trip notes`           | Add to note    |
-| `asdf banana purple`                          | No suggestion  |
+Six routes, all under `apps/api/src/app/api/` and bearer-authenticated (health is public):
 
-The mock parser treats an unqualified `at 2` as **2:00 PM**. It only supports a
-small set of phrases and relative dates (`today` and `tomorrow`); those strings
-remain display values rather than calendar dates.
+- `GET /api/intents` — Home's cards.
+- `POST /api/intents` — start a plan from a goal, seeding the travel template.
+- `GET /api/intents/:id` — one intent with its workspace, objects and relationships.
+- `POST /api/intents/:id/changesets` — apply a changeset; derived changes ride along with it.
+- `POST /api/events/:id/undo` — Undo a changeset; the same call on the Undo's own event is Redo.
+- `GET /api/changes` — the Changes feed, newest first.
+
+See [Intent graph](docs/architecture/intent-graph.md) for how a changeset is validated, derived
+and committed, and for the database and kind registry behind it.
 
 ```bash
 curl http://localhost:3000/api/health
 # {"status":"ok"}
-
-curl -X POST http://localhost:3000/api/intent \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"meet Sarah tomorrow at 2"}'
 
 pnpm lint
 pnpm fix             # ESLint autofixes, then Prettier formatting
@@ -101,57 +90,6 @@ In VS Code, open the repository root and install the recommended ESLint and Pret
 extensions. The checked-in workspace settings apply ESLint fixes and Prettier formatting
 on explicit save, with ESLint configured for each workspace. Agent conventions live in
 `AGENTS.md`; `CLAUDE.md` imports them for Claude Code.
-
-## Intent providers
-
-Configure only the API's ignored `apps/api/.env.local`:
-
-```dotenv
-AI_PROVIDER=jev
-AI_GATEWAY_API_KEY=<your Vercel AI Gateway key>
-NEXUI_INTENT_MODEL=typesafe-ai/jev
-NEXUI_INTENT_TIMEOUT_MS=3500
-```
-
-Restart `pnpm dev:api` after changing configuration. `AI_PROVIDER=mock` (also
-the default when unset) preserves the original offline classifier and requires no
-key. Any other provider value, missing Jev key/model, or invalid timeout produces
-an actionable server log and a generic HTTP 500; configuration mistakes do not
-silently switch providers. The timeout accepts integer milliseconds from 1 to
-4500, below the unchanged mobile five-second timeout. The model is always read
-from configuration; `typesafe-ai` alone is a provider name, not Jev's model ID.
-
-`getDecisionEngine()` selects the implementation behind the same interface.
-`JevDecisionEngine` uses native fetch against Vercel's documented
-[evaluation API](https://vercel.com/docs/ai-gateway/modalities/evaluation),
-`POST https://ai-gateway.vercel.sh/v1/evaluate`. No AI SDK was previously installed;
-this integration needs only Zod and the existing Node runtime.
-
-Jev selects among the five intents and assesses whether the input is ready for a
-useful preview in one request. It does not generate arbitrary entity strings.
-A small local parser copies/normalizes title, person, query, relative day/weekday,
-and 12-hour time expressions from the source. Unsupported expressions stay in
-editable text; this is not general-purpose entity extraction. Unqualified hours
-1–7 retain the starter's PM assumption. Dates remain display strings, without
-calendar or timezone resolution.
-
-The Gateway envelope is validated with Zod, then mapped into the unchanged shared
-`intentResponseSchema`. Confidence is the lower of classification confidence
-(or selected-option probability when Gateway omits confidence) and preview-readiness
-probability. This is a conservative display signal, not a calibrated probability
-that every extracted field is correct. Mobile thresholds and debounce are unchanged.
-
-Gateway HTTP errors, malformed JSON/output, network failures, and timeouts return
-HTTP 200 with `{ intent: 'UNKNOWN', confidence: 0, entities: {} }`. There are no
-retries or fallback models. Development logs contain provider, intent, confidence,
-latency, and safe error categories/HTTP status; they omit inputs, credentials, and
-raw provider responses. Vercel may retain its own Gateway logs independently.
-
-`pnpm test` uses Node's built-in runner and mocks the HTTP boundary; it never calls
-Jev. To smoke-test the real path, select `jev`, start the API, and use the curl
-command above with all five demo phrases, plus `meet` and `meet Sarah tomorrow`.
-Check API terminal timings and Gateway usage; a safe UNKNOWN fallback by itself
-is not evidence that a real model request succeeded.
 
 ## Device networking and environment
 
@@ -179,10 +117,11 @@ in `apps/api/.env.local`, where account deletion uses it.
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.
 Never use either prefix for secrets. Future server credentials belong only in the
 API's environment, without a public prefix. Environment files are ignored by git;
-the `.env.example` files are tracked. Turbo passes Gateway configuration only to the API dev task. Do not add Gateway
-keys to Expo configuration or any public environment variable.
+the `.env.example` files are tracked. Turbo passes AI Gateway configuration only to the API dev
+task, ahead of the intelligence plan that will use it. Do not add Gateway keys to Expo
+configuration or any public environment variable.
 
-`GET /api/health` is public. `POST /api/intent` and `DELETE /api/account` require
+`GET /api/health` is public. The intent graph routes and `DELETE /api/account` require
 `Authorization: Bearer <Supabase access token>` and return 401 without one. They allow
 cross-origin requests for Expo web, and no cookies are involved.
 
@@ -197,19 +136,24 @@ apps/
     src/stores/               # Zustand stores, including the auth session mirror
   api/
     src/app/api/health/        # GET /api/health
-    src/app/api/intent/        # POST /api/intent (signed-in users)
+    src/app/api/intents/       # GET, POST /api/intents; :id and :id/changesets
+    src/app/api/events/        # POST /api/events/:id/undo
+    src/app/api/changes/       # GET /api/changes
     src/app/api/account/       # DELETE /api/account (deletes the signed-in user)
-    src/lib/decision-engine/  # Provider factory, mock, Jev, entity parser
-    src/lib/supabase/         # Server clients and Bearer-token verification
+    src/lib/graph/             # applyChangeset, undo, snapshot loading, error mapping
+    src/lib/kinds/             # Per-kind derivations (derive.trip)
+    src/lib/templates/         # Per-template seed ops and derivation dispatch
+    src/lib/supabase/          # Server clients and Bearer-token verification
 packages/
   types/src/                  # Shared Zod schemas and inferred contracts
   config/                     # Strict TS, shared ESLint, Prettier
 tests/                         # Node tests for contracts, classifier, thresholds
 ```
 
-- Add future provider implementations in `apps/api/src/lib/decision-engine/` and
-  register them in `getDecisionEngine()` there. The route and mobile client
-  depend only on the shared contract; provider secrets stay server-side.
+- Add a kind by adding its Zod schema and a `KIND_REGISTRY` entry in
+  `packages/types/src/kinds/`; no migration is needed. Add a derivation for it in
+  `apps/api/src/lib/kinds/` and wire it into `apps/api/src/lib/templates/index.ts`. See
+  [Intent graph](docs/architecture/intent-graph.md).
 - Protect a new API route with `verifyRequest()` from
   `apps/api/src/lib/supabase/verify-request.ts`, which returns the user or a ready
   401 response. Keep Supabase clients and data access in `apps/api/src/lib/supabase/`.

@@ -5,10 +5,10 @@
 This pnpm/Turborepo monorepo contains four private workspaces:
 
 - `apps/mobile/src/app/`: Expo Router screens and root layout. API/query helpers live in `src/lib/`; local Zustand stores live in `src/stores/`.
-- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. AI, Supabase, and shared response code belongs in `src/lib/decision-engine/`, `src/lib/supabase/`, and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
+- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, and templates in `src/lib/templates/`; Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
 - `packages/types/src/`: shared Zod schemas and inferred TypeScript contracts, imported through `@nexui/types`.
 - `packages/config/`: strict TypeScript defaults, shared ESLint rules, and Prettier configuration.
-- `supabase/migrations/`: Postgres schema, RLS and SQL functions (see `docs/architecture/persistence.md`). Saved-record queries live in `apps/api/src/lib/records/`. Instant commits, Undo and change intents (`COMPLETE`, `RESCHEDULE`, `APPEND`) are covered in `docs/architecture/instant-actions.md`.
+- `supabase/migrations/`: Postgres schema, RLS and the graph functions (see `docs/architecture/intent-graph.md`).
 
 `tests/` contains Node tests; `docs/architecture/` contains short guides to current behavior. Keep new assets within their owning app. Keep server code out of shared contracts and mobile imports.
 
@@ -23,7 +23,7 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `pnpm build`: build Next.js and export Expo web; does not build native binaries.
 - `pnpm lint` / `pnpm typecheck`: check all applicable workspaces.
 - `pnpm test`: run the Node test suite.
-- `pnpm eval:intent`: run `evals/intent-fixtures.json` through the decision engine (`--provider jev` makes billed calls; `--compare <file>` diffs runs).
+- `node scripts/smoke-intent-graph.mjs`: exercise the graph API as the QA user (API must be running).
 - `pnpm lint:fix`: apply ESLint fixes across the workspaces.
 - `pnpm fix`: apply ESLint fixes, then Prettier formatting.
 - `pnpm format` / `pnpm format:check`: apply or verify formatting.
@@ -59,15 +59,8 @@ Project subagents live in `.claude/agents/`. Reviewers report findings and never
 
 - `api-reviewer`: before handing off changes in `apps/api` or `packages/types`.
 - `mobile-reviewer`: before handing off changes in `apps/mobile`.
-- `security-reviewer`: for changes to auth, env, logging, API routes, or the decision engine.
+- `security-reviewer`: for changes to auth, env, logging, or API routes.
 - `docs-keeper`: after a behavior, contract, env, or command change; it edits docs.
-- `intent-evaluator`: after changes to the decision-engine prompt or model; defaults to the free mock provider.
-
-## Claude Code Skills
-
-Project skills live in `.claude/skills/`.
-
-- `add-intent`: add, rename, or remove an intent. It covers all 18 files for a new-item intent (fewer for a change intent that acts on a saved item), in order, and includes a completeness check.
 
 ## Commit & Pull Request Guidelines
 
