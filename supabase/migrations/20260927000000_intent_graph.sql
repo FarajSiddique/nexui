@@ -189,7 +189,7 @@ begin
   end if;
 
   if jsonb_typeof(p_source) <> 'object'
-    or (p_source ->> 'type') not in ('user', 'ai', 'derived', 'external')
+    or coalesce(p_source ->> 'type', '') not in ('user', 'ai', 'derived', 'external')
   then
     raise exception 'Invalid source' using errcode = 'NXU22';
   end if;
@@ -235,7 +235,7 @@ begin
     before_row := null;
     after_row := null;
 
-    if op ? 'origin' and (op ->> 'origin') not in ('direct', 'derived') then
+    if op ? 'origin' and coalesce(op ->> 'origin', '') not in ('direct', 'derived') then
       raise exception 'Invalid origin' using errcode = 'NXU22';
     end if;
 
@@ -463,6 +463,8 @@ declare
   restored jsonb;
   stored jsonb := '[]'::jsonb;
   logged public.events;
+  soft_deleted_ids uuid[] := '{}';
+  revived_relationship_ids uuid[] := '{}';
 begin
   if caller is null then
     raise exception 'Sign in to continue' using errcode = 'NXU04';
@@ -505,6 +507,14 @@ begin
           raise exception 'Changed since' using errcode = 'NXU09';
         end if;
 
+        -- Undoing an insert soft-deletes a row that was live. Checked against live links after
+        -- the loop. (Redoing an ordinary delete reproduces a state a forward delete_object can
+        -- already leave dangling by design, so it isn't flagged here — only a brand-new
+        -- disappearance introduced by this revert is.)
+        if current_row ->> 'deleted_at' is null and prior is null then
+          soft_deleted_ids := soft_deleted_ids || row_id;
+        end if;
+
         if prior is null then
           update public.objects o set deleted_at = now()
           where o.id = row_id returning to_jsonb(o.*) into restored;
@@ -531,16 +541,10 @@ begin
           raise exception 'Changed since' using errcode = 'NXU09';
         end if;
 
-        -- Reviving a link: both endpoints must still be live, or this revert can't be applied.
+        -- Reviving a link: its endpoints are checked after the loop, once every row this
+        -- revert touches has reached its final state.
         if prior is not null and prior ->> 'deleted_at' is null then
-          begin
-            perform private.check_endpoint(
-              caller, current_row ->> 'source_type', (current_row ->> 'source_id')::uuid);
-            perform private.check_endpoint(
-              caller, current_row ->> 'target_type', (current_row ->> 'target_id')::uuid);
-          exception when sqlstate 'NXU04' then
-            raise exception 'Changed since' using errcode = 'NXU09';
-          end;
+          revived_relationship_ids := revived_relationship_ids || row_id;
         end if;
 
         begin
@@ -597,15 +601,44 @@ begin
     ));
   end loop;
 
-  -- A restored soft-delete must not leave a live link dangling onto it.
+  -- A row this revert just soft-deleted must not leave a live link (in any of the caller's
+  -- intents) dangling onto it. Scoped to only the rows this revert touched, so an unrelated
+  -- forward delete elsewhere in the intent (which legitimately leaves its own link live) never
+  -- blocks this or any other Undo/Redo.
   if exists (
     select 1
     from public.relationships r
-    join public.objects o on
-      (r.source_type = 'object' and r.source_id = o.id)
-      or (r.target_type = 'object' and r.target_id = o.id)
-    where r.user_id = caller and r.intent_id = original.intent_id
-      and r.deleted_at is null and o.deleted_at is not null
+    where r.user_id = caller and r.deleted_at is null
+      and (
+        (r.source_type = 'object' and r.source_id = any (soft_deleted_ids))
+        or (r.target_type = 'object' and r.target_id = any (soft_deleted_ids))
+      )
+  ) then
+    raise exception 'Changed since' using errcode = 'NXU09';
+  end if;
+
+  -- A link this revert just revived must have both endpoints still live and owned by the
+  -- caller, or the revive can't be applied.
+  if exists (
+    select 1
+    from public.relationships r
+    where r.id = any (revived_relationship_ids)
+      and (
+        (r.source_type = 'object' and not exists (
+          select 1 from public.objects o
+          where o.id = r.source_id and o.user_id = caller and o.deleted_at is null
+        ))
+        or (r.source_type = 'intent' and not exists (
+          select 1 from public.intents i where i.id = r.source_id and i.user_id = caller
+        ))
+        or (r.target_type = 'object' and not exists (
+          select 1 from public.objects o
+          where o.id = r.target_id and o.user_id = caller and o.deleted_at is null
+        ))
+        or (r.target_type = 'intent' and not exists (
+          select 1 from public.intents i where i.id = r.target_id and i.user_id = caller
+        ))
+      )
   ) then
     raise exception 'Changed since' using errcode = 'NXU09';
   end if;

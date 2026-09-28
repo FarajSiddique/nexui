@@ -45,6 +45,11 @@ declare
   e1 jsonb;
   e2 jsonb;
   e3 jsonb;
+  e4 jsonb;
+  e5 jsonb;
+  e5_undo jsonb;
+  place_undo jsonb;
+  place_redo jsonb;
 begin
   assert jsonb_array_length(snapshot -> 'objects') = 2, 'owner sees the trip and the place';
   assert jsonb_array_length(snapshot -> 'relationships') = 1, 'owner sees the link';
@@ -101,6 +106,18 @@ begin
     null;
   end;
 
+  begin
+    perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+      jsonb_build_array(jsonb_build_object('op', 'insert_object',
+        'id', '10000000-0000-4000-8000-000000000007',
+        'kind', 'place', 'kindVersion', 1, 'title', 'Bad Source', 'status', null,
+        'data', '{"name":"Bad Source","country":"US","placeType":"poi","lat":0,"lng":0,"days":1}'::jsonb,
+        'source', '{}'::jsonb, 'position', 3, 'origin', 'direct')));
+    assert false, 'a source object without a type must be rejected';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+
   -- A revert must fail once the row it would restore has moved on (NXU09), without waiting on
   -- the clock: two update_intent changesets in a row, then Undo the older one.
   e1 := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
@@ -139,6 +156,32 @@ begin
     null;
   end;
 
+  -- N1 regression: a forward delete_object is allowed to leave a live link dangling (the place
+  -- still has its 'part_of' link into X from the case above). That must never block an
+  -- unrelated Undo elsewhere in the intent, and Undo/Redo of the delete itself must both still
+  -- succeed even though the link stays live throughout.
+  e4 := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'delete_object',
+      'id', '10000000-0000-4000-8000-000000000003', 'origin', 'direct')));
+
+  e5 := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+      'patch', jsonb_build_object('summary', '{"line":"c"}'::jsonb))));
+
+  e5_undo := public.revert_event((e5 ->> 'id')::uuid);
+  assert (e5_undo ->> 'reverts_event_id') = (e5 ->> 'id'),
+    'an unrelated Undo must succeed even though the place delete left a live link dangling';
+
+  place_undo := public.revert_event((e4 ->> 'id')::uuid);
+  assert (select deleted_at from public.objects
+    where id = '10000000-0000-4000-8000-000000000003') is null,
+    'Undo of the place delete succeeds and restores it to live';
+
+  place_redo := public.revert_event((place_undo ->> 'id')::uuid);
+  assert (select deleted_at from public.objects
+    where id = '10000000-0000-4000-8000-000000000003') is not null,
+    'Redo of the place delete succeeds even though its link is still live';
+
   begin
     perform public.revert_event(create_event_id);
     assert false, 'reverting the create event must fail';
@@ -146,8 +189,11 @@ begin
     null;
   end;
 
-  assert jsonb_array_length(public.changes_page(10)) = 8,
-    'Changes lists create, change, undo, redo, both intent edits, and both graph inserts';
+  -- Successful events, in order: create, days-change, undo, redo, e1, e2, e3,
+  -- insert_relationship(place,X), e4 (place delete), e5, e5 undo, place undo, place redo = 13.
+  -- Every other call above is expected to raise and is caught, so it logs nothing.
+  assert jsonb_array_length(public.changes_page(20)) = 13,
+    'Changes lists every successful create/change/undo/redo, with none lost to a raised error';
 end;
 $$;
 
