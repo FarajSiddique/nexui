@@ -60,7 +60,6 @@ test('a row changed since, or a second undo, is a 409', async (t) => {
   for (const [code, message] of [
     ['NXU09', "Something changed since then, so this can't be undone."],
     ['NXU10', 'That was already undone.'],
-    ['23505', 'That was already undone.'],
   ]) {
     t.mock.restoreAll();
     mockSupabaseAuth(t, postgrest({ revert_event: () => pgError(code) }));

@@ -2,6 +2,7 @@ import { changesetRequestSchema, commitResponseSchema, fromUserOps, idSchema } f
 
 import { commitChangeset } from '../../../../../lib/graph/commit.ts';
 import { graphErrorResponse } from '../../../../../lib/graph/respond.ts';
+import { readJsonBody } from '../../../../../lib/http/json-body.ts';
 import { corsHeaders, jsonError, preflight } from '../../../../../lib/http/responses.ts';
 import { getUserClient } from '../../../../../lib/supabase/clients.ts';
 import { verifyRequest } from '../../../../../lib/supabase/verify-request.ts';
@@ -33,15 +34,13 @@ export async function POST(request: Request, { params }: ChangesetRouteContext):
     return jsonError('Not found.', 404, headers);
   }
 
-  let body: unknown;
+  const read = await readJsonBody(request, headers);
 
-  try {
-    body = await request.json();
-  } catch {
-    return jsonError('Invalid JSON', 400, headers);
+  if (read instanceof Response) {
+    return read;
   }
 
-  const parsed = changesetRequestSchema.safeParse(body);
+  const parsed = changesetRequestSchema.safeParse(read.body);
 
   if (!parsed.success) {
     return jsonError('That change is not valid.', 400, headers);

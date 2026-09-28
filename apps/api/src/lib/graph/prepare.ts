@@ -47,6 +47,24 @@ function checkEndpoint(snapshot: GraphSnapshot, type: 'object' | 'intent', id: s
   }
 }
 
+type NewLink = Extract<ChangesetOp, { op: 'insert_relationship' }>;
+
+// The database allows one live copy of each link; saying so here beats a conflict there.
+function checkNewLink(snapshot: GraphSnapshot, link: NewLink): void {
+  const exists = snapshot.relationships.some(
+    (live) =>
+      live.sourceType === link.sourceType &&
+      live.sourceId === link.sourceId &&
+      live.targetType === link.targetType &&
+      live.targetId === link.targetId &&
+      live.type === link.type,
+  );
+
+  if (exists) {
+    throw new ChangesetInvalidError('That link already exists.');
+  }
+}
+
 function checkData(kind: string, data: unknown): Record<string, unknown> {
   const parsed = parseKindData(kind, data);
 
@@ -111,6 +129,7 @@ export function validateOps(
       case 'insert_relationship':
         checkEndpoint(running, op.sourceType, op.sourceId);
         checkEndpoint(running, op.targetType, op.targetId);
+        checkNewLink(running, op);
         break;
       default:
         break;
@@ -129,7 +148,7 @@ export function validateOps(
     valid.push(checked);
   }
 
-  if (ops.some((op) => op.op === 'set_workspace')) {
+  if (ops.some((op) => op.op === 'set_workspace' || op.op === 'delete_object')) {
     checkWorkspace(running);
   }
 

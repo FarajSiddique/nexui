@@ -22,9 +22,30 @@ export interface CommitResult {
   snapshot: GraphSnapshot;
 }
 
+// Derives from a fresh snapshot and applies it. `apply_changeset` refuses with NXU08 if the
+// intent's last activity moved since that snapshot, so derived values are never stale.
+async function applyFromSnapshot(
+  db: SupabaseClient,
+  input: CommitInput,
+  now: string,
+  newId: () => string,
+): Promise<{ data: unknown; error: { code?: string } | null }> {
+  const before = await loadSnapshot(db, input.intentId);
+  const ops = prepareChangeset(before, input.ops, input.actor, now, newId);
+
+  return db.rpc('apply_changeset', {
+    p_intent_id: input.intentId,
+    p_actor: input.actor,
+    p_run_id: input.runId ?? null,
+    p_ops: ops,
+    p_expected_activity_at: before.intent.lastActivityAt,
+  });
+}
+
 /**
  * Validates, derives and commits a changeset in one database transaction, then returns the
- * logged event and the intent as it now is.
+ * logged event and the intent as it now is. If another change landed between loading and
+ * committing, it re-derives from the new state and tries once more before reporting a 409.
  */
 export async function commitChangeset(
   db: SupabaseClient,
@@ -32,20 +53,18 @@ export async function commitChangeset(
   clock: Date = new Date(),
   newId: () => string = randomUUID,
 ): Promise<CommitResult> {
-  const before = await loadSnapshot(db, input.intentId);
-  const ops = prepareChangeset(before, input.ops, input.actor, clock.toISOString(), newId);
-  const { data, error } = await db.rpc('apply_changeset', {
-    p_intent_id: input.intentId,
-    p_actor: input.actor,
-    p_run_id: input.runId ?? null,
-    p_ops: ops,
-  });
+  const now = clock.toISOString();
+  let result = await applyFromSnapshot(db, input, now, newId);
 
-  if (error) {
-    throw mapRpcError(error);
+  if (result.error?.code === 'NXU08') {
+    result = await applyFromSnapshot(db, input, now, newId);
   }
 
-  return { event: mapEventRow(data), snapshot: await loadSnapshot(db, input.intentId) };
+  if (result.error) {
+    throw mapRpcError(result.error);
+  }
+
+  return { event: mapEventRow(result.data), snapshot: await loadSnapshot(db, input.intentId) };
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   objectRow,
   snapshotRow,
   TOKYO_ID,
+  TOKYO_REL_ID,
   tokyoData,
   TRIP_ID,
   tripRow,
@@ -130,6 +131,80 @@ test('relationships may point at objects inserted earlier in the same changeset'
   );
 });
 
+test('a second live copy of an existing link is rejected', () => {
+  const duplicate = {
+    op: 'insert_relationship',
+    id: 'a1b2c3d4-0000-4000-8000-0000000000f5',
+    sourceType: 'object',
+    sourceId: TOKYO_ID,
+    targetType: 'object',
+    targetId: TRIP_ID,
+    type: 'part_of',
+    metadata: null,
+    origin: 'direct',
+  };
+
+  assert.throws(
+    () => validateOps(before, [duplicate], LATER),
+    (error) =>
+      error instanceof ChangesetInvalidError && error.message === 'That link already exists.',
+  );
+  assert.equal(validateOps(before, [{ ...duplicate, type: 'near' }], LATER).length, 1);
+  assert.equal(
+    validateOps(
+      before,
+      [{ op: 'delete_relationship', id: TOKYO_REL_ID, origin: 'direct' }, duplicate],
+      LATER,
+    ).length,
+    2,
+    'relinking after deleting the old link is fine',
+  );
+});
+
+test('deleting what the workspace refers to is rejected', () => {
+  assert.throws(
+    () => validateOps(before, [{ op: 'delete_object', id: TRIP_ID, origin: 'direct' }], LATER),
+    ChangesetInvalidError,
+  );
+  assert.equal(
+    prepareChangeset(
+      before,
+      [{ op: 'delete_object', id: TOKYO_ID, origin: 'direct' }],
+      'user',
+      LATER,
+      idSequence(),
+    )[0].op,
+    'delete_object',
+    'deleting a place is fine',
+  );
+});
+
+test('a workspace naming a missing decision is rejected', () => {
+  const doc = travelWorkspace(TRIP_ID);
+  const decision = {
+    id: 'stay',
+    type: 'decision',
+    decisionId: 'a1b2c3d4-0000-4000-8000-0000000000f6',
+    fields: [],
+  };
+
+  assert.throws(
+    () =>
+      validateOps(
+        before,
+        [
+          {
+            op: 'set_workspace',
+            doc: { ...doc, sections: [...doc.sections, decision] },
+            origin: 'direct',
+          },
+        ],
+        LATER,
+      ),
+    ChangesetInvalidError,
+  );
+});
+
 test('a user edit to something Nexui wrote marks it reviewed', () => {
   const aiTokyo = mapSnapshotRow(
     snapshotRow(travelWorkspace(TRIP_ID), {
@@ -203,7 +278,9 @@ test('database error codes map to user-safe errors', () => {
     "Something changed since then, so this can't be undone.",
   );
   assert.equal(mapRpcError({ code: 'NXU10' }).message, 'That was already undone.');
-  assert.equal(mapRpcError({ code: '23505' }).message, 'That was already undone.');
+  assert.equal(mapRpcError({ code: 'NXU11' }).message, 'That already exists.');
+  assert.ok(mapRpcError({ code: 'NXU11' }) instanceof ChangesetConflictError);
+  assert.equal(mapRpcError({ code: '23505' }).message, 'Saving the change failed.');
   assert.ok(mapRpcError({ code: 'NXU08' }) instanceof ChangesetConflictError);
   assert.ok(mapRpcError({ code: 'NXU22' }) instanceof ChangesetInvalidError);
   assert.equal(

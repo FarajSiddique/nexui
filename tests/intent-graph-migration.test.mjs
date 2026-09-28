@@ -87,7 +87,9 @@ test('apply_changeset takes the expected activity time, with no older overload',
   );
   assert.equal(sql.match(/create function public\.apply_changeset\(/g).length, 1);
 
-  const privileges = sql.match(/(grant|revoke) execute on function public\.apply_changeset\([^)]*\)/g);
+  const privileges = sql.match(
+    /(grant|revoke) execute on function public\.apply_changeset\([^)]*\)/g,
+  );
 
   assert.equal(privileges.length, 2);
 

@@ -7,6 +7,8 @@ import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import {
   eventRow,
   INTENT_ID,
+  intentRow,
+  LATER,
   snapshotRow,
   STAMP,
   TOKYO_ID,
@@ -64,6 +66,7 @@ test('an edit commits with its derived ops and returns the event and snapshot', 
   assert.equal(body.event.seq, 42);
   assert.equal(applied.p_actor, 'user');
   assert.equal(applied.p_run_id, null);
+  assert.equal(applied.p_expected_activity_at, STAMP);
   assert.deepEqual(applied.p_ops[0], { ...shorten, origin: 'direct' });
   assert.equal(applied.p_ops.at(-1).op, 'update_intent');
 });
@@ -105,12 +108,46 @@ test('server-owned fields are refused before anything is loaded', async (t) => {
   assert.equal(upstream.mock.callCount(), 0);
 });
 
-test('a stale edit is a 409 with a readable message', async (t) => {
+test('a commit that loses a race re-derives from a fresh snapshot and retries once', async (t) => {
+  const calls = [];
+  const moved = { ...intentRow, last_activity_at: LATER };
+
+  mockSupabaseAuth(
+    t,
+    postgrest({
+      get_intent_snapshot: () => {
+        calls.push('snapshot');
+
+        return snapshotRow(travelWorkspace(TRIP_ID), {
+          intent: calls.length > 1 ? moved : intentRow,
+        });
+      },
+      apply_changeset: (args) => {
+        calls.push(`apply@${args.p_expected_activity_at}`);
+
+        return calls.length === 2 ? pgError('NXU08') : eventRow;
+      },
+    }),
+  );
+
+  const response = await send([shorten]);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ['snapshot', `apply@${STAMP}`, 'snapshot', `apply@${LATER}`, 'snapshot']);
+});
+
+test('a stale edit is a 409 with a readable message after one retry', async (t) => {
+  let attempts = 0;
+
   mockSupabaseAuth(
     t,
     postgrest({
       get_intent_snapshot: () => snapshotRow(travelWorkspace(TRIP_ID)),
-      apply_changeset: () => pgError('NXU08'),
+      apply_changeset: () => {
+        attempts += 1;
+
+        return pgError('NXU08');
+      },
     }),
   );
 
@@ -118,6 +155,34 @@ test('a stale edit is a 409 with a readable message', async (t) => {
 
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, 'This changed while you were editing. Try again.');
+  assert.equal(attempts, 2);
+});
+
+test('an id or link that already exists is a 409', async (t) => {
+  mockSupabaseAuth(
+    t,
+    postgrest({
+      get_intent_snapshot: () => snapshotRow(travelWorkspace(TRIP_ID)),
+      apply_changeset: () => pgError('NXU11'),
+    }),
+  );
+
+  const response = await send([shorten]);
+
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, 'That already exists.');
+});
+
+test('a body over 64 KiB is a 413 and nothing is loaded', async (t) => {
+  const upstream = mockSupabaseAuth(t);
+  const body = JSON.stringify({ ops: [shorten], padding: 'x'.repeat(65_536) });
+
+  const response = await POST(authed(url, { method: 'POST', body }), context);
+
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).error, 'That change is too large.');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(upstream.mock.callCount(), 0);
 });
 
 test('an unknown intent is a 404', async (t) => {

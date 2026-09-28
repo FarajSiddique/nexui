@@ -6,6 +6,7 @@ import {
   fromUserOps,
   graphQuerySchema,
   insightDataSchema,
+  optionDataSchema,
   parseKindData,
   placeDataSchema,
   tripDataSchema,
@@ -65,6 +66,43 @@ test('insights allow at most two actions of the known types', () => {
     insightDataSchema.safeParse({ ...base, actions: [{ ...give, name: 'rm -rf' }] }).success,
     false,
   );
+});
+
+test('free-form JSON fields are capped in size', () => {
+  const link = {
+    op: 'insert_relationship',
+    id: TOKYO_ID,
+    sourceType: 'object',
+    sourceId: TOKYO_ID,
+    targetType: 'object',
+    targetId: TRIP_ID,
+    type: 'near',
+  };
+  const small = { note: 'x'.repeat(1_900) };
+  const large = { note: 'x'.repeat(2_000) };
+  const give = { type: 'capability', label: 'Give back', name: 'trip.setPlaceDays' };
+  const insight = { text: 'You have 1 day unallocated', severity: 'attention' };
+
+  assert.equal(userOpSchema.safeParse({ ...link, metadata: small }).success, true);
+  assert.equal(userOpSchema.safeParse({ ...link, metadata: large }).success, false);
+  assert.equal(userOpSchema.safeParse({ ...link, metadata: null }).success, true);
+  assert.equal(
+    insightDataSchema.safeParse({ ...insight, actions: [{ ...give, input: small }] }).success,
+    true,
+  );
+  assert.equal(
+    insightDataSchema.safeParse({ ...insight, actions: [{ ...give, input: large }] }).success,
+    false,
+  );
+});
+
+test('an option carries at most 12 metrics', () => {
+  const option = { label: 'Ryokan', summary: 'Quiet', pros: [], cons: [] };
+  const metrics = (count) =>
+    Object.fromEntries(Array.from({ length: count }, (_, index) => [`m${index}`, index]));
+
+  assert.equal(optionDataSchema.safeParse({ ...option, metrics: metrics(12) }).success, true);
+  assert.equal(optionDataSchema.safeParse({ ...option, metrics: metrics(13) }).success, false);
 });
 
 test('graph queries accept registered kinds and data paths only', () => {

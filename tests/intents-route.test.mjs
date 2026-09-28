@@ -107,7 +107,9 @@ test('a goal must be 3 to 500 characters', async (t) => {
   );
 });
 
-test('a database failure returns a safe 500', async (t) => {
+test('a database failure returns a safe 500 and logs only its code', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+
   mockSupabaseAuth(t, postgrest({ create_intent: () => pgError('XX000', 500) }));
 
   const response = await POST(
@@ -116,4 +118,28 @@ test('a database failure returns a safe 500', async (t) => {
 
   assert.equal(response.status, 500);
   assert.equal((await response.json()).error, 'Could not start that plan. Try again.');
+  assert.deepEqual(logged.mock.calls[0].arguments, [
+    '[intents]',
+    'Could not start that plan (XX000).',
+  ]);
+});
+
+test('a body over 64 KiB is a 413 and nothing is written', async (t) => {
+  const upstream = mockSupabaseAuth(t);
+  const body = JSON.stringify({ goal: 'Plan Japan', padding: 'x'.repeat(65_536) });
+
+  const response = await POST(authed(url, { method: 'POST', body }));
+
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).error, 'That change is too large.');
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
+test('bad JSON is a 400', async (t) => {
+  mockSupabaseAuth(t);
+
+  const response = await POST(authed(url, { method: 'POST', body: '{' }));
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error, 'Invalid JSON');
 });

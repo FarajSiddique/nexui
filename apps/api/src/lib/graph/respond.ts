@@ -2,6 +2,23 @@ import { jsonError } from '../http/responses.ts';
 import { SupabaseConfigurationError } from '../supabase/clients.ts';
 import { ChangesetConflictError, ChangesetInvalidError, GraphNotFoundError } from './errors.ts';
 
+// Only a short code such as a SQLSTATE or `PGRST202` is logged, never an error's message.
+function errorCode(error: unknown): string | null {
+  const code = error instanceof Error ? (error as { code?: unknown }).code : undefined;
+
+  return typeof code === 'string' && /^[A-Za-z0-9_]{1,20}$/.test(code) ? code : null;
+}
+
+function logLine(error: unknown, fallback: string): string {
+  if (error instanceof SupabaseConfigurationError) {
+    return error.message;
+  }
+
+  const code = errorCode(error);
+
+  return code ? `${fallback} (${code}).` : `${fallback}.`;
+}
+
 /**
  * The response for an error from the graph code: 404, 400 or 409 with the error's user-safe
  * message, or a logged 500 with `fallback` for anything else.
@@ -27,10 +44,7 @@ export function graphErrorResponse(
     return jsonError(error.message, 409, headers);
   }
 
-  console.error(
-    tag,
-    error instanceof SupabaseConfigurationError ? error.message : `${fallback} failed.`,
-  );
+  console.error(tag, logLine(error, fallback));
 
   return jsonError(`${fallback}. Try again.`, 500, headers);
 }

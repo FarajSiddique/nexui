@@ -8,7 +8,7 @@ import {
   originSchema,
 } from './graph.ts';
 import { KIND_REGISTRY, isKindName } from './kinds/registry.ts';
-import { idSchema, relTypeSchema, timestampSchema } from './primitives.ts';
+import { fitsFreeJson, idSchema, relTypeSchema, timestampSchema } from './primitives.ts';
 import { workspaceDocSchema } from './workspace.ts';
 
 const hasKeys = (patch: object): boolean => Object.keys(patch).length > 0;
@@ -17,7 +17,10 @@ const titleSchema = z.string().trim().min(1).max(200).nullable();
 const statusSchema = z.string().min(1).max(40).nullable();
 const dataSchema = z.record(z.string(), z.unknown());
 const positionSchema = z.number().nullable();
-const metadataSchema = z.record(z.string(), z.unknown()).nullable();
+const metadataSchema = z
+  .record(z.string(), z.unknown())
+  .refine(fitsFreeJson, 'Too much metadata.')
+  .nullable();
 const kindSchema = z.string().regex(/^[a-z_]{1,40}$/);
 
 const relationshipFields = {

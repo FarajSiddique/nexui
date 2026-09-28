@@ -3,6 +3,14 @@ import { z } from 'zod';
 export const idSchema = z.uuid();
 export const timestampSchema = z.iso.datetime({ offset: true });
 
+/** The most characters a free-form JSON field (link metadata, action input) may serialize to. */
+export const MAX_FREE_JSON_LENGTH = 2_000;
+
+/** True when `value` serializes to at most `MAX_FREE_JSON_LENGTH` characters. */
+export function fitsFreeJson(value: unknown): boolean {
+  return JSON.stringify(value).length <= MAX_FREE_JSON_LENGTH;
+}
+
 /** Relationship types: part_of, option_of, leg_from, leg_to … */
 export const relTypeSchema = z.string().regex(/^[a-z][a-z_]{0,39}$/);
 
@@ -24,7 +32,7 @@ export const insightActionSchema = z.discriminatedUnion('type', [
     type: z.literal('capability'),
     label: z.string().min(1).max(40),
     name: capabilityNameSchema,
-    input: z.record(z.string(), z.json()),
+    input: z.record(z.string(), z.json()).refine(fitsFreeJson, 'Too much input.'),
   }),
 ]);
 

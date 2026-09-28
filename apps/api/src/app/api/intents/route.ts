@@ -7,6 +7,7 @@ import {
 import { createIntent } from '../../../lib/graph/commit.ts';
 import { graphErrorResponse } from '../../../lib/graph/respond.ts';
 import { listIntents } from '../../../lib/graph/lists.ts';
+import { readJsonBody } from '../../../lib/http/json-body.ts';
 import { corsHeaders, jsonError, preflight } from '../../../lib/http/responses.ts';
 import { getUserClient } from '../../../lib/supabase/clients.ts';
 import { verifyRequest } from '../../../lib/supabase/verify-request.ts';
@@ -42,15 +43,13 @@ export async function POST(request: Request): Promise<Response> {
     return user;
   }
 
-  let body: unknown;
+  const read = await readJsonBody(request, headers);
 
-  try {
-    body = await request.json();
-  } catch {
-    return jsonError('Invalid JSON', 400, headers);
+  if (read instanceof Response) {
+    return read;
   }
 
-  const parsed = createIntentRequestSchema.safeParse(body);
+  const parsed = createIntentRequestSchema.safeParse(read.body);
 
   if (!parsed.success) {
     return jsonError('Describe what you are planning in 3 to 500 characters.', 400, headers);

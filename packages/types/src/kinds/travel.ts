@@ -84,7 +84,9 @@ export const optionDataSchema = z.strictObject({
   summary: z.string().max(400),
   pros: z.array(z.string().max(120)).max(8),
   cons: z.array(z.string().max(120)).max(8),
-  metrics: z.record(z.string().max(40), z.number()),
+  metrics: z
+    .record(z.string().max(40), z.number())
+    .refine((metrics) => Object.keys(metrics).length <= 12, 'At most 12 metrics.'),
   fit: z.string().max(120).optional(),
 });
 
