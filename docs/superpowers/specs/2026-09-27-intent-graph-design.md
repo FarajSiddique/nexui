@@ -10,17 +10,19 @@ designs. These are deleted in slice 1, step 1.
 
 ## 0. Decisions made while brainstorming
 
-| Topic         | Decision                                                                                                                                                             |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quick capture | **Deleted.** No tasks, events, notes, command classifier or Tasks/Calendar/Notes tabs. A loose capture may come back later as an input that Jev routes to an intent. |
-| Shell         | **Tabs: Home · (+) · Changes.** A workspace pushes over Home. + opened inside a workspace acts on that workspace; opened anywhere else, it starts a new intent.      |
-| Object model  | **Generic graph plus a kind registry in code** (Zod), with a `thing` fallback kind. No table per kind, and no kinds invented by the AI at runtime.                   |
-| Workspace     | A versioned JSON doc per intent, created from a template. Sections bind to **graph queries**, not fixed IDs.                                                         |
-| Mutations     | Every write is a **changeset** in `events`, with before and after values. Changes inside Nexui apply at once with Undo; anything that leaves Nexui needs approval.   |
-| Long AI work  | A `runs` row. Objects are written as they're produced and streamed to the client through **Supabase Realtime**.                                                      |
-| First slice   | **Travel anywhere in the world**, not Japan specifically. It includes a `map` primitive.                                                                             |
-| Second slice  | Job search. It gets its own spec and plan and must reuse the architecture without new tables or screens.                                                             |
-| Old data      | Prototype with no users: delete the old migrations and reset the dev database (ask before running the reset).                                                        |
+| Topic         | Decision                                                                                                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quick capture | **Deleted.** No tasks, events, notes, command classifier or Tasks/Calendar/Notes tabs. A loose capture may come back later as an input that Jev routes to an intent.                                     |
+| Shell         | **Tabs: Home · (+) · Changes.** A workspace pushes over Home. + opened inside a workspace acts on that workspace; opened anywhere else, it starts a new intent.                                          |
+| Object model  | **Generic graph plus a kind registry in code** (Zod), with a `thing` fallback kind. No table per kind, and no kinds invented by the AI at runtime.                                                       |
+| Workspace     | A versioned JSON doc per intent, created from a template. Sections bind to **graph queries**, not fixed IDs.                                                                                             |
+| Mutations     | Every write is a **changeset** in `events`, with before and after values. Changes inside Nexui apply at once with Undo; anything that leaves Nexui needs approval.                                       |
+| Long AI work  | A `runs` row. Objects are written as they're produced and streamed to the client through **Supabase Realtime**.                                                                                          |
+| First slice   | **Travel anywhere in the world**, not Japan specifically. It includes a `map` primitive.                                                                                                                 |
+| Second slice  | Job search. It gets its own spec and plan and must reuse the architecture without new tables or screens.                                                                                                 |
+| Old data      | Prototype with no users: delete the old migrations and reset the dev database (ask before running the reset).                                                                                            |
+| Design        | **Option A, "Itinerary Page"**, with three ideas borrowed from the other directions: C's pinned Open area and proportional day bar, and B's dashed "pencilled in" outline for AI content. See section I. |
+| Dark mode     | **Supported everywhere from day one.** Colors come only from semantic tokens with light and dark values, and the app follows the system setting. See section I.                                          |
 
 ## A. Current architecture assessment
 
@@ -114,7 +116,7 @@ intents (
   status text not null default 'exploring'
     check (status in ('exploring','active','blocked','completed','archived')),
   context jsonb not null default '{}',            -- validated per template in code
-  summary jsonb not null default '{}',            -- derived lines for Home, e.g. "3 unallocated days"
+  summary jsonb not null default '{}',            -- IntentSummary (section D), derived; drives Home cards
   created_at, updated_at, last_activity_at timestamptz not null default now()
 )
 index (user_id, status, last_activity_at desc)
@@ -125,7 +127,7 @@ objects (
   kind text not null, kind_version int not null default 1,
   title text, status text,
   data jsonb not null,                            -- validated against KIND_REGISTRY[kind]
-  source jsonb,                                   -- {type:'user'|'ai'|'derived'|'external', runId?, url?}
+  source jsonb,                                   -- {type:'user'|'ai'|'derived'|'external', runId?, url?, reviewedAt?}
   position double precision,                      -- stable user ordering (route order)
   deleted_at timestamptz,                         -- soft delete: Undo and audit
   created_at, updated_at
@@ -149,7 +151,8 @@ events (                                          -- append-only: audit log and 
   type text not null,                             -- changeset | run_started | run_finished | …
   actor text not null check (actor in ('user','derived','ai','system')),
   run_id uuid, reverts_event_id uuid references events,
-  ops jsonb,                                      -- [{op, table, id, before, after}] for changesets
+  ops jsonb,                                      -- [{op, table, id, before, after, origin}] for changesets;
+                                                  -- origin 'direct' | 'derived' (derived ops ride in the edit's changeset)
   payload jsonb not null default '{}',
   created_at
 )
@@ -194,7 +197,9 @@ applies inserts, updates, soft deletes, relationship ops and workspace doc repla
 check `expected_updated_at` for optimistic concurrency. The function records `before` and
 `after` for each op and inserts one `events` row, all in a single transaction. Undo is
 `apply_changeset(inverse(ops))` with `reverts_event_id` set. It refuses to run if a later event
-has changed the same rows since (409 with a readable message).
+has changed the same rows since (409 with a readable message). Redo, shown on undone rows in
+Changes, reverts the Undo event under the same conflict rule. Derived ops are reverted together
+with the edit that caused them and can't be undone on their own.
 
 ## D. Workspace contract
 
@@ -227,13 +232,25 @@ interface WorkspaceDoc {
   sections: Section[]; // ordered; changed only by explicit workspace ops
 }
 
-type Section = { id: string; title?: string; collapsed?: boolean } & (
+type Section = {
+  id: string;
+  title?: string;
+  collapsed?: boolean;
+  pin?: 'open'; // renders in the Open band while it has something unresolved (see below)
+} & (
   | { type: 'map'; places: GraphQuery; legs?: GraphQuery }
-  | { type: 'route'; query: GraphQuery; editable: ('days' | 'order')[] }
+  | { type: 'route'; query: GraphQuery; editable: ('days' | 'order')[]; showUnallocated?: boolean }
   | { type: 'metric'; metrics: MetricSpec[] }
+  | {
+      type: 'allocation';
+      parts: GraphQuery;
+      valueField: string;
+      labelField: string;
+      total: DerivedKey;
+    }
   | { type: 'objectList'; query: GraphQuery; card: 'compact' | 'rich'; empty?: string }
-  | { type: 'comparison'; query: GraphQuery; fields: FieldSpec[]; decisionId?: string }
-  | { type: 'decision'; decisionId: string }
+  | { type: 'comparison'; query: GraphQuery; fields: FieldSpec[] }
+  | { type: 'decision'; decisionId: string; fields: FieldSpec[] } // question, tradeoff, options compared by `fields`
   | { type: 'insight'; query: GraphQuery }
 );
 
@@ -241,9 +258,33 @@ type MetricSpec = {
   label: string;
   derived: DerivedKey; // e.g. 'trip.totalDays', 'trip.unallocatedDays', 'trip.estCost'
   format: 'days' | 'currency' | 'count';
+  emphasis?: 'whenPositive'; // accent fill while the value is above 0 (the unallocated metric)
 };
 type FieldSpec = { field: string; label: string; format?: 'currency' | 'days' | 'hours' | 'text' };
+
+// Buttons an insight can offer. They never take free-form model output as code.
+type InsightAction =
+  | { type: 'ask'; label: string; prompt: string } // opens + on this workspace, prefilled
+  | { type: 'capability'; label: string; name: CapabilityName; input: Json }; // one deterministic call
+
+// Drives a Home card; rebuilt by the template's derivation after every changeset.
+interface IntentSummary {
+  line: string; // "Dec 12 – 24, 12 days, 4 stops, 1 open decision"
+  badge?: { text: string; tone: 'attention' | 'ok' | 'running' };
+  strip?: { label: string; ai: boolean }[]; // ordered stop names for the mini route
+}
 ```
+
+**The Open band.** The renderer draws the doc in order, but lifts every section with
+`pin: 'open'` into a band directly under the first `metric` section while that section has
+something unresolved. A decision is unresolved while its status is `open`; an insight is
+unresolved while its query returns rows. Once resolved, a pinned section stays hidden, and the
+outcome is visible in the graph itself (the route, the map) and in Changes. The Open band shows
+questions and objects, never "do X" items.
+
+**Decisions include their comparison.** A `decision` section renders the question, the tradeoff
+line and its options compared by `fields`, with Choose and "Keep it open" actions. The standalone
+`comparison` section compares objects outside a decision (for example stays).
 
 Slice 2 adds `pipeline` (`stageField`, `stages`) and `timeline` (`dateField`). `Chart`,
 `RelationshipGraph` and `Scenario` from the product brief are deferred until a slice needs them.
@@ -265,6 +306,15 @@ derives.
 both validation and rendering. `thing` has `data: { fields: {label, value}[] }` and renders as a
 generic list of labeled fields.
 
+**Marking what Nexui wrote.** Every primitive applies one rule from `source`, not per kind:
+
+- `source.type === 'ai'` and no `source.reviewedAt`: the title sits on the highlighter mark and
+  carries a small "Nexui" tag. Any user edit to the object sets `reviewedAt` in the same
+  changeset, which removes the mark. The provenance stays in `source`.
+- `option` objects (proposals not yet chosen) also get a dashed outline, so "not committed yet"
+  reads without color.
+- `derived` values (metrics, derived insights) show the "auto-calculated" glyph instead.
+
 **Who changes the doc.** Templates create it. The `workspace.addSection`,
 `workspace.removeSection` and `workspace.moveSection` capabilities change it as ops inside a
 changeset (versioned and undoable). The shell is not in the doc and cannot change.
@@ -277,9 +327,9 @@ changeset (versioned and undoable). The shell is not in the doc and cannot chang
 | `place`    | `name`, `country` (ISO 3166-1 alpha-2), `placeType: 'city'\|'region'\|'town'\|'area'\|'site'`, `lat`, `lng`, `days`, `estDailyCost?: {amount, currency}`, `why?` |
 | `leg`      | `mode: 'flight'\|'train'\|'bus'\|'car'\|'ferry'\|'other'`, `estHours?`, `estCost?: {amount, currency}` (endpoints are `leg_from` and `leg_to` relationships)     |
 | `stay`     | `name`, `placeId`, `nights`, `estNightly?: {amount, currency}`, `url?`                                                                                           |
-| `decision` | `question`, `status: 'open'\|'resolved'`, `chosenOptionId?`, `tradeoff?`                                                                                         |
-| `option`   | `label`, `placeId?`, `summary`, `pros: string[]`, `cons: string[]`, `metrics: Record<string, number>`                                                            |
-| `insight`  | `text`, `severity: 'info'\|'attention'`, `derivedKey?`                                                                                                           |
+| `decision` | `question`, `status: 'open'\|'resolved'\|'dismissed'`, `chosenOptionId?`, `tradeoff?`                                                                            |
+| `option`   | `label`, `placeId?`, `summary`, `pros: string[]`, `cons: string[]`, `metrics: Record<string, number>`, `fit?: string`                                            |
+| `insight`  | `text`, `detail?`, `severity: 'info'\|'attention'`, `derivedKey?`, `actions: InsightAction[]` (at most 2)                                                        |
 | `thing`    | `fields: {label, value}[]`                                                                                                                                       |
 
 Relationships: `part_of` (place, stay or decision to the trip), `option_of` (option to decision),
@@ -291,13 +341,20 @@ Relationships: `part_of` (place, stay or decision to the trip), `option_of` (opt
 - `unallocatedDays = totalDays − Σ place.days` for places that are `part_of` the trip.
 - `estCost = Σ days·estDailyCost + Σ leg.estCost + Σ stay costs`, converted to `trip.currency`
   with a fixed rate table and labelled "approximate".
-- If `unallocatedDays > 0`, one insight with `derivedKey: 'trip.unallocatedDays'` is upserted.
-  At 0 or below it is soft-deleted. If `totalDays` is unknown, an open decision "How long is the
-  trip?" is created instead.
-- `intent.summary` is refreshed so Home shows lines like "5 stops · 3 unallocated days".
+- If `unallocatedDays > 0`, one insight with `derivedKey: 'trip.unallocatedDays'` is upserted
+  ("You have 1 unallocated day", detail naming the edit that freed it). Its actions are
+  `ask` ("Ask Nexui for ideas") and, when the last edit shortened a stop, `capability`
+  `trip.setPlaceDays` giving the days back to that stop. At 0 or below it is soft-deleted. If
+  `totalDays` is unknown, an open decision "How long is the trip?" is created instead.
+- If `unallocatedDays < 0` (more days placed than the trip has), the insight says so and offers
+  no automatic fix.
+- `intent.summary` is rebuilt: the line, a badge ("1 day unallocated" as attention, "Every day
+  planned" as ok, "Drafting" as running while a run is active) and the ordered stop strip.
 
-The travel template's default sections are `map`, `route` (editable: days, order), `metric`
-(total days, unallocated, estimated cost), `insight`, and `decision` for each open decision.
+The travel template's default sections, in order: `map`, `metric` (total days, unallocated with
+`emphasis: 'whenPositive'`, estimated cost), `allocation` (places' `days` against
+`trip.totalDays`), `insight` (pinned open), `route` (editable days and order, `showUnallocated`).
+Decision sections are added pinned open by `decision.propose`.
 
 ## E. Capability interface
 
@@ -337,8 +394,10 @@ interface CapabilityContext {
 
 **Slice-1 capabilities:** `object.create`, `object.update`, `object.delete`,
 `relationship.create`, `relationship.delete`, `trip.setPlaceDays`, `trip.reorderPlaces`,
-`decision.propose` (creates decision, options and a comparison section), `decision.resolve`
-(links the chosen place `part_of` the trip, gives it the available days and adds legs),
+`decision.propose` (creates the decision and its options, and adds a pinned `decision` section),
+`decision.resolve` (with an option: links the chosen place `part_of` the trip, gives it the
+available days and adds legs; with no option: marks the decision `dismissed`; either way it
+removes the decision section in the same changeset),
 `workspace.addSection`, `workspace.removeSection`, `workspace.moveSection`, `derive.trip`
 (code only). Slice 2 adds `web.search`, `jobs.*` and an `external_change` input.
 
@@ -367,6 +426,9 @@ ExternalEvent (slice 2) ─► Jev: material? affects which intent? surface? ─
 - **Where runs execute:** `after()` in the route handler (Fluid Compute, 300s default). The
   route returns `{ runId }` immediately. If runs need retries or more time, the executor moves
   to Vercel Workflow without changing its interface.
+- **Stopping a run:** `POST /api/runs/[id]/cancel` sets `cancelled`. The executor checks the
+  status between steps and stops after the current step commits, so what's already written
+  stays and can be undone. Closing the + sheet does not stop a run.
 - **Surfacing thresholds (ambient, mostly slice 2):** ≥ 0.85 applies automatically where the
   policy is `internal`; 0.6–0.85 creates an insight suggesting it; below that, nothing happens.
 - **Audit and reversal:** every AI changeset appears in Changes with its actor and run, and can
@@ -381,9 +443,9 @@ ExternalEvent (slice 2) ─► Jev: material? affects which intent? surface? ─
 
 ## G. Migration plan
 
-| Keep as is                                                                                                                                                                                                                                                                                              | Refactor                                                                                                                                                                                                                                                                                                                                                 | Replace                                                                                                                                                                                                                                           | Remove                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth (sign-in, verify, session lifecycle, secure storage, `api/account`), `lib/http`, `lib/supabase`, `api/health` + `connection-banner` + `use-health`, `query-provider`, fonts and theme tokens, `packages/config`, format hook, `scripts/qa-session.mjs`, test setup, reviewer agents, `docs-keeper` | Jev client → `lib/perception`. `getDecisionEngine` → provider factory for perception + cognition. `tab-bar-items`, `tab-header`, `list-states`, `undo-toast`, `use-undo-store` → new shell. `scripts/eval-intent.mjs` → `eval-travel.mjs`. `intent-evaluator` agent → the travel evals. `docs/architecture/{persistence,instant-actions}.md` → rewritten | `@nexui/types` domain contracts, the migrations, the routes (`/api/intents`, `/api/intents/[id]`, `/api/intents/[id]/changesets`, `/api/intents/[id]/ask`, `/api/runs/[id]`, `/api/events/[id]/undo`, `/api/changes`), the tab layout and screens | `lib/decision-engine/*` except the Jev transport, `lib/records/*`, `chrono-node`, the `intent`, `intent-events`, `tasks`, `timeline`, `search` and `items` routes, the compose, draft, change, edit and item-form sheets, `intent-previews`, `magic-bar`, `item-fields`, `form-values`, `task-groups`, `timeline-*`, `highlight-segments`, `intent-display`, `intent-confidence`, `commit-label`, `compose-context`, `change-actions`, `submit-decision`, `use-intent-prediction`, `use-demo-store`, the `add-intent` skill, `evals/*.json`, their tests, all of `docs/specs/`, the 2026-09-24 superpowers specs and plans |
+| Keep as is                                                                                                                                                                                                                                                                             | Refactor                                                                                                                                                                                                                                                                                                                                                 | Replace                                                                                                                                                                                                                                                                                                                                                                           | Remove                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth (sign-in, verify, session lifecycle, secure storage, `api/account`), `lib/http`, `lib/supabase`, `api/health` + `connection-banner` + `use-health`, `query-provider`, fonts, `packages/config`, format hook, `scripts/qa-session.mjs`, test setup, reviewer agents, `docs-keeper` | Jev client → `lib/perception`. `getDecisionEngine` → provider factory for perception + cognition. `tab-bar-items`, `tab-header`, `list-states`, `undo-toast`, `use-undo-store` → new shell. `scripts/eval-intent.mjs` → `eval-travel.mjs`. `intent-evaluator` agent → the travel evals. `docs/architecture/{persistence,instant-actions}.md` → rewritten | `@nexui/types` domain contracts, the migrations, the routes (`/api/intents`, `/api/intents/[id]`, `/api/intents/[id]/changesets`, `/api/intents/[id]/ask`, `/api/runs/[id]`, `/api/runs/[id]/cancel`, `/api/events/[id]/undo`, `/api/events/[id]/redo`, `/api/changes`), the tab layout and screens, and `theme.ts` (light-only constants → light and dark token sets, section I) | `lib/decision-engine/*` except the Jev transport, `lib/records/*`, `chrono-node`, the `intent`, `intent-events`, `tasks`, `timeline`, `search` and `items` routes, the compose, draft, change, edit and item-form sheets, `intent-previews`, `magic-bar`, `item-fields`, `form-values`, `task-groups`, `timeline-*`, `highlight-segments`, `intent-display`, `intent-confidence`, `commit-label`, `compose-context`, `change-actions`, `submit-decision`, `use-intent-prediction`, `use-demo-store`, the `add-intent` skill, `evals/*.json`, their tests, all of `docs/specs/`, the 2026-09-24 superpowers specs and plans |
 
 ## H. Prototype plan
 
@@ -391,8 +453,10 @@ ExternalEvent (slice 2) ─► Jev: material? affects which intent? surface? ─
 
 Build order (each step keeps `pnpm lint`, `pnpm typecheck` and `pnpm test` passing):
 
-1. **Clean slate.** Delete the Remove column. Rewire the shell to Home · (+) · Changes with
-   placeholder screens.
+1. **Clean slate and theme.** Delete the Remove column. Replace `theme.ts` with the light and
+   dark token sets and `useTheme()` (section I), switch `userInterfaceStyle` to `automatic`,
+   and add the raw-color guard test. Rewire the shell to Home · (+) · Changes with placeholder
+   screens that already use tokens.
 2. **Contracts.** Kind registry, changeset ops, `GraphQuery` + `evaluateQuery`, `WorkspaceDoc`,
    Run, Event, plus unit tests.
 3. **Database.** The `intent_graph` migration, `apply_changeset`, inverse, and RLS smoke tests.
@@ -403,13 +467,15 @@ Build order (each step keeps `pnpm lint`, `pnpm typecheck` and `pnpm test` passi
 5. **Intelligence.** Jev template routing and ask routing, AI SDK cognition through the Gateway
    (tiers from env), the capability registry and model-tool adapter, runs with `after()`, and
    mock fixtures recorded from live runs.
-6. **Mobile.** Home (intent cards from `summary`), Changes (the event feed with Undo),
-   `intent/[id]` workspace, the seven primitives (`map` through react-native-maps with a list
-   fallback on web), optimistic changesets, and Realtime on the open intent's objects,
-   relationships, workspace and runs.
-7. **Ask flow.** "Could we use the extra time somewhere rural?" → reasoning run →
-   `decision.propose` → a comparison appears → the user picks → `decision.resolve` → the route
-   and map update and unallocated days drop to 0.
+6. **Mobile.** Home (intent cards from `summary`, plus "What changed"), Changes (filters by
+   actor, Undo and Redo), the `intent/[id]` workspace with its Open band, the eight primitives
+   (`map` through react-native-maps with a list fallback on web), the AI marking rule,
+   optimistic changesets, and Realtime on the open intent's objects, relationships, workspace
+   and runs. Every screen is checked in light and dark.
+7. **Ask flow.** The insight's "Ask Nexui for ideas" opens + prefilled. "Could we use the extra
+   time somewhere rural?" → reasoning run streaming into the sheet → `decision.propose` → a
+   pinned decision with its comparison appears → the user picks → `decision.resolve` → the
+   route, day bar and map update and unallocated days drop to 0.
 8. **Evals and smoke test.** `pnpm eval:travel` runs 8 varied prompts: Japan in December, a
    weekend in Chicago, a Portugal road trip, Southeast Asia on a backpacker budget, "a beach
    week somewhere warm", a business trip to Berlin plus two free days, a family Disney trip,
@@ -422,8 +488,10 @@ trip intent, and it is saved. Objects and relationships appear, the workspace is
 rendered from primitives, and the map shows the route. The user shortens a stop, and code
 recalculates the days and shows the unallocated time. The user asks to use that time
 differently, a reasoning run proposes candidate places as objects, and a comparison appears.
-The user picks one, and the trip graph, route and map update. No task or checkbox appears anywhere. Editing a place's days makes zero model calls
-(confirmed in logs). Every AI change can be undone from Changes.
+The user picks one, and the trip graph, route and map update. No task or checkbox appears
+anywhere. Editing a place's days makes zero model calls (confirmed in logs). Every AI change can
+be undone from Changes. Every screen works in light and dark, and matches the chosen design
+(section I).
 
 ### Slice 2: job search (separate spec and plan)
 
@@ -432,33 +500,109 @@ New kinds (`company`, `opportunity`, `person`, `interview`, `document`), the `pi
 surface it. **Test of the abstraction:** slice 2 adds kinds, primitives, a template and
 capabilities, but **no new tables and no new screens**. If it needs either, revisit this design.
 
+## I. Design direction and theming
+
+The reference is Option A in `docs/design/travel-mvp-options.html` (the "Itinerary Page"). Where
+the mockup and this section disagree, this section wins.
+
+### Screens
+
+- **Home.** The "nexui" wordmark and a large "Plans" title. Each intent is a card showing its
+  goal, the `summary.badge` pill, `summary.line` and the mini route strip (AI-added stops carry
+  the highlighter). Below the cards, "What changed" shows the latest three events across all
+  intents, with a link to Changes.
+- **Workspace (`intent/[id]`).** A back link, the goal as the title, then a meta line from the
+  anchor object. The sections follow in doc order: the map card, the metrics row (the
+  unallocated metric fills with the accent while above 0), the day bar, the Open band (the
+  insight with its two actions and any open decisions), then the route. The route shows the
+  stops with −/+ day steppers, "was 4" after an edit, legs between stops, and a dashed
+  "1 day not in the route" row while days are unallocated.
+- **Decision.** The card shows "You asked …", a "Proposed by Nexui" tag, the question on the
+  highlighter, the tradeoff line and the options compared column by column. Each option has
+  Choose, and the card offers "Keep the day free", which is `decision.resolve` with no option.
+- **+ sheet.** A tall sheet over a scrim. A context chip names the workspace it acts on, and
+  from Home it reads "New plan" instead. The user's message appears as a bubble. While a run is
+  active it shows as a card with a spinner, elapsed time and one line per object as it
+  arrives, plus a Stop button. The composer is pinned to the bottom.
+- **Changes.** Filters for All, You, Nexui and Auto-calculated. Rows are grouped by day. Each
+  row shows the actor avatar, a sentence with a before → after value, and Undo. Derived rows
+  read "Undoes with your edit", and undone rows are struck through with Redo.
+- **The map** is a fixed-height card (about 164pt) framed to fit its places and legs. It has
+  numbered pins and the route line, and no gestures in slice 1. On web it falls back to an
+  ordered list.
+
+### Tokens
+
+`apps/mobile/src/lib/theme.ts` exports `tokens.light` and `tokens.dark` with identical keys,
+typed with `satisfies Record<TokenName, string>`. `useTheme()` picks one set from
+`useColorScheme()`. Slice 1 follows the system setting only; an in-app override can come later.
+`app.config.ts` changes `userInterfaceStyle` from `'light'` to `'automatic'`. The status bar,
+navigation theme and the Android map style all follow the resolved scheme.
+
+| Token                               | Light                             | Dark                              | Use                                                |
+| ----------------------------------- | --------------------------------- | --------------------------------- | -------------------------------------------------- |
+| `paper`                             | `#F2F0F6`                         | `#15131B`                         | Screen background                                  |
+| `card`                              | `#FFFFFF`                         | `#211E2A`                         | Cards, sheets, tab bar                             |
+| `ink`                               | `#1E1A2B`                         | `#F2EFF8`                         | Primary text                                       |
+| `muted`                             | `#5B5670`                         | `#B6B0C6`                         | Secondary text                                     |
+| `faint`                             | `#6B6582`                         | `#A09AB2`                         | Tertiary text (darkened from `#8A859C` to pass AA) |
+| `soft`                              | `#F6F4FA`                         | `#2A2635`                         | Steppers, inputs, secondary buttons                |
+| `line`                              | `#E4E0EC`                         | `#363142`                         | Borders, dividers                                  |
+| `accent` / `accentInk`              | `#FFE45C` / `#1E1A2B`             | `#FFE45C` / `#1E1A2B`             | Primary buttons, +, hot metric (dark ink in both)  |
+| `success` / `danger`                | `#1D7A52` / `#B3322C`             | `#5FD49B` / `#FF8A80`             | Status                                             |
+| `scrim` / `shade`                   | 38% / 10% ink                     | 58% / 40% black                   | Sheet backdrop, shadows                            |
+| `aiMark`                            | `#FFE45C`                         | `rgba(255,228,92,0.28)`           | Highlighter behind text Nexui wrote                |
+| `aiChip` / `aiChipInk`              | `#FFE45C` / `#1E1A2B`             | 16% yellow / `#FFE45C`            | "Nexui" tag                                        |
+| `userMark`                          | `#1E1A2B`                         | `#F2EFF8`                         | "You" avatar, route stop numbers                   |
+| `mapLand` / `mapSea`                | `#FFFFFF` / `#E3DFED`             | `#2A2635` / `#1A1722`             | Web fallback and Android custom style              |
+| `mapRoute` / `mapPin` / `mapPinInk` | `#1E1A2B` / `#1E1A2B` / `#FFFFFF` | `#FFE45C` / `#F2EFF8` / `#15131B` | Route line and pins drawn over the native map      |
+
+Fonts don't change: Bricolage Grotesque for display and headings, and Atkinson Hyperlegible for
+body text.
+
+### Rules the code enforces
+
+- **No raw colors outside `theme.ts`.** A test scans `apps/mobile/src` for hex, `rgb(` and
+  `rgba(` literals in any other file and fails if it finds one.
+- **Both token sets have the same keys**, which the type checks and the test asserts.
+- **AA contrast in both themes.** The test computes contrast for the declared text pairs
+  (`ink`, `muted` and `faint` on `paper`, `card` and `soft`; `accentInk` on `accent`;
+  `aiChipInk` on `aiChip`; `ink` on `aiMark` over `card`) and requires at least 4.5:1.
+- **Maps:** on iOS, react-native-maps' `userInterfaceStyle` follows the scheme. On Android, a
+  dark `customMapStyle` JSON is applied, with its colors taken from the tokens.
+- **Screens are checked in both themes:** the smoke test in step 8 covers every screen in light
+  and in dark.
+
 ## Answers to the brief's technical questions (§23)
 
 1. **Task-centrism:** nearly total. See A.
 2. **Goal model → Intent:** no existing goal model to evolve (today's "intent" is a command
    label). New model.
-3. **Reusable UI:** the tab bar pieces, the header, list states, the undo toast and the theme.
-   The item cards and sheets are too tied to items to reuse.
-   4–5. **Schema and JSONB:** section C.
-4. **Object validation:** Zod schemas per kind in `@nexui/types`, checked in the API before the RPC.
-5. **Evolving kinds:** `kind_version` plus `upgrade` functions, and `thing` as the fallback.
-6. **Persisting layouts:** a versioned `workspaces.doc`, changed through changeset ops.
-7. **Config → components:** the exhaustive `SECTION_REGISTRY` plus `KIND_REGISTRY` card specs.
-8. **Optimistic updates:** the client applies ops to its cached snapshot, the server echoes the
-   committed changeset (including derived ops), and on error the client rolls back to the
-   pre-change snapshot.
-9. **Realtime:** only where the server writes without the client asking: run output (the
-   environment filling in) and, in slice 2, external changes. Direct edits use the response
-   instead.
-10. **Safe AI mutation:** only through capabilities → validated ops → the RPC under RLS.
-11. **Audit and reversal:** `events.ops` before and after values, and Undo via inverse
+3. **Reusable UI:** the tab bar pieces, the header, list states, the undo toast and the fonts.
+   The theme is rebuilt as light and dark tokens (section I). The item cards and sheets are too
+   tied to items to reuse.
+4. **Schema:** section C.
+5. **JSONB versus columns:** section C.
+6. **Object validation:** Zod schemas per kind in `@nexui/types`, checked in the API before the
+   RPC.
+7. **Evolving kinds:** `kind_version` plus `upgrade` functions, and `thing` as the fallback.
+8. **Persisting layouts:** a versioned `workspaces.doc`, changed through changeset ops.
+9. **Config → components:** the exhaustive `SECTION_REGISTRY` plus `KIND_REGISTRY` card specs.
+10. **Optimistic updates:** the client applies ops to its cached snapshot, the server echoes the
+    committed changeset (including derived ops), and on error the client rolls back to the
+    pre-change snapshot.
+11. **Realtime:** only where the server writes without the client asking: run output (the
+    environment filling in) and, in slice 2, external changes. Direct edits use the response
+    instead.
+12. **Safe AI mutation:** only through capabilities → validated ops → the RPC under RLS.
+13. **Audit and reversal:** `events.ops` before and after values, and Undo and Redo via inverse
     changesets.
-12. **Approval:** anything that leaves Nexui (`policy: 'approval'`).
-13. **Jev in the pipeline:** perception step F routes templates, asks and material changes.
-14. **Gateway routing:** two env-mapped tiers with Gateway fallbacks; the mock provider for
+14. **Approval:** anything that leaves Nexui (`policy: 'approval'`).
+15. **Jev in the pipeline:** perception step F routes templates, asks and material changes.
+16. **Gateway routing:** two env-mapped tiers with Gateway fallbacks; the mock provider for
     development and tests.
-15. **Long operations:** `runs` rows with progress, streamed by Realtime.
-16. **Partial rollback:** each committed step stays; Undo on a run reverts all of its steps.
-17. **Cross-intent:** typed relationship endpoints with no FK tying them to one intent.
-18. **Smallest proof:** slice 1 as specified. Six tables, one RPC, seven primitives, about 13
+17. **Long operations:** `runs` rows with progress, streamed by Realtime, stoppable between steps.
+18. **Partial rollback:** each committed step stays; Undo on a run reverts all of its steps.
+19. **Cross-intent:** typed relationship endpoints with no FK tying them to one intent.
+20. **Smallest proof:** slice 1 as specified. Six tables, one RPC, eight primitives, about 13
     capabilities.
