@@ -192,8 +192,12 @@ Clients get **no direct insert, update or delete** on any of the six tables. All
 through `security definer` functions (`create_intent`, `apply_changeset`, `revert_event`, and
 the run functions in slice 1's intelligence plan). Each of them checks `auth.uid()` and filters
 every statement by the caller's `user_id` and intent. Their shared implementation lives in a
-`private` schema that PostgREST doesn't expose. This keeps the audit log in `events` honest
-(nobody can forge or edit rows), and makes the API the only path that validates `data`.
+`private` schema that PostgREST doesn't expose. Nobody can edit or delete `events` rows, and
+nobody can touch another user's data. The functions check each op's `origin` and `source`
+shape. They're still callable with the user's own token, though, so a client that skips the
+API can write unvalidated `data` or mislabel the actor of **its own** changes. That's
+accepted for slice 1, because AI runs write with the user's token. Moving AI writes to a
+service-role function would close the gap if it ever matters.
 Relationship endpoints are checked against the caller's own objects and intents, because FK
 checks ignore RLS. `objects`, `relationships`, `workspaces`, `events` and `runs` are published
 to Realtime, which is scoped by RLS.
