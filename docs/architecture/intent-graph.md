@@ -24,8 +24,11 @@ direct `insert`/`update`/`delete` — the migration `revoke`s those and only `gr
 
 - `create_intent(id, goal, template, ops)`: inserts the intent, then applies its seed changeset
   as actor `system`.
-- `apply_changeset(intent_id, actor, run_id, ops)`: locks the intent, checks ownership, and
-  calls the shared `private.apply_ops` to apply the ops and log one `events` row.
+- `apply_changeset(intent_id, actor, run_id, ops, expected_activity_at default null)`: locks the
+  intent, checks ownership, refuses with `NXU08` when `expected_activity_at` is given and no
+  longer matches the intent's `last_activity_at` (every changeset and Undo bumps it), refuses a
+  `run_id` that isn't one of the caller's `runs` (`NXU22`), then calls the shared
+  `private.apply_ops` to apply the ops and log one `events` row.
 - `revert_event(event_id)`: Undo. Writes each op's `before` back, newest first, as a new
   changeset with `reverts_event_id` set. **Redo is `revert_event` on the Undo event itself** —
   one route serves both.
@@ -35,7 +38,10 @@ direct `insert`/`update`/`delete` — the migration `revoke`s those and only `gr
 `private.apply_ops` is the one place rows actually change. It rejects an op whose `origin` isn't
 `direct` or `derived`, a `source.type` outside `user`/`ai`/`derived`/`external`, more than one op
 touching the same row, and a relationship endpoint that isn't one of the caller's own live
-objects or intents (`private.check_endpoint`). `revert_event` additionally refuses to undo the
+objects or intents (`private.check_endpoint`). A clash with an existing row (a reused id, a
+second live copy of a link) becomes `NXU11`, and a missing or out-of-range column `NXU22`, so no
+constraint detail reaches the client. The `private` functions aren't executable by `public`,
+`anon` or `authenticated`; only the definer functions call them. `revert_event` additionally refuses to undo the
 create-intent (`system`) event, compares `updated_at` as `timestamptz` to detect a row that
 changed underneath it, and raises if undoing would leave a live relationship pointing at an
 object it just removed, or would revive a relationship whose endpoint is gone (also on a
@@ -48,14 +54,15 @@ section C), because AI runs write with the user's token too.
 **Error codes and HTTP mapping** (`apps/api/src/lib/graph/errors.ts#mapRpcError`, used by
 `apps/api/src/lib/graph/respond.ts#graphErrorResponse`):
 
-| Code              | Meaning                                                       | HTTP                                     |
-| ----------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| `NXU04`           | Not found, or not the caller's                                | 404                                      |
-| `NXU08`           | `expectedUpdatedAt` didn't match                              | 409                                      |
-| `NXU09`           | A row changed since, or Undo/Redo would leave a link dangling | 409                                      |
-| `NXU10` / `23505` | Already undone                                                | 409                                      |
-| `NXU22`           | Malformed changeset (bad op/origin/source)                    | 400                                      |
-| anything else     | Unknown                                                       | 500, logged, generic message to the user |
+| Code          | Meaning                                                                   | HTTP                                        |
+| ------------- | ------------------------------------------------------------------------- | ------------------------------------------- |
+| `NXU04`       | Not found, or not the caller's                                            | 404                                         |
+| `NXU08`       | `expectedUpdatedAt` or the intent's expected activity time didn't match   | 409 (after one re-derived retry)            |
+| `NXU09`       | A row changed since, or Undo/Redo would leave a link dangling             | 409                                         |
+| `NXU10`       | Already undone (including two Undos racing on the unique index)           | 409                                         |
+| `NXU11`       | Already exists: a reused id or a second live copy of a link               | 409 "That already exists."                  |
+| `NXU22`       | Malformed changeset (bad op/origin/source/run, missing or invalid column) | 400                                         |
+| anything else | Unknown                                                                   | 500, logged as `[tag] <fallback> (<code>).` |
 
 ## Kinds
 
@@ -90,7 +97,10 @@ route.ts → fromUserOps → prepareChangeset → apply_changeset (RPC) → { ev
      gains `source.reviewedAt = now`.
   2. `validateOps` walks the ops against the snapshot as it would be after each previous one,
      validating `insert_object`/`update_object` data against the kind registry and relationship
-     endpoints against the snapshot, via `applyOps` (`packages/types/src/apply-ops.ts`).
+     endpoints against the snapshot, via `applyOps` (`packages/types/src/apply-ops.ts`). It
+     refuses a second live copy of an existing link ("That link already exists."), and when the
+     ops include `set_workspace` or `delete_object` it checks the workspace doc still names only
+     live objects, so deleting the trip (the anchor) or a decision the doc shows is a 400.
   3. The validated ops are staged in memory (`applyOps`), and `deriveForTemplate`
      (`apps/api/src/lib/templates/index.ts`) runs the intent's template derivation — `derive.trip`
      for `template: 'travel'` — over the staged result, producing more ops with `origin:
@@ -98,9 +108,15 @@ route.ts → fromUserOps → prepareChangeset → apply_changeset (RPC) → { ev
   4. `coalesceOps` merges the direct and derived ops down to one op per row (a row can only
      appear once in `apply_changeset`'s input), then the whole set is validated again.
 - **`commitChangeset`** (`apps/api/src/lib/graph/commit.ts`) loads the current snapshot, runs
-  `prepareChangeset`, and calls the `apply_changeset` RPC. The route
+  `prepareChangeset`, and calls the `apply_changeset` RPC with the snapshot's `lastActivityAt`.
+  If another change landed in between (`NXU08`), the derived values would be stale, so it
+  reloads, re-prepares and retries once; a second `NXU08` is the 409. The route
   (`apps/api/src/app/api/intents/[id]/changesets/route.ts`) returns its `{ event, snapshot }`
   unchanged.
+- **Size caps**: `POST /api/intents` and `POST /api/intents/:id/changesets` read the body with
+  `readJsonBody` (`apps/api/src/lib/http/json-body.ts`) and refuse more than 65 536 characters
+  with 413 "That change is too large.". In the contracts, link `metadata` and a capability
+  action's `input` serialize to at most 2 000 characters, and an option has at most 12 `metrics`.
 
 **Example** (`tests/derive-trip.test.mjs`): shortening Tokyo from 4 days to 3 stages an
 `update_object` on Tokyo, then `derive.trip` sees the trip now has 1 unallocated day and adds:
@@ -119,7 +135,8 @@ Conflict rules, enforced in Postgres because the client's view can be stale:
 - **Changed since**: if any row the original event touched no longer matches its recorded
   `after` value, the whole Undo is refused (`NXU09`) rather than partially applied.
 - **Already undone**: a unique index on `reverts_event_id` means only one Undo can exist per
-  event; a second attempt gets `NXU10`.
+  event; a second attempt gets `NXU10`, and so does the loser of two Undos racing (its insert
+  hits the index and is re-raised as `NXU10`).
 - **Can't undo the create**: the `system`-actor event that creates the intent is refused
   (`NXU22`) — there's nothing to undo back to.
 - **Derived ops ride along**: they were part of the original changeset's `ops`, so reverting the
