@@ -10,17 +10,17 @@ designs. These are deleted in slice 1, step 1.
 
 ## 0. Decisions made while brainstorming
 
-| Topic            | Decision                                                                                                                                                      |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quick capture    | **Deleted.** No tasks, events, notes, command classifier or Tasks/Calendar/Notes tabs. A loose capture may come back later as an input that Jev routes to an intent. |
-| Shell            | **Tabs: Home · (+) · Changes.** A workspace pushes over Home. + opened inside a workspace acts on that workspace; opened anywhere else, it starts a new intent. |
-| Object model     | **Generic graph plus a kind registry in code** (Zod), with a `thing` fallback kind. No table per kind, and no kinds invented by the AI at runtime.             |
-| Workspace        | A versioned JSON doc per intent, created from a template. Sections bind to **graph queries**, not fixed IDs.                                                   |
-| Mutations        | Every write is a **changeset** in `events`, with before and after values. Changes inside Nexui apply at once with Undo; anything that leaves Nexui needs approval. |
-| Long AI work     | A `runs` row. Objects are written as they're produced and streamed to the client through **Supabase Realtime**.                                                |
-| First slice      | **Travel anywhere in the world**, not Japan specifically. It includes a `map` primitive.                                                                      |
-| Second slice     | Job search. It gets its own spec and plan and must reuse the architecture without new tables or screens.                                                      |
-| Old data         | Prototype with no users: delete the old migrations and reset the dev database (ask before running the reset).                                                 |
+| Topic         | Decision                                                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quick capture | **Deleted.** No tasks, events, notes, command classifier or Tasks/Calendar/Notes tabs. A loose capture may come back later as an input that Jev routes to an intent. |
+| Shell         | **Tabs: Home · (+) · Changes.** A workspace pushes over Home. + opened inside a workspace acts on that workspace; opened anywhere else, it starts a new intent.      |
+| Object model  | **Generic graph plus a kind registry in code** (Zod), with a `thing` fallback kind. No table per kind, and no kinds invented by the AI at runtime.                   |
+| Workspace     | A versioned JSON doc per intent, created from a template. Sections bind to **graph queries**, not fixed IDs.                                                         |
+| Mutations     | Every write is a **changeset** in `events`, with before and after values. Changes inside Nexui apply at once with Undo; anything that leaves Nexui needs approval.   |
+| Long AI work  | A `runs` row. Objects are written as they're produced and streamed to the client through **Supabase Realtime**.                                                      |
+| First slice   | **Travel anywhere in the world**, not Japan specifically. It includes a `map` primitive.                                                                             |
+| Second slice  | Job search. It gets its own spec and plan and must reuse the architecture without new tables or screens.                                                             |
+| Old data      | Prototype with no users: delete the old migrations and reset the dev database (ask before running the reset).                                                        |
 
 ## A. Current architecture assessment
 
@@ -271,16 +271,16 @@ changeset (versioned and undoable). The shell is not in the doc and cannot chang
 
 ### Slice-1 travel kinds
 
-| Kind       | `data` (all validated)                                                                                                                                    |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `trip`     | `destinations: string[]`, `startDate?`, `endDate?`, `totalDays?`, `travelers?`, `budget?: {amount, currency}`, `pace?: 'slow'\|'balanced'\|'fast'`, `currency` |
+| Kind       | `data` (all validated)                                                                                                                                           |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trip`     | `destinations: string[]`, `startDate?`, `endDate?`, `totalDays?`, `travelers?`, `budget?: {amount, currency}`, `pace?: 'slow'\|'balanced'\|'fast'`, `currency`   |
 | `place`    | `name`, `country` (ISO 3166-1 alpha-2), `placeType: 'city'\|'region'\|'town'\|'area'\|'site'`, `lat`, `lng`, `days`, `estDailyCost?: {amount, currency}`, `why?` |
-| `leg`      | `mode: 'flight'\|'train'\|'bus'\|'car'\|'ferry'\|'other'`, `estHours?`, `estCost?: {amount, currency}` (endpoints are `leg_from` and `leg_to` relationships) |
-| `stay`     | `name`, `placeId`, `nights`, `estNightly?: {amount, currency}`, `url?`                                                                                    |
-| `decision` | `question`, `status: 'open'\|'resolved'`, `chosenOptionId?`, `tradeoff?`                                                                                   |
-| `option`   | `label`, `placeId?`, `summary`, `pros: string[]`, `cons: string[]`, `metrics: Record<string, number>`                                                     |
-| `insight`  | `text`, `severity: 'info'\|'attention'`, `derivedKey?`                                                                                                    |
-| `thing`    | `fields: {label, value}[]`                                                                                                                                |
+| `leg`      | `mode: 'flight'\|'train'\|'bus'\|'car'\|'ferry'\|'other'`, `estHours?`, `estCost?: {amount, currency}` (endpoints are `leg_from` and `leg_to` relationships)     |
+| `stay`     | `name`, `placeId`, `nights`, `estNightly?: {amount, currency}`, `url?`                                                                                           |
+| `decision` | `question`, `status: 'open'\|'resolved'`, `chosenOptionId?`, `tradeoff?`                                                                                         |
+| `option`   | `label`, `placeId?`, `summary`, `pros: string[]`, `cons: string[]`, `metrics: Record<string, number>`                                                            |
+| `insight`  | `text`, `severity: 'info'\|'attention'`, `derivedKey?`                                                                                                           |
+| `thing`    | `fields: {label, value}[]`                                                                                                                                       |
 
 Relationships: `part_of` (place, stay or decision to the trip), `option_of` (option to decision),
 `leg_from` / `leg_to` (leg to place).
@@ -381,8 +381,8 @@ ExternalEvent (slice 2) ─► Jev: material? affects which intent? surface? ─
 
 ## G. Migration plan
 
-| Keep as is                                                                                                                                                                                                  | Refactor                                                                                                                                                                                                                                                                                                                                       | Replace                                                                                                                                                                                                           | Remove                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep as is                                                                                                                                                                                                                                                                                              | Refactor                                                                                                                                                                                                                                                                                                                                                 | Replace                                                                                                                                                                                                                                           | Remove                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Auth (sign-in, verify, session lifecycle, secure storage, `api/account`), `lib/http`, `lib/supabase`, `api/health` + `connection-banner` + `use-health`, `query-provider`, fonts and theme tokens, `packages/config`, format hook, `scripts/qa-session.mjs`, test setup, reviewer agents, `docs-keeper` | Jev client → `lib/perception`. `getDecisionEngine` → provider factory for perception + cognition. `tab-bar-items`, `tab-header`, `list-states`, `undo-toast`, `use-undo-store` → new shell. `scripts/eval-intent.mjs` → `eval-travel.mjs`. `intent-evaluator` agent → the travel evals. `docs/architecture/{persistence,instant-actions}.md` → rewritten | `@nexui/types` domain contracts, the migrations, the routes (`/api/intents`, `/api/intents/[id]`, `/api/intents/[id]/changesets`, `/api/intents/[id]/ask`, `/api/runs/[id]`, `/api/events/[id]/undo`, `/api/changes`), the tab layout and screens | `lib/decision-engine/*` except the Jev transport, `lib/records/*`, `chrono-node`, the `intent`, `intent-events`, `tasks`, `timeline`, `search` and `items` routes, the compose, draft, change, edit and item-form sheets, `intent-previews`, `magic-bar`, `item-fields`, `form-values`, `task-groups`, `timeline-*`, `highlight-segments`, `intent-display`, `intent-confidence`, `commit-label`, `compose-context`, `change-actions`, `submit-decision`, `use-intent-prediction`, `use-demo-store`, the `add-intent` skill, `evals/*.json`, their tests, all of `docs/specs/`, the 2026-09-24 superpowers specs and plans |
 
 ## H. Prototype plan
@@ -439,26 +439,26 @@ capabilities, but **no new tables and no new screens**. If it needs either, revi
    label). New model.
 3. **Reusable UI:** the tab bar pieces, the header, list states, the undo toast and the theme.
    The item cards and sheets are too tied to items to reuse.
-4–5. **Schema and JSONB:** section C.
-6. **Object validation:** Zod schemas per kind in `@nexui/types`, checked in the API before the RPC.
-7. **Evolving kinds:** `kind_version` plus `upgrade` functions, and `thing` as the fallback.
-8. **Persisting layouts:** a versioned `workspaces.doc`, changed through changeset ops.
-9. **Config → components:** the exhaustive `SECTION_REGISTRY` plus `KIND_REGISTRY` card specs.
-10. **Optimistic updates:** the client applies ops to its cached snapshot, the server echoes the
-    committed changeset (including derived ops), and on error the client rolls back to the
-    pre-change snapshot.
-11. **Realtime:** only where the server writes without the client asking: run output (the
-    environment filling in) and, in slice 2, external changes. Direct edits use the response
-    instead.
-12. **Safe AI mutation:** only through capabilities → validated ops → the RPC under RLS.
-13. **Audit and reversal:** `events.ops` before and after values, and Undo via inverse
+   4–5. **Schema and JSONB:** section C.
+4. **Object validation:** Zod schemas per kind in `@nexui/types`, checked in the API before the RPC.
+5. **Evolving kinds:** `kind_version` plus `upgrade` functions, and `thing` as the fallback.
+6. **Persisting layouts:** a versioned `workspaces.doc`, changed through changeset ops.
+7. **Config → components:** the exhaustive `SECTION_REGISTRY` plus `KIND_REGISTRY` card specs.
+8. **Optimistic updates:** the client applies ops to its cached snapshot, the server echoes the
+   committed changeset (including derived ops), and on error the client rolls back to the
+   pre-change snapshot.
+9. **Realtime:** only where the server writes without the client asking: run output (the
+   environment filling in) and, in slice 2, external changes. Direct edits use the response
+   instead.
+10. **Safe AI mutation:** only through capabilities → validated ops → the RPC under RLS.
+11. **Audit and reversal:** `events.ops` before and after values, and Undo via inverse
     changesets.
-14. **Approval:** anything that leaves Nexui (`policy: 'approval'`).
-15. **Jev in the pipeline:** perception step F routes templates, asks and material changes.
-16. **Gateway routing:** two env-mapped tiers with Gateway fallbacks; the mock provider for
+12. **Approval:** anything that leaves Nexui (`policy: 'approval'`).
+13. **Jev in the pipeline:** perception step F routes templates, asks and material changes.
+14. **Gateway routing:** two env-mapped tiers with Gateway fallbacks; the mock provider for
     development and tests.
-17. **Long operations:** `runs` rows with progress, streamed by Realtime.
-18. **Partial rollback:** each committed step stays; Undo on a run reverts all of its steps.
-19. **Cross-intent:** typed relationship endpoints with no FK tying them to one intent.
-20. **Smallest proof:** slice 1 as specified. Six tables, one RPC, seven primitives, about 13
+15. **Long operations:** `runs` rows with progress, streamed by Realtime.
+16. **Partial rollback:** each committed step stays; Undo on a run reverts all of its steps.
+17. **Cross-intent:** typed relationship endpoints with no FK tying them to one intent.
+18. **Smallest proof:** slice 1 as specified. Six tables, one RPC, seven primitives, about 13
     capabilities.
