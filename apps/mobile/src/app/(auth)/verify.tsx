@@ -1,23 +1,26 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactElement } from 'react';
-import { StyleSheet, TextInput } from 'react-native';
+import { TextInput } from 'react-native';
 
 import {
   AuthScreen,
-  authStyles,
   FormError,
   FormNotice,
   PrimaryButton,
   TextButton,
+  useAuthStyles,
 } from '@/components/auth-screen';
 import { AuthActionError, sendEmailCode, verifyEmailCode } from '@/lib/auth';
-import { colors } from '@/lib/theme';
+import { createThemedStyles, useColors } from '@/lib/use-theme';
 
 const CODE_LENGTH = 6;
 // Match the email resend interval configured in Supabase.
 const RESEND_AFTER_S = 60;
 
 export default function VerifyScreen(): ReactElement {
+  const styles = useStyles();
+  const authStyles = useAuthStyles();
+  const colors = useColors();
   const { email = '' } = useLocalSearchParams<{ email?: string }>();
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -133,6 +136,6 @@ export default function VerifyScreen(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(() => ({
   code: { fontSize: 24, letterSpacing: 8, textAlign: 'center' },
-});
+}));

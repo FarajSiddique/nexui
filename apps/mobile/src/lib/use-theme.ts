@@ -1,0 +1,43 @@
+import { StyleSheet, useColorScheme } from 'react-native';
+
+import { palettes, type Palette, type Scheme } from './theme';
+
+/** The system color scheme; anything but dark counts as light. */
+export function useScheme(): Scheme {
+  return useColorScheme() === 'dark' ? 'dark' : 'light';
+}
+
+/** The token set for the current scheme, for colors passed as props. */
+export function useColors(): Palette {
+  return palettes[useScheme()];
+}
+
+/**
+ * Builds a hook that returns styles for the current scheme, created once per scheme.
+ *
+ * @example
+ * const useStyles = createThemedStyles((colors) => ({ screen: { backgroundColor: colors.paper } }));
+ * function Screen() {
+ *   const styles = useStyles();
+ * }
+ */
+export function createThemedStyles<T extends StyleSheet.NamedStyles<T>>(
+  factory: (colors: Palette) => T,
+): () => T {
+  const cache: Partial<Record<Scheme, T>> = {};
+
+  return function useThemedStyles(): T {
+    const scheme = useScheme();
+    const cached = cache[scheme];
+
+    if (cached) {
+      return cached;
+    }
+
+    const created = StyleSheet.create(factory(palettes[scheme]));
+
+    cache[scheme] = created;
+
+    return created;
+  };
+}

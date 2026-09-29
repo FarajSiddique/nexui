@@ -1,29 +1,63 @@
-import type { HighlightField } from '@nexui/types';
-
-export const colors = {
+/**
+ * Nexui's color tokens, one set per color scheme, and the font faces. Components never use raw
+ * colors: they read a palette through `useColors()` or `createThemedStyles()` in
+ * `use-theme.ts`. `tests/theme-tokens.test.mjs` checks both sets and their contrast.
+ */
+const light = {
   paper: '#F2F0F6', // screen background
   card: '#FFFFFF', // cards, sheets, tab bar
   ink: '#1E1A2B',
   muted: '#5B5670',
-  faint: '#8A859C',
-  soft: '#F6F4FA', // chips, avatar circles, input fill inside white sheets
+  faint: '#6B6582',
+  soft: '#F6F4FA', // steppers, inputs, secondary buttons
   line: '#E4E0EC',
-  accent: '#FFE45C', // main buttons, active tab, suggestion edge
-  accentInk: '#1E1A2B', // text on accent
+  accent: '#FFE45C', // primary buttons, +, the unallocated metric
+  accentInk: '#1E1A2B', // text on accent, in both schemes
   success: '#1D7A52',
   danger: '#B3322C',
   scrim: 'rgba(30, 26, 43, 0.38)',
+  shade: 'rgba(30, 26, 43, 0.10)',
+  aiMark: '#FFE45C', // highlighter behind text Nexui wrote
+  aiChip: '#FFE45C', // "Nexui" tag
+  aiChipInk: '#1E1A2B',
+  userMark: '#1E1A2B', // "You" avatar, route stop numbers
+  mapLand: '#FFFFFF',
+  mapSea: '#E3DFED',
+  mapRoute: '#1E1A2B',
+  mapPin: '#1E1A2B',
+  mapPinInk: '#FFFFFF',
 } as const;
 
-// One marker color per kind of detail, used on the input and on the draft alike.
-export const markers: Record<HighlightField, string> = {
-  when: '#FFE45C',
-  range: '#FFE45C',
-  attendees: '#FFB3D4',
-  location: '#9FEBC3',
-  duration: '#A8DBFF',
-  priority: '#FFC59A',
+export type TokenName = keyof typeof light;
+export type Palette = Record<TokenName, string>;
+export type Scheme = 'light' | 'dark';
+
+const dark: Palette = {
+  paper: '#15131B',
+  card: '#211E2A',
+  ink: '#F2EFF8',
+  muted: '#B6B0C6',
+  faint: '#A09AB2',
+  soft: '#2A2635',
+  line: '#363142',
+  accent: '#FFE45C',
+  accentInk: '#1E1A2B',
+  success: '#5FD49B',
+  danger: '#FF8A80',
+  scrim: 'rgba(0, 0, 0, 0.58)',
+  shade: 'rgba(0, 0, 0, 0.40)',
+  aiMark: 'rgba(255, 228, 92, 0.28)', // a wash: light text stays readable on it
+  aiChip: 'rgba(255, 228, 92, 0.16)',
+  aiChipInk: '#FFE45C',
+  userMark: '#F2EFF8',
+  mapLand: '#2A2635',
+  mapSea: '#1A1722',
+  mapRoute: '#FFE45C',
+  mapPin: '#F2EFF8',
+  mapPinInk: '#15131B',
 };
+
+export const palettes: Record<Scheme, Palette> = { light, dark };
 
 // Custom faces carry their weight in the family name, so styles omit fontWeight.
 export const fonts = {

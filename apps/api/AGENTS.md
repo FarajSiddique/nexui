@@ -7,7 +7,7 @@ These rules add to the root `AGENTS.md` for the Next.js API. Rules marked _(lint
 - A `route.ts` authenticates, parses, validates, calls a `src/lib/<domain>/` function, and maps the result to a response. Keep business logic out of route files.
 - Follow this order inside a handler:
   1. `verifyRequest(request, headers)`. If it returns a `Response`, return that response.
-  2. `await request.json()` inside `try`/`catch`. Respond with 400 `Invalid JSON` if parsing fails.
+  2. `await request.json()` inside `try`/`catch`. Respond with 400 `Invalid JSON` if parsing fails. Routes that write the intent graph use `readJsonBody(request, headers)` from `src/lib/http/json-body.ts` instead, which also answers 413 above 65 536 characters.
   3. `safeParse` the body with a schema from `@nexui/types`. Respond with 400 and a user-safe message if it fails.
   4. Do the work, then `schema.parse` the response body before sending it.
 - Build responses with `src/lib/http/responses.ts`: `corsHeaders` once per route, `preflight` for `OPTIONS`, and `jsonError` for failures. Send the route's headers on every response.

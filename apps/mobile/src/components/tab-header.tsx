@@ -1,15 +1,8 @@
 import type { ReactElement, ReactNode } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextStyle,
-} from 'react-native';
+import { Platform, Pressable, Text, TextInput, View, type TextStyle } from 'react-native';
 
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles, useColors } from '@/lib/use-theme';
 
 /**
  * A tab's fixed header: large title on the left, tools on the right. When `filter` is
@@ -27,6 +20,8 @@ export function TabHeader({
   filter?: string | null;
   onFilterChange?: (value: string | null) => void;
 }): ReactElement {
+  const styles = useStyles();
+  const colors = useColors();
   const filterable = filter !== undefined && onFilterChange !== undefined;
   const open = filterable && filter !== null;
 
@@ -90,6 +85,8 @@ export function HeaderButton({
   onPress: () => void;
   children: ReactNode;
 }): ReactElement {
+  const styles = useStyles();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -104,6 +101,8 @@ export function HeaderButton({
 
 // A magnifier drawn with views: a ring and a short handle.
 function SearchGlyph(): ReactElement {
+  const styles = useStyles();
+
   return (
     <View style={styles.glyph}>
       <View style={styles.lens} />
@@ -112,7 +111,7 @@ function SearchGlyph(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   head: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -176,7 +175,7 @@ const styles = StyleSheet.create({
   },
   close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.muted },
-});
+}));
 
 // The field's container already frames it; drop the browser's focus ring.
 const webInput = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : null;

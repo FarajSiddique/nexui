@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
 import type { ReactElement } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectionBanner } from '@/components/connection-banner';
 import { ListEmpty } from '@/components/list-states';
 import { HeaderButton, TabHeader } from '@/components/tab-header';
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles } from '@/lib/use-theme';
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
 
-// Placeholder until the Home zones arrive (anchored-shell.md, slice D). The gear opens Account.
+// Placeholder until the intent cards arrive (intent graph plan 3). The gear opens Account.
 export default function HomeScreen(): ReactElement {
+  const styles = useStyles();
   const today = new Date().toLocaleDateString('en-GB', DATE_FORMAT);
 
   return (
@@ -19,7 +21,7 @@ export default function HomeScreen(): ReactElement {
       <ScrollView style={styles.list} contentContainerStyle={styles.content}>
         <Text style={styles.date}>{today}</Text>
         <TabHeader
-          title="Home"
+          title="Plans"
           tools={
             <HeaderButton label="Account" onPress={() => router.push('/account')}>
               <GearGlyph />
@@ -27,7 +29,7 @@ export default function HomeScreen(): ReactElement {
           }
         />
         <ConnectionBanner />
-        <ListEmpty text="Your day will show here soon. Tap + to add a task, event or note." />
+        <ListEmpty text="Your plans will show here. Tap + and say what you're trying to do." />
       </ScrollView>
     </SafeAreaView>
   );
@@ -35,6 +37,8 @@ export default function HomeScreen(): ReactElement {
 
 // A gear drawn with views: a ring over four crossed bars.
 function GearGlyph(): ReactElement {
+  const styles = useStyles();
+
   return (
     <View style={styles.gear}>
       {[0, 45, 90, 135].map((angle) => (
@@ -45,7 +49,7 @@ function GearGlyph(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.paper },
   list: { flex: 1, width: '100%', maxWidth: 488, alignSelf: 'center' },
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
@@ -66,4 +70,4 @@ const styles = StyleSheet.create({
     borderColor: colors.ink,
     backgroundColor: colors.card,
   },
-});
+}));

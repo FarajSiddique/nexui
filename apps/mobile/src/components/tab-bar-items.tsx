@@ -1,24 +1,17 @@
-import { router, usePathname } from 'expo-router';
+import { router } from 'expo-router';
 import type { ReactElement } from 'react';
-import { Pressable, StyleSheet, View, type ColorValue } from 'react-native';
+import { Pressable, View, type ColorValue } from 'react-native';
 
-import type { ShellTab } from '@/lib/compose-context';
-import { colors } from '@/lib/theme';
+import { createThemedStyles } from '@/lib/use-theme';
 
 /** The tab bar's height above the bottom safe area. */
 export const TAB_BAR_HEIGHT = 64;
 
-export type TabIconName = 'home' | 'tasks' | 'calendar' | 'notes';
-
-const PATH_TABS: Record<string, ShellTab> = {
-  '/': 'home',
-  '/tasks': 'tasks',
-  '/calendar': 'calendar',
-  '/notes': 'notes',
-};
+export type TabIconName = 'home' | 'changes';
 
 // Line icons drawn with views (the app ships no icon font), on a 22-point grid.
 function Glyph({ name, color }: { name: TabIconName; color: ColorValue }): ReactElement {
+  const styles = useStyles();
   const stroke = { borderColor: color };
   const fill = { backgroundColor: color };
 
@@ -32,66 +25,39 @@ function Glyph({ name, color }: { name: TabIconName; color: ColorValue }): React
           </View>
         </View>
       );
-    case 'tasks':
+    case 'changes':
       return (
         <View style={styles.glyph}>
-          <View style={[styles.box, stroke]}>
-            <View style={[styles.tick, stroke]} />
-          </View>
-        </View>
-      );
-    case 'calendar':
-      return (
-        <View style={styles.glyph}>
-          <View style={[styles.calendar, stroke]}>
-            <View style={[styles.calendarBar, fill]} />
-          </View>
-        </View>
-      );
-    case 'notes':
-      return (
-        <View style={styles.glyph}>
-          <View style={[styles.page, stroke]}>
-            <View style={[styles.pageLine, fill]} />
-            <View style={[styles.pageLine, styles.pageLineShort, fill]} />
+          <View style={[styles.clock, stroke]}>
+            <View style={[styles.clockHour, fill]} />
+            <View style={[styles.clockMinute, fill]} />
           </View>
         </View>
       );
   }
 }
 
-/** A tab's icon; the active tab sits on a 46×30 yellow pill. */
-export function TabIcon({
-  name,
-  focused,
-  color,
-}: {
-  name: TabIconName;
-  focused: boolean;
-  color: ColorValue;
-}): ReactElement {
+/** A tab's icon; the active tab is shown by its tint and bold label. */
+export function TabIcon({ name, color }: { name: TabIconName; color: ColorValue }): ReactElement {
+  const styles = useStyles();
+
   return (
-    <View style={[styles.pill, focused && styles.pillActive]}>
+    <View style={styles.iconSlot}>
       <Glyph name={name} color={color} />
     </View>
   );
 }
 
-/**
- * The + in the middle of the tab bar. It opens the compose sheet over the current tab and
- * never switches tabs.
- */
+/** The + in the middle of the tab bar. It opens the + sheet over the current screen. */
 export function PlusTabButton(): ReactElement {
-  const pathname = usePathname();
+  const styles = useStyles();
 
   return (
     <View style={styles.plusSlot}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="New task, event or note"
-        onPress={() =>
-          router.push({ pathname: '/compose', params: { from: PATH_TABS[pathname] ?? 'home' } })
-        }
+        accessibilityLabel="Start or change a plan"
+        onPress={() => router.push('/compose')}
         style={({ pressed }) => [styles.plus, pressed && styles.plusPressed]}
       >
         <View style={styles.plusBarWide} />
@@ -101,15 +67,8 @@ export function PlusTabButton(): ReactElement {
   );
 }
 
-const styles = StyleSheet.create({
-  pill: {
-    width: 46,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pillActive: { backgroundColor: colors.accent },
+const useStyles = createThemedStyles((colors) => ({
+  iconSlot: { width: 46, height: 30, alignItems: 'center', justifyContent: 'center' },
   glyph: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   roof: {
     position: 'absolute',
@@ -134,41 +93,29 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   door: { width: 4, height: 5, borderTopLeftRadius: 1, borderTopRightRadius: 1 },
-  box: {
-    width: 17,
-    height: 17,
+  clock: {
+    width: 18,
+    height: 18,
     borderWidth: 2,
-    borderRadius: 5,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tick: {
+  clockHour: { position: 'absolute', top: 3, width: 2, height: 6, borderRadius: 1 },
+  clockMinute: {
+    position: 'absolute',
+    top: 7,
+    left: 7,
     width: 5,
-    height: 9,
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    marginTop: -2,
-    transform: [{ rotate: '45deg' }],
+    height: 2,
+    borderRadius: 1,
   },
-  calendar: { width: 17, height: 16, borderWidth: 2, borderRadius: 4, overflow: 'hidden' },
-  calendarBar: { height: 3 },
-  page: {
-    width: 15,
-    height: 18,
-    borderWidth: 2,
-    borderRadius: 3,
-    paddingHorizontal: 2,
-    paddingTop: 5,
-    gap: 3,
-  },
-  pageLine: { height: 2, borderRadius: 1 },
-  pageLineShort: { width: 4 },
   plusSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   plus: {
-    width: 56,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: colors.ink,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -178,13 +125,13 @@ const styles = StyleSheet.create({
     width: 18,
     height: 2.5,
     borderRadius: 2,
-    backgroundColor: colors.card,
+    backgroundColor: colors.accentInk,
   },
   plusBarTall: {
     position: 'absolute',
     width: 2.5,
     height: 18,
     borderRadius: 2,
-    backgroundColor: colors.card,
+    backgroundColor: colors.accentInk,
   },
-});
+}));

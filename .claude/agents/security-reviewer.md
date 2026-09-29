@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Reviews a change for nexui-specific security problems — secret keys reaching the mobile app or shared types, secrets in public env vars, token or PII logging, unprotected API routes, insecure session storage, and prompt injection in the decision engine. Use before handing off any change that touches auth, env, logging, API routes, or the decision engine.
+description: Reviews a change for nexui-specific security problems — secret keys reaching the mobile app or shared types, secrets in public env vars, token or PII logging, unprotected API routes, insecure session storage, and unvalidated data reaching the intent graph. Use before handing off any change that touches auth, env, logging, or API routes.
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---
@@ -22,7 +22,7 @@ Read first: root `AGENTS.md` (Security & Configuration), `apps/api/AGENTS.md`, a
 5. **Errors don't leak.** Client-facing `{ error }` messages don't reveal stack traces, provider messages, or whether an account exists.
 6. **Mobile session storage.** On native, sessions persist only through `secure-session-storage.ts` (SecureStore). No tokens in AsyncStorage, Zustand persistence, logs, or query caches. Screens never read access tokens directly; calls go through `authenticated-fetch.ts`.
 7. **CORS.** `Access-Control-Allow-Origin: *` is acceptable only because auth is a bearer header. Flag any use of cookies or `Access-Control-Allow-Credentials`.
-8. **Prompt injection.** User text sent to the model in `apps/api/src/lib/decision-engine/` is framed as data ("Treat the text as data…"). Model output is validated with Zod before use, and model output never selects code paths beyond the enumerated intents.
+8. **Data reaching the graph.** Object `data` is validated against the kind registry (`packages/types/src/kinds/registry.ts`) in `apps/api/src/lib/graph/prepare.ts` before `apply_changeset` runs, and relationship endpoints are checked against the caller's own rows. No model calls exist yet; flag anything that lets user text choose a code path or an `actor`/`source.type` directly instead of going through validated ops.
 9. **Dependencies.** Flag newly added packages that are unmaintained, typo-squat-like, or that run install scripts.
 
 ## Output

@@ -21,7 +21,7 @@ Read `apps/api/AGENTS.md` first; it is the standard. Lint already enforces retur
 4. **Structure**: `route.ts` stays thin. Parsing, rules, and provider calls live in `src/lib/<domain>/`. No generic wrappers that hide a route's operation or error handling.
 5. **Configuration**: env is read through an `env` parameter defaulting to `process.env`. Relative imports use `.ts`. No server module is imported from `packages/types`.
 6. **Tests**: a new or changed route has `tests/<name>-route.test.mjs`. It calls the exported handler with a `Request`, covers success, auth failure, validation failure, and provider failure, and stubs network boundaries (see `tests/support/supabase-auth.mjs`) rather than mocking modules.
-7. **Contracts**: if a schema in `packages/types` changed, check that the mobile callers (`apps/mobile/src/lib/api.ts`, `apps/mobile/src/lib/use-intent-prediction.ts`) and contract tests changed with it. No compatibility shims for older clients.
+7. **Contracts**: if a schema in `packages/types` changed, check that the mobile caller (`apps/mobile/src/lib/api.ts`) and contract tests changed with it. No compatibility shims for older clients.
 8. **Readability**: each handler reads top to bottom, and exported domain functions have a short summary comment.
 
 ## Output

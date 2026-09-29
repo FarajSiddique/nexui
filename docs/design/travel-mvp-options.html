@@ -1,0 +1,1416 @@
+<meta charset="utf-8">
+<title>Nexui Travel Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Schibsted+Grotesk:wght@500..900&display=swap">
+<style>
+/* ============ Page chrome tokens ============ */
+:root {
+  --pg: #F3F2F7;
+  --pg-ink: #1E1A2B;
+  --pg-muted: #5B5670;
+  --pg-line: #DDD8E6;
+  --pg-card: #FFFFFF;
+  --pg-acc: #FFE45C;
+  --pg-acc-ink: #1E1A2B;
+  --pg-focus: #5B3FD6;
+  --frame: #1E1A2B;
+  --f-page-d: 'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif;
+  --f-page-b: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --pg: #121017;
+    --pg-ink: #EEEAF6;
+    --pg-muted: #ABA5BC;
+    --pg-line: #2F2B3A;
+    --pg-card: #1D1A25;
+    --pg-focus: #B8A8FF;
+    --frame: #3B3648;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --pg: #121017;
+  --pg-ink: #EEEAF6;
+  --pg-muted: #ABA5BC;
+  --pg-line: #2F2B3A;
+  --pg-card: #1D1A25;
+  --pg-focus: #B8A8FF;
+  --frame: #3B3648;
+}
+
+/* ============ Option A tokens: Itinerary Page (evolves the brand) ============ */
+.opt-a, .opt-a .ph-light {
+  --paper: #F2F0F6; --card: #FFFFFF; --ink: #1E1A2B; --muted: #5B5670; --faint: #6B6582;
+  --soft: #F6F4FA; --line: #E4E0EC; --accent: #FFE45C; --accentInk: #1E1A2B;
+  --success: #1D7A52; --danger: #B3322C; --scrim: rgba(30, 26, 43, 0.38); --shade: rgba(30, 26, 43, 0.10);
+  --mapLand: #FFFFFF; --mapSea: #E3DFED; --mapRoad: #E4E0EC; --mapRoute: #1E1A2B; --mapPin: #1E1A2B; --mapPinInk: #FFFFFF; --mapLabel: #1E1A2B;
+  --aiMark: #FFE45C; --aiChip: #FFE45C; --aiChipInk: #1E1A2B; --userMark: #1E1A2B;
+  color-scheme: light;
+}
+:root[data-theme="dark"] .opt-a, .opt-a .ph-dark {
+  --paper: #15131B; --card: #211E2A; --ink: #F2EFF8; --muted: #B6B0C6; --faint: #A09AB2;
+  --soft: #2A2635; --line: #363142; --accent: #FFE45C; --accentInk: #1E1A2B;
+  --success: #5FD49B; --danger: #FF8A80; --scrim: rgba(0, 0, 0, 0.58); --shade: rgba(0, 0, 0, 0.4);
+  --mapLand: #2A2635; --mapSea: #1A1722; --mapRoad: #3A3547; --mapRoute: #FFE45C; --mapPin: #F2EFF8; --mapPinInk: #15131B; --mapLabel: #F2EFF8;
+  --aiMark: rgba(255, 228, 92, 0.28); --aiChip: rgba(255, 228, 92, 0.16); --aiChipInk: #FFE45C; --userMark: #F2EFF8;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .opt-a {
+    --paper: #15131B; --card: #211E2A; --ink: #F2EFF8; --muted: #B6B0C6; --faint: #A09AB2;
+    --soft: #2A2635; --line: #363142; --accent: #FFE45C; --accentInk: #1E1A2B;
+    --success: #5FD49B; --danger: #FF8A80; --scrim: rgba(0, 0, 0, 0.58); --shade: rgba(0, 0, 0, 0.4);
+    --mapLand: #2A2635; --mapSea: #1A1722; --mapRoad: #3A3547; --mapRoute: #FFE45C; --mapPin: #F2EFF8; --mapPinInk: #15131B; --mapLabel: #F2EFF8;
+    --aiMark: rgba(255, 228, 92, 0.28); --aiChip: rgba(255, 228, 92, 0.16); --aiChipInk: #FFE45C; --userMark: #F2EFF8;
+    color-scheme: dark;
+  }
+}
+
+/* ============ Option B tokens: Atlas (map-first) ============ */
+.opt-b, .opt-b .ph-light {
+  --paper: #EEF2F5; --card: #FFFFFF; --ink: #12263F; --muted: #4E6079; --faint: #4E6079;
+  --soft: #F0F4F8; --line: #D8E0E8; --accent: #12263F; --accentInk: #FFFFFF;
+  --need: #FFE45C; --needInk: #12263F;
+  --success: #17785A; --danger: #B42D3A; --scrim: rgba(18, 38, 63, 0.35); --shade: rgba(18, 38, 63, 0.16);
+  --mapLand: #E3EAE3; --mapSea: #BCD5E0; --mapRoad: #FFFFFF; --mapRiver: #9CC3D6; --mapBorder: #8C9CAE;
+  --mapRoute: #C8175F; --mapPin: #12263F; --mapPinInk: #FFFFFF; --mapLabel: #12263F; --mapHalo: #FFFFFF;
+  --ai: #6A3FD0; --aiSoft: #F1ECFC; --userMark: #12263F;
+  color-scheme: light;
+}
+:root[data-theme="dark"] .opt-b, .opt-b .ph-dark {
+  --paper: #0D1826; --card: #152336; --ink: #E7EEF6; --muted: #9FB2C8; --faint: #9FB2C8;
+  --soft: #1B2C42; --line: #26384F; --accent: #E7EEF6; --accentInk: #0D1826;
+  --need: #FFE45C; --needInk: #12263F;
+  --success: #58CFA0; --danger: #FF8C94; --scrim: rgba(0, 0, 0, 0.5); --shade: rgba(0, 0, 0, 0.45);
+  --mapLand: #1A2839; --mapSea: #0A1420; --mapRoad: #2A3B50; --mapRiver: #1E3A55; --mapBorder: #4A5D74;
+  --mapRoute: #FF5FA2; --mapPin: #E7EEF6; --mapPinInk: #0D1826; --mapLabel: #E7EEF6; --mapHalo: #0D1826;
+  --ai: #B9A1FF; --aiSoft: #221F45; --userMark: #E7EEF6;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .opt-b {
+    --paper: #0D1826; --card: #152336; --ink: #E7EEF6; --muted: #9FB2C8; --faint: #9FB2C8;
+    --soft: #1B2C42; --line: #26384F; --accent: #E7EEF6; --accentInk: #0D1826;
+    --need: #FFE45C; --needInk: #12263F;
+    --success: #58CFA0; --danger: #FF8C94; --scrim: rgba(0, 0, 0, 0.5); --shade: rgba(0, 0, 0, 0.45);
+    --mapLand: #1A2839; --mapSea: #0A1420; --mapRoad: #2A3B50; --mapRiver: #1E3A55; --mapBorder: #4A5D74;
+    --mapRoute: #FF5FA2; --mapPin: #E7EEF6; --mapPinInk: #0D1826; --mapLabel: #E7EEF6; --mapHalo: #0D1826;
+    --ai: #B9A1FF; --aiSoft: #221F45; --userMark: #E7EEF6;
+    color-scheme: dark;
+  }
+}
+
+/* ============ Option C tokens: Decision Board ============ */
+.opt-c, .opt-c .ph-light {
+  --paper: #E4E6EE; --card: #FFFFFF; --ink: #16161D; --muted: #555869; --faint: #555869;
+  --soft: #F1F2F6; --line: #CFD2DE; --accent: #16161D; --accentInk: #FFFFFF;
+  --success: #1B7650; --danger: #B3322C; --scrim: rgba(22, 22, 29, 0.4); --shade: rgba(22, 22, 29, 0.12);
+  --kPlace: #9FEBC3; --kPlaceInk: #0F3B2A; --kLeg: #A8DBFF; --kLegInk: #10324D;
+  --kDecision: #FFE45C; --kDecisionInk: #16161D; --kInsight: #FFC59A; --kInsightInk: #4A2308;
+  --kOption: #FFB3D4; --kOptionInk: #4D1030; --hatch: rgba(22, 22, 29, 0.28);
+  --mapLand: #FFFFFF; --mapSea: #D3D7E3; --mapRoute: #16161D; --mapPin: #16161D; --mapPinInk: #FFFFFF; --mapLabel: #16161D;
+  --aiChip: #16161D; --aiChipInk: #FFFFFF; --userMark: #16161D;
+  color-scheme: light;
+}
+:root[data-theme="dark"] .opt-c, .opt-c .ph-dark {
+  --paper: #111217; --card: #1C1D25; --ink: #EDEEF3; --muted: #A6A9BA; --faint: #A6A9BA;
+  --soft: #252733; --line: #2F3140; --accent: #EDEEF3; --accentInk: #111217;
+  --success: #5ED39D; --danger: #FF8A80; --scrim: rgba(0, 0, 0, 0.55); --shade: rgba(0, 0, 0, 0.4);
+  --kPlace: #1E4536; --kPlaceInk: #B6F3D4; --kLeg: #1C3A55; --kLegInk: #BFE3FF;
+  --kDecision: #FFE45C; --kDecisionInk: #16161D; --kInsight: #4D2E17; --kInsightInk: #FFD3B0;
+  --kOption: #4A1D33; --kOptionInk: #FFC6DF; --hatch: rgba(237, 238, 243, 0.26);
+  --mapLand: #2A2C38; --mapSea: #15161C; --mapRoute: #EDEEF3; --mapPin: #EDEEF3; --mapPinInk: #111217; --mapLabel: #EDEEF3;
+  --aiChip: #EDEEF3; --aiChipInk: #111217; --userMark: #EDEEF3;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .opt-c {
+    --paper: #111217; --card: #1C1D25; --ink: #EDEEF3; --muted: #A6A9BA; --faint: #A6A9BA;
+    --soft: #252733; --line: #2F3140; --accent: #EDEEF3; --accentInk: #111217;
+    --success: #5ED39D; --danger: #FF8A80; --scrim: rgba(0, 0, 0, 0.55); --shade: rgba(0, 0, 0, 0.4);
+    --kPlace: #1E4536; --kPlaceInk: #B6F3D4; --kLeg: #1C3A55; --kLegInk: #BFE3FF;
+    --kDecision: #FFE45C; --kDecisionInk: #16161D; --kInsight: #4D2E17; --kInsightInk: #FFD3B0;
+    --kOption: #4A1D33; --kOptionInk: #FFC6DF; --hatch: rgba(237, 238, 243, 0.26);
+    --mapLand: #2A2C38; --mapSea: #15161C; --mapRoute: #EDEEF3; --mapPin: #EDEEF3; --mapPinInk: #111217; --mapLabel: #EDEEF3;
+    --aiChip: #EDEEF3; --aiChipInk: #111217; --userMark: #EDEEF3;
+    color-scheme: dark;
+  }
+}
+
+/* ============ Page layout ============ */
+html { background: var(--pg); }
+body {
+  background: var(--pg);
+  color: var(--pg-ink);
+  font-family: var(--f-page-b);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1760px; margin: 0 auto; }
+:focus-visible { outline: 3px solid var(--pg-focus); outline-offset: 2px; }
+h1, h2, h3, h4 { text-wrap: balance; }
+.intro { padding-block: 40px 20px; max-width: 70ch; }
+.intro h1 { font-family: var(--f-page-d); font-weight: 800; font-size: clamp(34px, 6vw, 56px); line-height: 1; letter-spacing: -0.03em; margin: 0 0 16px; }
+.intro p { margin: 0 0 10px; color: var(--pg-muted); }
+.intro p strong { color: var(--pg-ink); }
+.rules { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 14px 0 0; list-style: none; }
+.rules li { border: 1px solid var(--pg-line); border-radius: 999px; padding: 3px 11px; font-size: 13.5px; color: var(--pg-muted); background: var(--pg-card); }
+
+.switcher {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50;
+  background: var(--pg); border-bottom: 1px solid var(--pg-line);
+  padding-block: 10px; margin-inline: -16px; padding-inline: 16px;
+  display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between;
+}
+.seg { display: inline-flex; background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 14px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button {
+  font: inherit; font-size: 14.5px; border: 0; background: transparent; color: var(--pg-muted);
+  padding: 7px 13px; border-radius: 11px; cursor: pointer; display: inline-flex; gap: 7px; align-items: baseline;
+}
+.seg button b { font-family: var(--f-page-d); font-weight: 800; color: var(--pg-ink); }
+.seg button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--pg-acc); color: var(--pg-acc-ink); }
+.seg button[aria-selected="true"] b, .seg button[aria-pressed="true"] b { color: var(--pg-acc-ink); }
+.theme-seg { font-size: 13px; }
+.theme-lab { font-size: 13.5px; color: var(--pg-muted); margin-right: 8px; }
+
+.option { padding-block: 28px 12px; }
+.opt-head { display: grid; gap: 18px 40px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); margin-bottom: 30px; max-width: 1280px; }
+@media (max-width: 860px) { .opt-head { grid-template-columns: 1fr; } }
+.opt-head h2 { font-family: var(--f-page-d); font-size: clamp(30px, 4.5vw, 44px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.02; margin: 0 0 12px; }
+.opt-head h2 small { display: block; font-size: 15px; letter-spacing: 0; font-weight: 600; color: var(--pg-muted); margin-bottom: 6px; font-family: var(--f-page-b); }
+.thesis { font-size: 18px; margin: 0 0 12px; max-width: 60ch; }
+.facts { display: grid; gap: 14px; margin: 0; }
+.facts div { border-top: 1px solid var(--pg-line); padding-top: 10px; }
+.facts dt { font-family: var(--f-page-d); font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+.facts dd { margin: 0; color: var(--pg-muted); font-size: 15px; max-width: 64ch; }
+.facts dd strong { color: var(--pg-ink); }
+
+.shots { display: flex; flex-wrap: wrap; gap: 40px 28px; align-items: flex-start; }
+.shot { margin: 0; width: min(375px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.shot figcaption { display: grid; gap: 2px; }
+.shot figcaption b { font-family: var(--f-page-d); font-size: 17px; font-weight: 700; }
+.shot figcaption span { color: var(--pg-muted); font-size: 14px; }
+
+/* ============ Phone shell (shared) ============ */
+.phone { height: 812px; border-radius: 50px; padding: 10px; background: var(--frame); }
+.scr {
+  position: relative; height: 100%; border-radius: 40px; overflow: hidden;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--f-page-b); font-size: 15px; line-height: 1.4;
+}
+.scr * { box-sizing: border-box; }
+.sb { position: absolute; top: 0; left: 0; right: 0; height: 46px; z-index: 9; display: flex; align-items: center; justify-content: space-between; padding: 6px 28px 0; font: 600 15px/1 system-ui, -apple-system, sans-serif; color: var(--ink); pointer-events: none; }
+.sb .sbi { display: flex; gap: 5px; align-items: center; }
+.sb svg { width: 17px; height: 12px; }
+.body { position: absolute; inset: 46px 0 0 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px 16px 118px; scrollbar-width: none; }
+.body::-webkit-scrollbar { display: none; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 6; }
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 8px 40px 28px; background: var(--card); border-top: 1px solid var(--line); }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11.5px; color: var(--muted); }
+.tab.on { color: var(--ink); font-weight: 700; }
+.tab svg { width: 24px; height: 24px; }
+.plus { width: 54px; height: 54px; border-radius: 50%; background: var(--accent); color: var(--accentInk); display: grid; place-items: center; }
+.plus svg { width: 24px; height: 24px; }
+.ico { width: 16px; height: 16px; flex: none; }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--ink); animation: spin 0.9s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.skel { background: linear-gradient(90deg, var(--soft) 0%, var(--line) 50%, var(--soft) 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; border-radius: 6px; height: 12px; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes pulse { 0% { r: 11; opacity: 0.8; } 100% { r: 24; opacity: 0; } }
+.pulse { animation: pulse 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .spin, .skel, .pulse { animation: none; } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; padding: 9px 13px; font-weight: 700; font-size: 14px; line-height: 1.1; }
+.btn-p { background: var(--accent); color: var(--accentInk); }
+.btn-s { background: var(--soft); color: var(--ink); border: 1px solid var(--line); }
+.btn-t { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; padding-inline: 4px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Map classes; colors come only from tokens */
+.m-sea { fill: var(--mapSea); }
+.m-land { fill: var(--mapLand); }
+.m-road { fill: none; stroke: var(--mapRoad); stroke-width: 3; stroke-linecap: round; }
+.m-river { fill: none; stroke: var(--mapRiver); stroke-width: 2.5; }
+.m-border { fill: none; stroke: var(--mapBorder); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.m-route { fill: none; stroke: var(--mapRoute); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.m-detour { fill: none; stroke: var(--ai, var(--mapRoute)); stroke-width: 2; stroke-dasharray: 5 5; stroke-linecap: round; }
+.m-pin { fill: var(--mapPin); stroke: var(--mapLand); stroke-width: 2; }
+.m-pint { fill: var(--mapPinInk); font: 700 10px/1 system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; }
+.m-label { fill: var(--mapLabel); font: 600 10px/1 system-ui, sans-serif; paint-order: stroke; stroke: var(--mapLand); stroke-width: 3px; stroke-linejoin: round; }
+
+/* ============ Option A: Itinerary Page ============ */
+.opt-a .scr { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
+.opt-a .dsp { font-family: 'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif; }
+.a-word { font: 800 19px/1 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.03em; padding: 8px 0 2px; display: block; }
+.a-h1 { font: 800 36px/1.02 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.035em; margin: 8px 0 14px; }
+.a-h2 { font: 700 19px/1.2 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.015em; margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.a-h2 small { font: 400 12.5px/1.2 'Atkinson Hyperlegible', system-ui, sans-serif; color: var(--muted); letter-spacing: 0; }
+.a-stack { display: grid; gap: 10px; }
+.a-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 14px 16px; }
+.a-trip h4 { font: 700 20px/1.15 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0; }
+.a-trip-h { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.a-sum { margin: 4px 0 10px; color: var(--muted); font-size: 14px; }
+.a-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.a-pill-att { background: var(--accent); color: var(--accentInk); }
+.a-pill-ok { background: var(--soft); color: var(--success); border: 1px solid var(--line); }
+.a-pill-run { background: var(--soft); color: var(--ink); border: 1px solid var(--line); }
+.a-mini { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+.a-mini i { width: 12px; height: 2px; background: var(--faint); border-radius: 2px; }
+.a-hl { background: linear-gradient(transparent 56%, var(--aiMark) 56%, var(--aiMark) 94%, transparent 94%); padding-inline: 1px; }
+.a-by { display: inline-flex; align-items: center; gap: 4px; background: var(--aiChip); color: var(--aiChipInk); font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+.a-by svg { width: 10px; height: 10px; }
+.av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; flex: none; }
+.av svg { width: 14px; height: 14px; }
+.av-you { background: var(--userMark); color: var(--paper); }
+.av-ai { background: var(--accent); color: var(--accentInk); }
+.av-auto { background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
+.a-feed { padding-block: 4px; }
+.a-fr { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; font-size: 14px; }
+.a-fr + .a-fr { border-top: 1px solid var(--line); }
+.a-fr time { color: var(--muted); font-size: 12.5px; }
+.a-more { display: block; text-align: center; padding: 10px 0 4px; font-weight: 700; font-size: 14px; border-top: 1px solid var(--line); }
+.a-nav { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-weight: 700; font-size: 15px; }
+.a-nav span { display: inline-flex; align-items: center; gap: 2px; }
+.a-title { font: 800 30px/1.04 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.035em; margin: 8px 0 4px; }
+.a-meta { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.a-map { border-radius: 20px; overflow: hidden; border: 1px solid var(--line); height: 164px; }
+.a-map svg { display: block; width: 100%; height: 100%; }
+.a-metrics { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-top: 10px; }
+.a-met { padding: 11px 12px; display: grid; gap: 3px; align-content: start; }
+.a-met + .a-met { border-left: 1px solid var(--line); }
+.a-met b { font: 800 25px/1 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.a-met span { font-size: 12px; color: var(--muted); line-height: 1.2; }
+.a-met.hot { background: var(--accent); color: var(--accentInk); }
+.a-met.hot span { color: var(--accentInk); }
+.a-insight { margin-top: 10px; display: grid; gap: 10px; }
+.a-ins-h { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+.a-ins-h b { display: block; font-size: 15.5px; }
+.a-ins-h p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+.a-route { list-style: none; margin: 0; padding: 0; display: grid; }
+.a-stop { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 10px 10px 12px; }
+.a-stop b { display: block; font-size: 15.5px; }
+.a-stop small { color: var(--muted); font-size: 12.5px; display: block; }
+.a-n { width: 26px; height: 26px; border-radius: 50%; background: var(--userMark); color: var(--paper); display: grid; place-items: center; font: 700 13px/1 'Bricolage Grotesque', system-ui, sans-serif; }
+.a-step { display: flex; align-items: center; gap: 2px; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
+.a-step > span:not(.a-dv) { width: 28px; height: 28px; border-radius: 9px; background: var(--card); display: grid; place-items: center; font-size: 17px; font-weight: 700; }
+.a-dv { min-width: 50px; text-align: center; font-weight: 700; font-size: 13.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.a-dv s { display: block; font-weight: 400; color: var(--muted); font-size: 11px; text-decoration: none; }
+.a-leg { margin-left: 24px; border-left: 2px dashed var(--line); padding: 7px 0 7px 22px; font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.a-gap { margin-top: 8px; border: 2px dashed var(--faint); border-radius: 16px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.a-gap b { font-size: 14.5px; }
+.a-ask { background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.a-ask q { color: var(--ink); font-size: 15px; font-weight: 700; quotes: '\201C' '\201D'; }
+.a-dec h4 { font: 700 21px/1.15 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; margin: 8px 0 6px; }
+.a-trade { font-size: 13.5px; margin: 0 0 10px; }
+.a-trade b { display: block; font-size: 12.5px; color: var(--muted); }
+.a-cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; }
+.a-cmp th, .a-cmp td { padding: 8px 4px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.a-cmp thead th { border-top: 0; overflow-wrap: anywhere; hyphens: auto; font: 700 12.5px/1.15 'Bricolage Grotesque', system-ui, sans-serif; }
+.a-cmp th[scope="row"] { color: var(--muted); font-weight: 400; width: 62px; }
+.a-cmp .btn { width: 100%; padding: 8px 4px; font-size: 13px; }
+.a-fit { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--success); }
+.a-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 118px; z-index: 7; background: var(--card); border-radius: 26px 26px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px var(--shade); }
+.handle { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 4px; flex: none; }
+.a-sh-body { flex: 1; overflow-y: auto; padding: 4px 16px 12px; display: grid; gap: 12px; align-content: start; scrollbar-width: none; }
+.a-ctx { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
+.a-ctx b { display: inline-flex; gap: 6px; align-items: center; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+.a-me { justify-self: end; background: var(--userMark); color: var(--paper); border-radius: 18px 18px 4px 18px; padding: 10px 13px; max-width: 82%; font-size: 15px; }
+.a-run { border: 1px solid var(--line); border-radius: 18px; padding: 12px; display: grid; gap: 10px; background: var(--paper); }
+.a-run-h { display: grid; grid-template-columns: 16px 1fr auto; gap: 10px; align-items: center; font-weight: 700; font-size: 14.5px; }
+.a-run-h time { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.a-run p { margin: 0; font-size: 13px; color: var(--muted); }
+.a-obj { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 3px; }
+.a-obj b { font-size: 15px; }
+.a-obj small { color: var(--muted); font-size: 12.5px; }
+.a-obj.arriving { opacity: 0.7; }
+.a-sh-foot { border-top: 1px solid var(--line); padding: 10px 16px 30px; display: grid; gap: 10px; }
+.a-input { display: flex; align-items: center; gap: 8px; background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 10px 10px 10px 14px; color: var(--muted); font-size: 15px; }
+.a-input span:first-child { flex: 1; }
+.a-send { width: 34px; height: 34px; border-radius: 50%; background: var(--line); color: var(--muted); display: grid; place-items: center; }
+.a-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.a-filters span { border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; font-size: 13px; background: var(--card); }
+.a-filters span.on { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 700; }
+.a-ch { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: start; padding: 12px 0; }
+.a-ch + .a-ch { border-top: 1px solid var(--line); }
+.a-ch p { margin: 0; font-size: 14.5px; }
+.a-ch small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.a-ch .btn { padding: 7px 11px; font-size: 13px; }
+.a-ch.undone p { text-decoration: line-through; color: var(--muted); }
+.a-diff { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.a-tied { font-size: 11.5px; color: var(--muted); max-width: 76px; text-align: right; line-height: 1.25; }
+.a-gh { font-size: 13px; color: var(--muted); font-weight: 700; margin: 16px 0 2px; }
+
+/* ============ Option B: Atlas ============ */
+.opt-b .scr { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
+.b-d { font-family: 'Schibsted Grotesk', 'Helvetica Neue', system-ui, sans-serif; }
+.opt-b .tabs { left: 14px; right: 14px; bottom: 16px; border-radius: 26px; padding: 8px 26px; border: 1px solid var(--line); box-shadow: 0 6px 24px var(--shade); }
+.opt-b .tab { font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-weight: 600; }
+.opt-b .tab.on { font-weight: 800; }
+.b-map { position: absolute; inset: 0; }
+.b-map svg { width: 100%; height: 100%; display: block; }
+.b-top { position: absolute; top: 52px; left: 12px; right: 12px; z-index: 3; display: flex; gap: 8px; align-items: center; }
+.b-fab { width: 42px; height: 42px; border-radius: 50%; background: var(--card); color: var(--ink); display: grid; place-items: center; box-shadow: 0 3px 12px var(--shade); flex: none; }
+.b-fab svg { width: 20px; height: 20px; }
+.b-tp { flex: 1; background: var(--card); border-radius: 16px; padding: 7px 13px; box-shadow: 0 3px 12px var(--shade); line-height: 1.2; }
+.b-tp b { font: 800 15.5px/1.2 'Schibsted Grotesk', system-ui, sans-serif; display: block; }
+.b-tp span { font-size: 12.5px; color: var(--muted); }
+.b-chips { position: absolute; top: 104px; left: 12px; right: 12px; z-index: 3; display: flex; gap: 6px; flex-wrap: wrap; }
+.b-chip { background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 11px; font: 700 13px/1.1 'Schibsted Grotesk', system-ui, sans-serif; box-shadow: 0 3px 12px var(--shade); font-variant-numeric: tabular-nums; }
+.b-chip.need { background: var(--need); color: var(--needInk); }
+.b-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; background: var(--card); border-radius: 24px 24px 0 0; box-shadow: 0 -6px 26px var(--shade); overflow-y: auto; padding: 0 16px 118px; scrollbar-width: none; }
+.b-sheet::-webkit-scrollbar { display: none; }
+.b-sheet .handle { margin-bottom: 8px; }
+.b-sh-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 0 10px; }
+.b-sh-h h4 { margin: 0; font: 800 18px/1.2 'Schibsted Grotesk', system-ui, sans-serif; }
+.b-sh-h span { font-size: 12.5px; color: var(--muted); }
+.b-ins { background: var(--need); color: var(--needInk); border-radius: 16px; padding: 11px 13px; display: grid; gap: 9px; }
+.b-ins b { font-size: 15px; display: block; }
+.b-ins p { margin: 1px 0 0; font-size: 13.5px; }
+.b-ins .btn { background: var(--needInk); color: var(--need); }
+.b-ins .btn.alt { background: transparent; color: var(--needInk); border: 1.5px solid var(--needInk); }
+.b-route { list-style: none; margin: 12px 0 0; padding: 0; }
+.b-stop { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; }
+.b-stop b { font-size: 15px; display: block; }
+.b-stop small { color: var(--muted); font-size: 12.5px; }
+.b-pn { width: 26px; height: 26px; border-radius: 50%; background: var(--mapRoute); color: var(--card); display: grid; place-items: center; font: 800 12.5px/1 'Schibsted Grotesk', system-ui, sans-serif; }
+.b-leg { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); padding: 1px 0 1px 12px; margin-left: 12px; border-left: 2px solid var(--mapRoute); }
+.b-leg svg { width: 14px; height: 14px; }
+.b-step { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.b-step span { padding: 5px 10px; font-weight: 700; font-size: 14px; }
+.b-step .v { border-inline: 1px solid var(--line); min-width: 54px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.b-step .v s { display: block; font-size: 10.5px; color: var(--muted); font-weight: 400; text-decoration: none; }
+.b-stop.edited .b-step { border-color: var(--ink); }
+.b-gap { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: center; padding: 8px 0; color: var(--ink); font-size: 14px; }
+.b-ring { width: 26px; height: 26px; border-radius: 50%; border: 2.5px dashed var(--muted); }
+.b-by { display: inline-flex; gap: 4px; align-items: center; color: var(--ai); font-size: 12px; font-weight: 700; }
+.b-by svg { width: 11px; height: 11px; }
+.b-ai { border: 1.5px dashed var(--ai); background: var(--aiSoft); }
+.b-dec { border-radius: 18px; padding: 12px 14px; display: grid; gap: 6px; }
+.b-dec h4 { margin: 0; font: 800 19px/1.2 'Schibsted Grotesk', system-ui, sans-serif; }
+.b-dec p { margin: 0; font-size: 13.5px; }
+.b-asked { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.b-asked q { color: var(--ink); font-weight: 700; }
+.b-cards { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 12px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
+.b-cards::-webkit-scrollbar { display: none; }
+.b-opt { flex: 0 0 80%; scroll-snap-align: start; border-radius: 18px; padding: 12px; display: grid; gap: 8px; background: var(--card); border: 1.5px dashed var(--ai); }
+.b-opt-h { display: grid; grid-template-columns: 28px 1fr; gap: 9px; align-items: center; }
+.b-let { width: 28px; height: 28px; border-radius: 50%; border: 2px dashed var(--ai); color: var(--ai); display: grid; place-items: center; font: 800 13px/1 'Schibsted Grotesk', system-ui, sans-serif; }
+.b-opt-h b { font: 800 16.5px/1.15 'Schibsted Grotesk', system-ui, sans-serif; display: block; }
+.b-opt-h small { color: var(--muted); font-size: 12.5px; }
+.b-kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 13px; }
+.b-kv dt { color: var(--muted); }
+.b-kv dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.b-opt .btn { width: 100%; }
+.b-note { font-size: 12.5px; color: var(--muted); margin: 0; }
+.b-query { display: flex; gap: 8px; align-items: center; border: 1.5px solid var(--ink); border-radius: 16px; padding: 10px 10px 10px 14px; font-size: 15px; }
+.b-query span { flex: 1; }
+.b-stopbtn { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; font-weight: 700; font-size: 13px; }
+.b-run { display: grid; grid-template-columns: 16px 1fr; gap: 10px; align-items: center; margin: 12px 0 4px; font-size: 14px; font-weight: 700; }
+.b-run small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.b-srow { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 14px; margin-top: 8px; }
+.b-srow b { display: block; font-size: 14.5px; }
+.b-srow small { color: var(--muted); font-size: 12.5px; }
+.b-home-h { font: 900 34px/1 'Schibsted Grotesk', system-ui, sans-serif; letter-spacing: -0.03em; margin: 10px 0 14px; }
+.b-trips { display: grid; gap: 12px; }
+.b-tc { background: var(--card); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+.b-thumb { height: 116px; position: relative; }
+.b-thumb svg { width: 100%; height: 100%; display: block; }
+.b-tb { padding: 10px 14px 12px; display: grid; gap: 4px; }
+.b-tb-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.b-tb b { font: 800 17px/1.2 'Schibsted Grotesk', system-ui, sans-serif; }
+.b-tb p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.b-tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.b-tag.need { background: var(--need); color: var(--needInk); }
+.b-tag.ok { color: var(--success); border: 1px solid var(--line); }
+.b-tag.ai { color: var(--ai); border: 1.5px dashed var(--ai); }
+.b-empty { height: 100%; display: grid; place-items: center; background: var(--soft); color: var(--muted); font-size: 13px; text-align: center; padding: 10px; }
+.b-feed { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 2px 14px; }
+.b-fr { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 10px 0; font-size: 14px; align-items: center; }
+.b-fr + .b-fr { border-top: 1px solid var(--line); }
+.b-fr small { display: block; color: var(--muted); font-size: 12.5px; }
+.b-actor { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 1px 7px; margin-right: 4px; vertical-align: 1px; }
+.b-actor.you { background: var(--userMark); color: var(--paper); }
+.b-actor.ai { color: var(--ai); border: 1.5px dashed var(--ai); }
+.b-actor.auto { color: var(--muted); border: 1px solid var(--line); background: var(--soft); }
+.b-h2 { font: 800 17px/1.2 'Schibsted Grotesk', system-ui, sans-serif; margin: 22px 0 10px; }
+.b-cgrp { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 4px 14px; margin-bottom: 12px; }
+.b-cgrp-h { display: flex; gap: 10px; align-items: center; padding: 10px 0 8px; border-bottom: 1px solid var(--line); }
+.b-cgrp-h svg { width: 44px; height: 32px; border-radius: 8px; flex: none; }
+.b-cgrp-h b { font: 800 15px/1.2 'Schibsted Grotesk', system-ui, sans-serif; }
+.b-ch { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 11px 0; align-items: center; font-size: 14px; }
+.b-ch + .b-ch { border-top: 1px solid var(--line); }
+.b-ch small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.b-ch .btn { padding: 7px 11px; font-size: 13px; }
+.b-ch .muted { font-size: 12px; color: var(--muted); text-align: right; max-width: 84px; line-height: 1.25; }
+
+/* ============ Option C: Decision Board ============ */
+.opt-c .scr { font-family: 'Archivo', system-ui, sans-serif; font-stretch: 100%; }
+.c-x { font-family: 'Archivo', system-ui, sans-serif; font-stretch: 125%; font-weight: 800; letter-spacing: -0.01em; }
+.opt-c .tabs { grid-template-columns: 1fr auto 1fr; }
+.opt-c .plus { border-radius: 14px; background: var(--accent); color: var(--accentInk); }
+.c-h1 { font-size: 30px; line-height: 1; margin: 10px 0 4px; }
+.c-lane { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 8px; font-weight: 700; font-size: 14px; }
+.c-lane span { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.c-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 6px; background: var(--ink); color: var(--paper); font-size: 11.5px; margin-left: 6px; padding-inline: 5px; }
+.c-t { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; position: relative; }
+.c-kind { font-size: 11.5px; font-weight: 700; display: flex; justify-content: space-between; gap: 6px; align-items: center; margin-bottom: 4px; }
+.c-dec { background: var(--kDecision); color: var(--kDecisionInk); border-color: transparent; }
+.c-ins { background: var(--kInsight); color: var(--kInsightInk); border-color: transparent; }
+.c-opt { background: var(--kOption); color: var(--kOptionInk); border-color: transparent; }
+.c-place { background: var(--kPlace); color: var(--kPlaceInk); border-color: transparent; }
+.c-legk { background: var(--kLeg); color: var(--kLegInk); border-color: transparent; }
+.c-draft { padding-top: 18px; }
+.c-draft::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 9px; border-radius: 10px 10px 0 0; background: repeating-linear-gradient(135deg, var(--hatch) 0 2px, transparent 2px 7px); }
+.c-by { display: inline-flex; align-items: center; gap: 4px; background: var(--aiChip); color: var(--aiChipInk); border-radius: 5px; padding: 2px 6px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.c-by svg { width: 10px; height: 10px; }
+.c-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.c-q { font-size: 16px; line-height: 1.2; margin: 0 0 6px; }
+.c-sub { margin: 0; font-size: 12.5px; opacity: 0.92; }
+.c-bar { display: flex; gap: 2px; height: 30px; border-radius: 8px; overflow: hidden; }
+.c-bar span { display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--kPlace); color: var(--kPlaceInk); min-width: 0; overflow: hidden; white-space: nowrap; }
+.c-bar .free { background: repeating-linear-gradient(135deg, var(--hatch) 0 2px, transparent 2px 6px); outline: 2px dashed var(--ink); outline-offset: -2px; color: var(--ink); }
+.c-bar.sm { height: 12px; border-radius: 4px; }
+.c-bar.sm span { font-size: 0; }
+.c-bar-l { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.c-trip b { font-size: 15.5px; display: block; }
+.c-trip p { margin: 2px 0 8px; color: var(--muted); font-size: 12.5px; }
+.c-mets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.c-met { padding: 10px; }
+.c-met b { display: block; font-size: 24px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.c-met span { font-size: 11.5px; color: var(--muted); }
+.c-met.hot { background: var(--kDecision); color: var(--kDecisionInk); border-color: transparent; }
+.c-met.hot span { color: var(--kDecisionInk); }
+.c-back { display: flex; align-items: center; gap: 2px; font-weight: 700; font-size: 14.5px; padding: 4px 0; }
+.c-meta { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.c-ins-t b { font-size: 16px; display: block; }
+.c-ins-t p { margin: 3px 0 10px; font-size: 13px; }
+.c-ins .btn-p { background: var(--kInsightInk); color: var(--kInsight); }
+.c-ins .btn-s { background: transparent; color: var(--kInsightInk); border: 1.5px solid var(--kInsightInk); }
+.c-map { padding: 0; overflow: hidden; height: 150px; }
+.c-map svg { width: 100%; height: 100%; display: block; }
+.c-route { display: grid; gap: 4px; }
+.c-stop { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 9px 10px 9px 12px; }
+.c-stop b { font-size: 14.5px; display: block; }
+.c-stop small { font-size: 12px; opacity: 0.9; }
+.c-step { display: flex; align-items: center; gap: 1px; background: var(--card); color: var(--ink); border-radius: 8px; padding: 2px; }
+.c-step span { width: 26px; height: 26px; display: grid; place-items: center; font-weight: 700; }
+.c-step .v { width: auto; min-width: 44px; font-size: 13px; font-variant-numeric: tabular-nums; line-height: 1.05; text-align: center; }
+.c-step .v s { display: block; font-size: 10px; color: var(--muted); font-weight: 400; text-decoration: none; }
+.c-leg { margin-left: 14px; display: inline-flex; gap: 6px; align-items: center; font-size: 12px; padding: 3px 8px; border-radius: 6px; justify-self: start; }
+.c-leg svg { width: 13px; height: 13px; }
+.c-ask { font-size: 12.5px; margin: 0 0 8px; }
+.c-ask q { font-weight: 700; }
+.c-trade { font-size: 13px; margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--card); color: var(--ink); }
+.c-trade b { display: block; font-size: 11.5px; color: var(--muted); }
+.c-opts { display: grid; gap: 8px; }
+.c-o-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.c-o-h b { font-size: 16px; }
+.c-o-h small { font-size: 12px; }
+.c-bars { display: grid; grid-template-columns: 70px 1fr 50px; gap: 5px 8px; align-items: center; font-size: 11.5px; margin: 8px 0 10px; font-variant-numeric: tabular-nums; }
+.c-bars i { display: block; height: 7px; border-radius: 4px; background: var(--kOptionInk); }
+.c-bars em { font-style: normal; font-weight: 700; text-align: right; }
+.c-o-f { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.c-fit { font-size: 12px; font-weight: 700; }
+.c-opt .btn-p { background: var(--kOptionInk); color: var(--kOption); padding: 7px 14px; }
+.c-feed .c-fr { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 13.5px; padding: 8px 0; }
+.c-feed .c-fr + .c-fr { border-top: 1px solid var(--line); }
+.c-feed time { font-size: 12px; color: var(--muted); }
+.c-actor { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; border-radius: 5px; padding: 2px 6px; white-space: nowrap; }
+.c-actor svg { width: 10px; height: 10px; }
+.c-actor.you { background: var(--userMark); color: var(--paper); }
+.c-actor.ai { background: var(--aiChip); color: var(--aiChipInk); outline: 1px dashed var(--ink); outline-offset: 1px; }
+.c-actor.auto { background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
+.c-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 150px; z-index: 7; background: var(--paper); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px var(--shade); }
+.c-sh-body { flex: 1; overflow-y: auto; padding: 2px 16px 12px; scrollbar-width: none; }
+.c-sh-top { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); }
+.c-sh-top b { color: var(--ink); }
+.c-me { margin: 12px 0 0 auto; background: var(--userMark); color: var(--paper); border-radius: 12px 12px 3px 12px; padding: 10px 12px; max-width: 84%; font-size: 14.5px; width: fit-content; }
+.c-runbar { margin-top: 12px; display: grid; grid-template-columns: 16px 1fr auto; gap: 10px; align-items: center; font-size: 13.5px; font-weight: 700; }
+.c-runbar small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+.c-runbar .btn { padding: 6px 10px; font-size: 12.5px; }
+.c-skel-t { border: 2px dashed var(--line); background: transparent; display: grid; gap: 8px; }
+.c-sh-foot { padding: 10px 16px 30px; border-top: 1px solid var(--line); background: var(--card); }
+.c-input { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); background: var(--soft); border-radius: 10px; padding: 10px 12px; color: var(--muted); font-size: 14.5px; }
+.c-input span:first-child { flex: 1; }
+.c-cs { padding: 0; overflow: hidden; margin-bottom: 10px; }
+.c-cs-h { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 11px 12px; align-items: center; }
+.c-cs-h b { display: block; font-size: 14.5px; margin-top: 4px; }
+.c-cs-h small { color: var(--muted); font-size: 12px; }
+.c-cs-h .btn { padding: 7px 11px; font-size: 13px; }
+.c-ops { list-style: none; margin: 0; padding: 6px 12px 10px; border-top: 1px solid var(--line); display: grid; gap: 5px; font-size: 13px; }
+.c-ops li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: center; }
+.c-ops i { width: 10px; height: 10px; border-radius: 3px; }
+.c-ops .num { font-weight: 700; }
+.c-cs.undone .c-cs-h b { text-decoration: line-through; color: var(--muted); }
+.c-legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin: 6px 0 2px; }
+.c-legend span { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); }
+.c-legend i { width: 10px; height: 10px; border-radius: 3px; }
+
+/* ============ Comparison table ============ */
+.compare { padding-block: 48px 0; max-width: 1280px; }
+.compare h2 { font-family: var(--f-page-d); font-weight: 800; font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.03em; margin: 0 0 8px; }
+.compare > p { color: var(--pg-muted); max-width: 70ch; margin: 0 0 20px; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--pg-line); border-radius: 18px; background: var(--pg-card); }
+.tbl { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 15px; }
+.tbl th, .tbl td { text-align: left; vertical-align: top; padding: 14px 16px; border-top: 1px solid var(--pg-line); }
+.tbl thead th { border-top: 0; font-family: var(--f-page-d); font-size: 17px; font-weight: 800; }
+.tbl thead th small { display: block; font-family: var(--f-page-b); font-weight: 400; font-size: 13px; color: var(--pg-muted); }
+.tbl tbody th { font-family: var(--f-page-d); font-weight: 700; width: 170px; }
+.tbl td { color: var(--pg-muted); }
+.tbl td b { color: var(--pg-ink); display: block; }
+.rec { margin-top: 28px; border-radius: 18px; padding: 18px 20px; background: var(--pg-card); border: 2px solid var(--pg-acc); max-width: 80ch; }
+.rec h3 { font-family: var(--f-page-d); font-weight: 800; font-size: 21px; margin: 0 0 6px; }
+.rec p { margin: 0 0 8px; color: var(--pg-muted); }
+.rec p strong { color: var(--pg-ink); }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-changes" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3.8h3.8M12 8v4.3l2.8 1.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 0c.6 4.6 3.4 7.4 8 8-4.6.6-7.4 3.4-8 8-.6-4.6-3.4-7.4-8-8 4.6-.6 7.4-3.4 8-8z" fill="currentColor"/></symbol>
+    <symbol id="i-calc" viewBox="0 0 16 16"><path d="M3 5.5h10M3 10.5h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 16V11l2-5h10l2 5v5M5 16h14M5 16v2M19 16v2M4 11h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-train" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2zM5 11h14M8 21l2-3M16 21l-2-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M3 13l7-2 4-7h2l-2 7 5 1.5V15l-5-.5-2 5.5h-2l.5-5.5L4 15z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sig" viewBox="0 0 17 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="9" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></symbol>
+    <symbol id="i-bat" viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="currentColor"/><rect x="2.5" y="2.5" width="16" height="7" rx="1.5" fill="currentColor"/><rect x="23.5" y="4" width="2" height="4" rx="1" fill="currentColor"/></symbol>
+
+    <!-- Base maps: fills come from tokens through classes -->
+    <symbol id="map-jp" viewBox="0 0 340 164">
+      <rect class="m-sea" width="340" height="164"/>
+      <path class="m-land" d="M300 0C305 40 262 70 205 88C150 104 90 116 0 124V164H80C125 150 170 140 222 124C282 104 330 70 340 26V0Z"/>
+      <path class="m-land" d="M18 146C40 140 64 142 84 150L78 164H10Z"/>
+      <path class="m-road" d="M268 96C240 104 200 118 158 128"/>
+    </symbol>
+    <symbol id="map-pt" viewBox="0 0 375 560">
+      <rect class="m-sea" width="375" height="560"/>
+      <path class="m-land" d="M196 0H375V560H182C176 520 186 470 178 430C170 395 175 372 160 334C140 332 128 322 136 300C148 270 156 250 164 222C172 190 170 150 170 110C174 70 186 30 196 0Z"/>
+      <path class="m-border" d="M334 0C322 60 348 110 322 170C306 220 340 280 326 340C316 400 344 470 332 560"/>
+      <path class="m-river" d="M176 110C210 104 240 120 270 114C295 110 315 116 330 114"/>
+      <path class="m-river" d="M166 326C200 306 240 300 280 284C300 276 318 272 330 270"/>
+      <path class="m-road" d="M166 328L196 190L176 110L240 48M166 328L306 360M176 110L262 116M196 190L300 200"/>
+    </symbol>
+    <symbol id="map-chi" viewBox="0 0 200 116">
+      <rect class="m-land" width="200" height="116"/>
+      <path class="m-road" d="M0 30H150M0 60H146M0 90H142M40 0V116M80 0V116M115 0V116" style="stroke-width:2"/>
+      <path class="m-sea" d="M152 0C142 40 148 80 140 116H200V0Z"/>
+    </symbol>
+    <symbol id="map-sea" viewBox="0 0 180 170">
+      <rect class="m-sea" width="180" height="170"/>
+      <path class="m-land" d="M10 8L160 4L172 30L150 52L168 84L176 112L160 138L140 148L118 132L100 118L92 150L80 166L70 150L66 124L48 116L34 88L22 50Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Three ways to draw a trip</h1>
+    <p>Mobile directions for Nexui's first slice: a travel planner where the trip is an object graph and the workspace is assembled from seven primitives (map, route, metric, object list, comparison, decision, insight). Each direction shows the same five moments: <strong>Home</strong>, a <strong>workspace</strong> right after a stop was shortened, the <strong>decision</strong> that answers "Could we use the extra time somewhere rural?", the <strong>+ sheet</strong> while a run streams objects in, and <strong>Changes</strong> with Undo.</p>
+    <p>Every palette is a token set with a light and a dark value. Use the theme control to flip all phones; each option also shows its workspace in the opposite theme. Phone screens scroll.</p>
+    <ul class="rules" aria-label="Constraints every option keeps">
+      <li>Tabs: Home, +, Changes</li>
+      <li>Workspace pushes over Home</li>
+      <li>Only the seven primitives</li>
+      <li>No tasks or checkboxes</li>
+      <li>AI content looks different from yours</li>
+      <li>Every change has Undo</li>
+    </ul>
+  </header>
+
+  <div class="switcher">
+    <div class="seg" role="tablist" aria-label="Design option">
+      <button role="tab" id="tab-a" aria-controls="opt-a" aria-selected="true"><b>A</b>Itinerary Page</button>
+      <button role="tab" id="tab-b" aria-controls="opt-b" aria-selected="false"><b>B</b>Atlas</button>
+      <button role="tab" id="tab-c" aria-controls="opt-c" aria-selected="false"><b>C</b>Decision Board</button>
+    </div>
+    <div>
+      <span class="theme-lab">Phones and page</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme">
+        <button id="th-system" data-theme-set="system" aria-pressed="true">System</button>
+        <button id="th-light" data-theme-set="light" aria-pressed="false">Light</button>
+        <button id="th-dark" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <section class="option opt-a" id="opt-a" role="tabpanel" aria-labelledby="tab-a">
+      <div class="opt-head">
+        <div>
+          <h2><small>Option A, evolves the current brand</small>Itinerary Page</h2>
+          <p class="thesis">The workspace reads like one well-kept page, top to bottom: a map postcard, the numbers, what needs attention, then the route as an editable spine. Conversation stays in the + sheet; the page is the record.</p>
+          <dl class="facts">
+            <div><dt>Example trips</dt><dd>Japan in December (the workspace), Chicago weekend, and a Portugal road trip Nexui is still drafting.</dd></div>
+            <div><dt>Brand</dt><dd>Keeps violet-tinted paper, white cards, ink, yellow, Bricolage Grotesque and Atkinson Hyperlegible. The existing highlighter idea becomes the AI mark: <strong>anything Nexui wrote sits on a yellow highlighter stroke</strong> with a small Nexui tag. Your own objects are plain ink.</dd></div>
+            <div><dt>Dark mode</dt><dd>Paper goes to a violet-black (#15131B), cards lift to #211E2A. Yellow stays as a <strong>solid fill with dark ink</strong> (13.3:1) for buttons and the unallocated metric, because it glows on dark. The highlighter cannot stay solid behind light text, so it becomes a 28% yellow wash (light text on it measures about 8:1) and the Nexui tag switches to yellow text on a faint yellow tint (12.9:1). The map route turns yellow on dark. Checked: body text 15–16:1, secondary text 6–8.8:1, the faintest text 4.9:1 (light) and 6.0:1 (dark). All text and controls pass WCAG AA in both themes.</dd></div>
+          </dl>
+        </div>
+        <dl class="facts">
+          <div><dt>Optimizes for</dt><dd><strong>Learnability and continuity.</strong> It looks like the app people already use, and a scrolling page is the cheapest mental model. The order of sections (map, numbers, insight, route, decisions) is the template's default section order, so the renderer is a plain list of primitives.</dd></div>
+          <div><dt>Risks and tradeoffs</dt><dd>Pages get long as trips grow, so decisions can drift below the fold; this mockup pins open decisions right under the metrics to counter that. The map is a postcard, not a tool: you cannot plan by dragging on it. It is the least surprising of the three, which is also its weakness.</dd></div>
+          <div><dt>How the + sheet behaves</dt><dd>A tall sheet with a context chip naming the trip. Runs stream objects into the sheet and into the page at the same time, so closing the sheet loses nothing.</dd></div>
+        </dl>
+      </div>
+
+      <div class="shots">
+        <!-- A1 Home -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="a-home">
+            <div class="sb"></div>
+            <div class="body">
+              <span class="a-word">nexui</span>
+              <h3 class="a-h1">Plans</h3>
+              <div class="a-stack">
+                <article class="a-card a-trip">
+                  <div class="a-trip-h"><h4>Japan in December</h4><span class="a-pill a-pill-att">1 day unallocated</span></div>
+                  <p class="a-sum">Dec 12 – 24, 12 days, 4 stops, 1 open decision</p>
+                  <div class="a-mini"><span>Tokyo</span><i></i><span class="a-hl">Kanazawa</span><i></i><span>Kyoto</span><i></i><span>Osaka</span></div>
+                </article>
+                <article class="a-card a-trip">
+                  <div class="a-trip-h"><h4>Chicago weekend</h4><span class="a-pill a-pill-ok">Every day planned</span></div>
+                  <p class="a-sum">Oct 17 – 19, 3 days, 3 neighborhoods</p>
+                  <div class="a-mini"><span>The Loop</span><i></i><span>Wicker Park</span><i></i><span>Hyde Park</span></div>
+                </article>
+                <article class="a-card a-trip">
+                  <div class="a-trip-h"><h4 class="a-hl" style="display:inline">Portugal road trip</h4><span class="a-pill a-pill-run"><span class="spin"></span>Drafting</span></div>
+                  <p class="a-sum">Porto to Lisbon by car, 4 stops so far</p>
+                  <span class="a-by"><svg><use href="#i-spark"/></svg>Started by Nexui from your note</span>
+                </article>
+              </div>
+              <h4 class="a-h2">What changed</h4>
+              <div class="a-card a-feed">
+                <div class="a-fr"><span class="av av-ai"><svg><use href="#i-spark"/></svg></span><span>Nexui added 3 rural options to Japan</span><time>2 min</time></div>
+                <div class="a-fr"><span class="av av-auto"><svg><use href="#i-calc"/></svg></span><span>Japan now has <b class="num">1</b> unallocated day</span><time>5 min</time></div>
+                <div class="a-fr"><span class="av av-you">You</span><span>You shortened Tokyo to 3 days</span><time>5 min</time></div>
+                <span class="a-more">See all changes</span>
+              </div>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>1. Home</b><span>Trips as cards with their summary line. Nexui's draft carries the highlighter.</span></figcaption>
+        </figure>
+
+        <!-- A2 Workspace -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" id="a-ws" data-screen="a-ws">
+            <div class="sb"></div>
+            <div class="body">
+              <div class="a-nav"><span><svg class="ico"><use href="#i-back"/></svg>Plans</span><span class="a-by"><svg><use href="#i-spark"/></svg>1 run today</span></div>
+              <h3 class="a-title">Japan in December</h3>
+              <p class="a-meta">Dec 12 – 24, 2 travelers, balanced pace</p>
+              <div class="a-map">
+                <svg viewBox="0 0 340 164" role="img" aria-label="Map of the route from Tokyo to Kanazawa, Kyoto and Osaka">
+                  <use href="#map-jp" width="340" height="164"/>
+                  <path class="m-route" d="M268 94C244 76 214 82 200 94L176 112L158 124"/>
+                  <circle class="m-pin" cx="268" cy="94" r="9"/><text class="m-pint" x="268" y="94">1</text>
+                  <circle class="m-pin" cx="200" cy="94" r="9"/><text class="m-pint" x="200" y="94">2</text>
+                  <circle class="m-pin" cx="176" cy="112" r="9"/><text class="m-pint" x="176" y="112">3</text>
+                  <circle class="m-pin" cx="158" cy="124" r="9"/><text class="m-pint" x="158" y="124">4</text>
+                  <text class="m-label" x="280" y="98">Tokyo</text>
+                  <text class="m-label" x="178" y="80">Kanazawa</text>
+                  <text class="m-label" x="188" y="116">Kyoto</text>
+                  <text class="m-label" x="112" y="138">Osaka</text>
+                </svg>
+              </div>
+              <div class="a-metrics">
+                <div class="a-met"><b>12</b><span>days in total</span></div>
+                <div class="a-met hot"><b>1</b><span>day unallocated</span></div>
+                <div class="a-met"><b>≈$3.1k</b><span>approximate cost</span></div>
+              </div>
+              <div class="a-card a-insight">
+                <div class="a-ins-h"><span class="av av-auto"><svg><use href="#i-calc"/></svg></span><div><b>You have 1 unallocated day</b><p>Tokyo went from 4 to 3 days. The day is yours to place.</p></div></div>
+                <div class="row"><span class="btn btn-p">Ask Nexui for ideas</span><span class="btn btn-s">Give it back to Tokyo</span></div>
+              </div>
+              <h4 class="a-h2">Route <small>Drag to reorder</small></h4>
+              <ol class="a-route">
+                <li class="a-stop"><span class="a-n">1</span><div><b>Tokyo</b><small>City, arrive Dec 12</small></div><div class="a-step"><span>−</span><span class="a-dv">3 days<s>was 4</s></span><span>+</span></div></li>
+                <li class="a-leg"><svg class="ico"><use href="#i-train"/></svg>Hokuriku Shinkansen, 2h 30m, ≈ $95</li>
+                <li class="a-stop"><span class="a-n">2</span><div><b><span class="a-hl">Kanazawa</span></b><small><span class="a-by"><svg><use href="#i-spark"/></svg>Nexui</span> Kenroku-en garden in snow</small></div><div class="a-step"><span>−</span><span class="a-dv">2 days</span><span>+</span></div></li>
+                <li class="a-leg"><svg class="ico"><use href="#i-train"/></svg>Thunderbird express, 2h 10m, ≈ $60</li>
+                <li class="a-stop"><span class="a-n">3</span><div><b>Kyoto</b><small>City</small></div><div class="a-step"><span>−</span><span class="a-dv">4 days</span><span>+</span></div></li>
+                <li class="a-leg"><svg class="ico"><use href="#i-train"/></svg>JR special rapid, 30m, ≈ $5</li>
+                <li class="a-stop"><span class="a-n">4</span><div><b>Osaka</b><small>City, fly home Dec 24</small></div><div class="a-step"><span>−</span><span class="a-dv">2 days</span><span>+</span></div></li>
+              </ol>
+              <div class="a-gap"><div><b>1 day not in the route</b><br><span style="color:var(--muted);font-size:13px">11 of 12 days placed</span></div><span class="btn btn-s">Place it</span></div>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>2. Workspace, after shortening Tokyo</b><span>map, metric, insight and route, in the template's order. The day math ran in code, with no model call.</span></figcaption>
+        </figure>
+
+        <!-- A3 Decision -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="a-dec">
+            <div class="sb"></div>
+            <div class="body">
+              <div class="a-nav"><span><svg class="ico"><use href="#i-back"/></svg>Plans</span></div>
+              <h3 class="a-title" style="font-size:24px">Japan in December</h3>
+              <div class="a-metrics" style="margin-bottom:12px">
+                <div class="a-met"><b>12</b><span>days in total</span></div>
+                <div class="a-met hot"><b>1</b><span>day unallocated</span></div>
+                <div class="a-met"><b>≈$3.1k</b><span>approximate cost</span></div>
+              </div>
+              <div class="a-ask">You asked<q>Could we use the extra time somewhere rural?</q></div>
+              <section class="a-card a-dec" style="margin-top:10px">
+                <span class="a-by"><svg><use href="#i-spark"/></svg>Proposed by Nexui, 3 options</span>
+                <h4><span class="a-hl">Where should the free day go?</span></h4>
+                <p class="a-trade"><b>Tradeoff</b>Shirakawa-go sits between Kanazawa and Kyoto, so there is no backtracking. Kinosaki costs the most but is the easiest to reach if snow closes the roads.</p>
+                <table class="a-cmp">
+                  <thead><tr><th scope="col"><span class="sr" style="position:absolute;left:-9999px">Field</span></th><th scope="col"><span class="a-hl">Shirakawa-go</span></th><th scope="col"><span class="a-hl">Tsumago</span></th><th scope="col"><span class="a-hl">Kinosaki Onsen</span></th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row">Detour</th><td class="num">+1h 25m<br><span class="a-fit">Fits route</span></td><td class="num">+2h 10m</td><td class="num">+2h 20m</td></tr>
+                    <tr><th scope="row">Per day</th><td class="num">≈ $140</td><td class="num">≈ $110</td><td class="num">≈ $180</td></tr>
+                    <tr><th scope="row">Stay</th><td>Farmhouse inn</td><td>Post-town inn</td><td>Onsen ryokan</td></tr>
+                    <tr><th scope="row">In Dec</th><td>Deep snow</td><td>Quiet, cold</td><td>Crab season</td></tr>
+                    <tr><th scope="row"></th><td><span class="btn btn-p">Choose</span></td><td><span class="btn btn-s">Choose</span></td><td><span class="btn btn-s">Choose</span></td></tr>
+                  </tbody>
+                </table>
+                <div style="text-align:center;margin-top:8px"><span class="btn btn-t">Keep the day free</span></div>
+              </section>
+              <h4 class="a-h2">Route <small>Updates when you choose</small></h4>
+              <ol class="a-route">
+                <li class="a-stop"><span class="a-n">1</span><div><b>Tokyo</b><small>City</small></div><div class="a-step"><span>−</span><span class="a-dv">3 days</span><span>+</span></div></li>
+              </ol>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>3. Decision with comparison</b><span>The decision is a section in the same page, pinned under the metrics while it is open.</span></figcaption>
+        </figure>
+
+        <!-- A4 + sheet running -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="a-plus">
+            <div class="sb"></div>
+            <div class="body" aria-hidden="true">
+              <div class="a-nav"><span><svg class="ico"><use href="#i-back"/></svg>Plans</span></div>
+              <h3 class="a-title">Japan in December</h3>
+            </div>
+            <div class="scrim"></div>
+            <div class="a-sheet">
+              <div class="handle"></div>
+              <div class="a-sh-body">
+                <div class="a-ctx"><b>Japan in December<svg class="ico" style="width:12px;height:12px"><use href="#i-close"/></svg></b><span>Asking about this trip</span></div>
+                <div class="a-me">Could we use the extra time somewhere rural?</div>
+                <div class="a-run">
+                  <div class="a-run-h"><span class="spin"></span><span>Finding rural places near your route</span><time>0:18</time></div>
+                  <p>Within about 2 hours of Kanazawa, Kyoto or Osaka, for 1 day in December.</p>
+                  <div class="a-obj"><b><span class="a-hl">Shirakawa-go</span></b><small>Village in Gifu, 1h 25m by bus from Kanazawa</small></div>
+                  <div class="a-obj"><b><span class="a-hl">Tsumago</span></b><small>Post town in Nagano, 2h 10m from Kyoto</small></div>
+                  <div class="a-obj arriving"><div class="skel" style="width:46%;height:14px"></div><div class="skel" style="width:78%;margin-top:6px"></div></div>
+                  <p>Each place is saved to this trip as it arrives. Closing this sheet doesn't stop the search.</p>
+                </div>
+              </div>
+              <div class="a-sh-foot">
+                <div class="row" style="justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--muted)">2 places so far</span><span class="btn btn-s">Stop</span></div>
+                <div class="a-input"><span>Ask anything or change this trip</span><span class="a-send"><svg class="ico"><use href="#i-send"/></svg></span></div>
+              </div>
+            </div>
+          </div></div>
+          <figcaption><b>4. + inside a workspace, run in progress</b><span>The context chip says what + acts on. Objects stream in as highlighted cards.</span></figcaption>
+        </figure>
+
+        <!-- A5 Changes -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="a-changes">
+            <div class="sb"></div>
+            <div class="body">
+              <h3 class="a-h1">Changes</h3>
+              <div class="a-filters"><span class="on">All</span><span>You</span><span>Nexui</span><span>Auto-calculated</span></div>
+              <p class="a-gh">Today</p>
+              <div class="a-card" style="padding-block:2px">
+                <div class="a-ch"><span class="av av-ai"><svg><use href="#i-spark"/></svg></span><div><p><b>Nexui</b> proposed 3 places for <span class="a-hl">Where should the free day go?</span></p><small>Japan in December, 2 min ago</small></div><span class="btn btn-s">Undo</span></div>
+                <div class="a-ch"><span class="av av-auto"><svg><use href="#i-calc"/></svg></span><div><p><b>Auto-calculated</b> unallocated days <span class="a-diff">0 → 1</span></p><small>Japan in December, after your Tokyo edit</small></div><span class="a-tied">Undoes with your edit</span></div>
+                <div class="a-ch"><span class="av av-you">You</span><div><p><b>You</b> set Tokyo to <span class="a-diff">4 → 3</span> days</p><small>Japan in December, 5 min ago</small></div><span class="btn btn-s">Undo</span></div>
+                <div class="a-ch"><span class="av av-ai"><svg><use href="#i-spark"/></svg></span><div><p><b>Nexui</b> created <span class="a-hl">Portugal road trip</span> with 4 stops</p><small>From your note "a week driving Portugal", 1 h ago</small></div><span class="btn btn-s">Undo</span></div>
+              </div>
+              <p class="a-gh">Yesterday</p>
+              <div class="a-card" style="padding-block:2px">
+                <div class="a-ch"><span class="av av-you">You</span><div><p><b>You</b> moved Wicker Park before Hyde Park</p><small>Chicago weekend</small></div><span class="btn btn-s">Undo</span></div>
+                <div class="a-ch undone"><span class="av av-ai"><svg><use href="#i-spark"/></svg></span><div><p><b>Nexui</b> swapped Kyoto and Osaka</p><small>Undone by you</small></div><span class="btn btn-s">Redo</span></div>
+              </div>
+            </div>
+            <div class="tabs" data-on="changes"></div>
+          </div></div>
+          <figcaption><b>5. Changes</b><span>Each row names the actor. Derived rows undo with the edit that caused them.</span></figcaption>
+        </figure>
+
+        <!-- A6 opposite theme -->
+        <figure class="shot">
+          <div class="phone"><div class="scr ph-invert" data-clone="a-ws"></div></div>
+          <figcaption><b>2b. Workspace, <span class="inv-name">other</span> theme</b><span>The same tokens with their other values.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+    <section class="option opt-b" id="opt-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+      <div class="opt-head">
+        <div>
+          <h2><small>Option B, departs from the brand</small>Atlas</h2>
+          <p class="thesis">The map is the workspace. Every other primitive lives in one bottom sheet that rises over it: peeked for the route, half-open for a decision, tall for +. Places Nexui proposes are pencilled onto the map before you commit to them.</p>
+          <dl class="facts">
+            <div><dt>Example trips</dt><dd>A Portugal road trip (the workspace), Chicago weekend, and a beach week that still has an open "How long is the trip?" decision.</dd></div>
+            <div><dt>Brand, and why it departs</dt><dd>Violet paper fights map colors and makes pins hard to read, so the ground becomes a cool chart palette: navy ink, pale land, sea blue, with the route in <strong>transit magenta</strong> so it reads as a line you travel. Schibsted Grotesk replaces Bricolage for its compact, sign-like numerals on pins and chips; Atkinson stays for body text. Yellow survives in one job only: <strong>the "needs you" signal</strong> (the unallocated day). AI content is <strong>pencilled</strong>: a violet dashed outline and dashed pins. Your own objects are solid ink.</dd></div>
+            <div><dt>Dark mode</dt><dd>The map goes to a night chart (land #1A2839, sea #0A1420). Magenta is lifted to #FF5FA2 so the route keeps 5.3:1 against dark land; the violet pencil lifts to #B9A1FF (7.3:1). The primary button inverts to pale ink on navy text. Yellow never carries light text: it keeps navy ink in both themes (12:1). Checked: body 13.6–15.3:1, secondary 5.7–8.2:1. All text and controls pass WCAG AA in both themes.</dd></div>
+          </dl>
+        </div>
+        <dl class="facts">
+          <div><dt>Optimizes for</dt><dd><strong>Spatial sense and delight.</strong> Travel is geography: you see at once that a detour is short or that a stop is out on a limb. Choosing a candidate on the map and in the sheet is the same act.</dd></div>
+          <div><dt>Risks and tradeoffs</dt><dd>The most expensive to build and the least portable. It needs native maps, a gesture-driven sheet with snap points and pins kept in sync with cards, and web gets a list fallback anyway. It also <strong>scales worst to job search</strong>: a pipeline has no geography, so the spatial model has to be swapped out, and the shell would feel like two apps.</dd></div>
+          <div><dt>How the + sheet behaves</dt><dd>The same sheet changes mode. While a run streams, new places drop onto the map as dashed pins and appear as rows below the question.</dd></div>
+        </dl>
+      </div>
+
+      <div class="shots">
+        <!-- B1 Home -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="b-home">
+            <div class="sb"></div>
+            <div class="body">
+              <h3 class="b-home-h">Trips</h3>
+              <div class="b-trips">
+                <article class="b-tc" style="display:grid;grid-template-columns:112px 1fr">
+                  <div class="b-thumb" style="height:auto;min-height:132px">
+                    <svg viewBox="90 80 260 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                      <use href="#map-pt" width="375" height="560"/>
+                      <path class="m-route" d="M166 328L140 318L160 262L196 190L176 110" style="stroke-width:6"/>
+                      <circle class="m-pin" cx="176" cy="110" r="11"/>
+                      <circle class="m-pin" cx="166" cy="328" r="11"/>
+                    </svg>
+                  </div>
+                  <div class="b-tb"><div class="b-tb-h"><b>Portugal road trip</b></div><p>Lisbon to Porto by car, 5 stops, 10 days</p><span><span class="b-tag need">1 day free</span></span></div>
+                </article>
+                <article class="b-tc" style="display:grid;grid-template-columns:112px 1fr">
+                  <div class="b-thumb" style="height:auto;min-height:132px">
+                    <svg viewBox="60 0 140 116" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                      <use href="#map-chi" width="200" height="116"/>
+                      <path class="m-route" d="M132 70L96 52L134 108" style="stroke-width:3"/>
+                      <circle class="m-pin" cx="132" cy="70" r="5"/><circle class="m-pin" cx="96" cy="52" r="5"/><circle class="m-pin" cx="134" cy="108" r="5"/>
+                    </svg>
+                  </div>
+                  <div class="b-tb"><div class="b-tb-h"><b>Chicago weekend</b></div><p>Oct 17 – 19, 3 neighborhoods on foot and L</p><span><span class="b-tag ok">Every day planned</span></span></div>
+                </article>
+                <article class="b-tc b-ai" style="display:grid;grid-template-columns:112px 1fr">
+                  <div class="b-thumb" style="height:auto;min-height:132px"><div class="b-empty">Map fills in once there are places</div></div>
+                  <div class="b-tb"><span class="b-by"><svg><use href="#i-spark"/></svg>Drafted by Nexui</span><b>Beach week somewhere warm</b><p>Waiting on one answer</p><span><span class="b-tag need">How long is the trip?</span></span></div>
+                </article>
+              </div>
+              <h4 class="b-h2">What changed</h4>
+              <div class="b-feed">
+                <div class="b-fr"><span><span class="b-actor ai">Nexui</span>Pencilled in 3 rural places<small>Portugal road trip, 2 min</small></span></div>
+                <div class="b-fr"><span><span class="b-actor auto">Auto</span>Free days 0 → 1<small>Portugal road trip, 4 min</small></span></div>
+                <div class="b-fr"><span><span class="b-actor you">You</span>Porto 3 → 2 days<small>Portugal road trip, 4 min</small></span></div>
+              </div>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>1. Home</b><span>Each trip leads with its own map. A draft with no places shows the open question instead.</span></figcaption>
+        </figure>
+
+        <!-- B2 Workspace -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" id="b-ws" data-screen="b-ws">
+            <div class="sb"></div>
+            <div class="b-map">
+              <svg viewBox="20 -70 400 890" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of Portugal with the route from Lisbon to Porto">
+                <use href="#map-pt" width="375" height="560"/>
+                <path class="m-route" d="M166 328L140 318L160 262L196 190L176 110" style="stroke-width:4.5"/>
+                <circle class="m-pin" cx="166" cy="328" r="11"/><text class="m-pint" x="166" y="328" style="font-size:11px">1</text>
+                <circle class="m-pin" cx="140" cy="318" r="11"/><text class="m-pint" x="140" y="318" style="font-size:11px">2</text>
+                <circle class="m-pin" cx="160" cy="262" r="11"/><text class="m-pint" x="160" y="262" style="font-size:11px">3</text>
+                <circle class="m-pin" cx="196" cy="190" r="11"/><text class="m-pint" x="196" y="190" style="font-size:11px">4</text>
+                <circle class="m-pin" cx="176" cy="110" r="11"/><text class="m-pint" x="176" y="110" style="font-size:11px">5</text>
+                <text class="m-label" x="182" y="336" style="font-size:12px">Lisbon</text>
+                <text class="m-label" x="96" y="306" style="font-size:12px">Sintra</text>
+                <text class="m-label" x="174" y="266" style="font-size:12px">Óbidos</text>
+                <text class="m-label" x="212" y="194" style="font-size:12px">Coimbra</text>
+                <rect x="194" y="92" width="86" height="34" rx="10" style="fill:var(--need)"/>
+                <text x="237" y="105" style="fill:var(--needInk);font:800 12px system-ui,sans-serif;text-anchor:middle">Porto 2 days</text>
+                <text x="237" y="119" style="fill:var(--needInk);font:500 10.5px system-ui,sans-serif;text-anchor:middle">was 3</text>
+              </svg>
+            </div>
+            <div class="b-top"><span class="b-fab"><svg><use href="#i-back"/></svg></span><div class="b-tp"><b>Portugal road trip</b><span>Lisbon to Porto by car, 2 travelers</span></div></div>
+            <div class="b-chips"><span class="b-chip">10 days</span><span class="b-chip need">1 day free</span><span class="b-chip">≈ €1,480</span></div>
+            <div class="b-sheet" style="top:50%">
+              <div class="handle"></div>
+              <div class="b-ins">
+                <div><b>1 day is free</b><p>Porto went from 3 to 2 days. Place it or ask for ideas.</p></div>
+                <div class="row"><span class="btn">Ask Nexui</span><span class="btn alt">Give it back to Porto</span></div>
+              </div>
+              <div class="b-sh-h" style="margin-top:14px"><h4>Route</h4><span>9 of 10 days placed</span></div>
+              <ol class="b-route">
+                <li class="b-stop"><span class="b-pn">1</span><div><b>Lisbon</b><small>City</small></div><div class="b-step"><span>−</span><span class="v">3 days</span><span>+</span></div></li>
+                <li class="b-leg"><svg><use href="#i-car"/></svg>40 min, ≈ €8 tolls</li>
+                <li class="b-stop"><span class="b-pn">2</span><div><b>Sintra</b><small>Town</small></div><div class="b-step"><span>−</span><span class="v">1 day</span><span>+</span></div></li>
+                <li class="b-leg"><svg><use href="#i-car"/></svg>1h, ≈ €9</li>
+                <li class="b-stop"><span class="b-pn">3</span><div><b>Óbidos</b><small>Town</small></div><div class="b-step"><span>−</span><span class="v">1 day</span><span>+</span></div></li>
+                <li class="b-leg"><svg><use href="#i-car"/></svg>1h 30m, ≈ €14</li>
+                <li class="b-stop"><span class="b-pn">4</span><div><b>Coimbra</b><small>City</small></div><div class="b-step"><span>−</span><span class="v">2 days</span><span>+</span></div></li>
+                <li class="b-leg"><svg><use href="#i-car"/></svg>1h 20m, ≈ €12</li>
+                <li class="b-stop edited"><span class="b-pn">5</span><div><b>Porto</b><small>City, you edited</small></div><div class="b-step"><span>−</span><span class="v">2 days<s>was 3</s></span><span>+</span></div></li>
+                <li class="b-gap"><span class="b-ring"></span><span><b>1 free day</b>, not on the map yet</span></li>
+              </ol>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>2. Workspace, after shortening Porto</b><span>Map fills the screen; metrics float as chips; the sheet holds insight and route.</span></figcaption>
+        </figure>
+
+        <!-- B3 Decision -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="b-dec">
+            <div class="sb"></div>
+            <div class="b-map">
+              <svg viewBox="40 -90 386 860" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map with three candidate places around the route">
+                <use href="#map-pt" width="375" height="560"/>
+                <path class="m-route" d="M166 328L140 318L160 262L196 190L176 110" style="stroke-width:4.5"/>
+                <path class="m-detour" d="M176 110L262 116M176 110L240 48M166 328L306 360" style="stroke-width:2.5"/>
+                <circle class="m-pin" cx="166" cy="328" r="7"/><circle class="m-pin" cx="140" cy="318" r="7"/><circle class="m-pin" cx="160" cy="262" r="7"/><circle class="m-pin" cx="196" cy="190" r="7"/><circle class="m-pin" cx="176" cy="110" r="7"/>
+                <circle cx="262" cy="116" r="13" style="fill:var(--card);stroke:var(--ai);stroke-width:2.5;stroke-dasharray:4 3"/><text x="262" y="116" style="fill:var(--ai);font:800 12px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central">A</text>
+                <circle cx="240" cy="48" r="13" style="fill:var(--card);stroke:var(--ai);stroke-width:2.5;stroke-dasharray:4 3"/><text x="240" y="48" style="fill:var(--ai);font:800 12px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central">B</text>
+                <circle cx="306" cy="360" r="13" style="fill:var(--card);stroke:var(--ai);stroke-width:2.5;stroke-dasharray:4 3"/><text x="306" y="360" style="fill:var(--ai);font:800 12px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central">C</text>
+                <text class="m-label" x="258" y="142" style="font-size:12px">Douro Valley</text>
+                <text class="m-label" x="258" y="52" style="font-size:12px">Peneda-Gerês</text>
+                <text class="m-label" x="262" y="390" style="font-size:12px">Monsaraz</text>
+                <text class="m-label" x="120" y="100" style="font-size:12px">Porto</text>
+                <text class="m-label" x="106" y="350" style="font-size:12px">Lisbon</text>
+              </svg>
+            </div>
+            <div class="b-top"><span class="b-fab"><svg><use href="#i-back"/></svg></span><div class="b-tp"><b>Portugal road trip</b><span>You asked for somewhere rural</span></div></div>
+            <div class="b-sheet" style="top:54%">
+              <div class="handle"></div>
+              <div class="b-dec b-ai">
+                <span class="b-by"><svg><use href="#i-spark"/></svg>Pencilled in by Nexui</span>
+                <h4>Where should the free day go?</h4>
+                <p><b>Tradeoff:</b> Douro is the easy add-on after Porto but costs the most. Monsaraz means reordering around Lisbon.</p>
+              </div>
+              <div class="b-cards">
+                <article class="b-opt">
+                  <div class="b-opt-h"><span class="b-let">A</span><div><b>Douro Valley</b><small>Pinhão, terraced vineyards</small></div></div>
+                  <dl class="b-kv"><dt>Detour</dt><dd>+1h 50m from Porto</dd><dt>Per day</dt><dd>≈ €140</dd></dl>
+                  <span class="btn btn-p">Choose Douro Valley</span>
+                </article>
+                <article class="b-opt">
+                  <div class="b-opt-h"><span class="b-let">B</span><div><b>Peneda-Gerês</b><small>Granite villages, trails</small></div></div>
+                  <dl class="b-kv"><dt>Detour</dt><dd>+1h 30m from Porto</dd><dt>Per day</dt><dd>≈ €80</dd></dl>
+                  <span class="btn btn-p">Choose Peneda-Gerês</span>
+                </article>
+                <article class="b-opt">
+                  <div class="b-opt-h"><span class="b-let">C</span><div><b>Monsaraz</b><small>Walled hill village, dark skies</small></div></div>
+                  <dl class="b-kv"><dt>Detour</dt><dd>+2h from Lisbon, reorders route</dd><dt>Per day</dt><dd>≈ €95</dd></dl>
+                  <span class="btn btn-p">Choose Monsaraz</span>
+                </article>
+              </div>
+              <p class="b-note" style="margin-top:8px">Swipe the cards or tap a pin. <span class="btn-t" style="font-weight:700;color:var(--ink)">Keep the day free</span></p>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>3. Decision with comparison</b><span>Lettered cards match dashed pins, so the detour is visible before you choose.</span></figcaption>
+        </figure>
+
+        <!-- B4 + sheet running -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="b-plus">
+            <div class="sb"></div>
+            <div class="b-map">
+              <svg viewBox="40 -90 386 860" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map with new places appearing">
+                <use href="#map-pt" width="375" height="560"/>
+                <path class="m-route" d="M166 328L140 318L160 262L196 190L176 110" style="stroke-width:4.5"/>
+                <circle class="m-pin" cx="196" cy="190" r="7"/><circle class="m-pin" cx="176" cy="110" r="7"/><circle class="m-pin" cx="160" cy="262" r="7"/>
+                <path class="m-detour" d="M176 110L262 116" style="stroke-width:2.5"/>
+                <circle cx="262" cy="116" r="13" style="fill:var(--card);stroke:var(--ai);stroke-width:2.5;stroke-dasharray:4 3"/><text x="262" y="116" style="fill:var(--ai);font:800 12px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central">A</text>
+                <circle class="pulse" cx="240" cy="48" r="11" style="fill:none;stroke:var(--ai);stroke-width:2"/>
+                <circle cx="240" cy="48" r="11" style="fill:var(--card);stroke:var(--ai);stroke-width:2.5;stroke-dasharray:4 3;opacity:.75"/><text x="240" y="48" style="fill:var(--ai);font:800 12px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central">B</text>
+                <text class="m-label" x="258" y="142" style="font-size:12px">Douro Valley</text>
+              </svg>
+            </div>
+            <div class="b-top"><span class="b-fab"><svg><use href="#i-back"/></svg></span><div class="b-tp"><b>Portugal road trip</b><span>Nexui is working on this trip</span></div></div>
+            <div class="b-sheet" style="top:44%">
+              <div class="handle"></div>
+              <div class="b-sh-h"><h4>Ask or change this trip</h4><span class="b-fab" style="width:30px;height:30px;box-shadow:none;border:1px solid var(--line)"><svg style="width:14px;height:14px"><use href="#i-close"/></svg></span></div>
+              <div class="b-query"><span>Could we use the extra time somewhere rural?</span><span class="b-stopbtn">Stop</span></div>
+              <div class="b-run"><span class="spin"></span><span>Finding rural places near your route<small>1 day, within 2 hours of a stop</small></span></div>
+              <div class="b-srow b-ai"><span class="b-let">A</span><span><b>Douro Valley</b><small>+1h 50m from Porto, ≈ €140/day</small></span><span class="b-by">New</span></div>
+              <div class="b-srow b-ai" style="opacity:.75"><span class="b-let">B</span><span><b>Peneda-Gerês</b><small>Checking drive times</small></span><span class="spin"></span></div>
+              <div class="b-srow" style="border:1.5px dashed var(--line)"><span class="b-ring" style="width:28px;height:28px"></span><span style="display:grid;gap:6px"><span class="skel" style="width:120px"></span><span class="skel" style="width:180px;height:10px"></span></span><span></span></div>
+              <p class="b-note" style="margin-top:10px">Places land on the map as they're found. Close this and the run keeps going; the comparison opens when it's done.</p>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>4. + inside a workspace, run in progress</b><span>The sheet switches to ask mode; streamed places drop onto the map as they arrive.</span></figcaption>
+        </figure>
+
+        <!-- B5 Changes -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="b-changes">
+            <div class="sb"></div>
+            <div class="body">
+              <h3 class="b-home-h">Changes</h3>
+              <section class="b-cgrp">
+                <div class="b-cgrp-h">
+                  <svg viewBox="100 90 200 145" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#map-pt" width="375" height="560"/><path class="m-route" d="M166 328L140 318L160 262L196 190L176 110" style="stroke-width:10"/></svg>
+                  <div><b>Portugal road trip</b><br><span style="font-size:12.5px;color:var(--muted)">4 changes today</span></div>
+                </div>
+                <div class="b-ch"><span><span class="b-actor ai">Nexui</span>Pencilled in Douro Valley, Peneda-Gerês and Monsaraz<small>As options for the free day, 2 min</small></span><span class="btn btn-s">Undo</span></div>
+                <div class="b-ch"><span><span class="b-actor auto">Auto</span>Free days <b class="num">0 → 1</b>, cost <b class="num">€1,610 → €1,480</b><small>Recalculated after your Porto edit</small></span><span class="muted">Undoes with your edit</span></div>
+                <div class="b-ch"><span><span class="b-actor you">You</span>Porto <b class="num">3 → 2</b> days<small>4 min</small></span><span class="btn btn-s">Undo</span></div>
+                <div class="b-ch"><span><span class="b-actor ai">Nexui</span>Added Óbidos between Sintra and Coimbra<small>While drafting the trip, 1 h</small></span><span class="btn btn-s">Undo</span></div>
+              </section>
+              <section class="b-cgrp">
+                <div class="b-cgrp-h">
+                  <svg viewBox="60 0 140 116" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#map-chi" width="200" height="116"/><path class="m-route" d="M132 70L96 52L134 108" style="stroke-width:5"/></svg>
+                  <div><b>Chicago weekend</b><br><span style="font-size:12.5px;color:var(--muted)">Yesterday</span></div>
+                </div>
+                <div class="b-ch"><span><span class="b-actor you">You</span>Moved Wicker Park before Hyde Park<small>Route order</small></span><span class="btn btn-s">Undo</span></div>
+                <div class="b-ch"><span style="color:var(--muted)"><span class="b-actor ai">Nexui</span><s>Swapped the L for a taxi to Hyde Park</s><small>Undone by you</small></span><span class="btn btn-s">Redo</span></div>
+              </section>
+            </div>
+            <div class="tabs" data-on="changes"></div>
+          </div></div>
+          <figcaption><b>5. Changes</b><span>Grouped by trip, each group headed by its map. Pencil and ink marks carry over.</span></figcaption>
+        </figure>
+
+        <figure class="shot">
+          <div class="phone"><div class="scr ph-invert" data-clone="b-ws"></div></div>
+          <figcaption><b>2b. Workspace, <span class="inv-name">other</span> theme</b><span>Night chart: magenta and violet are lifted, yellow keeps navy ink.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+    <section class="option opt-c" id="opt-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+      <div class="opt-head">
+        <div>
+          <h2><small>Option C, departs from the brand</small>Decision Board</h2>
+          <p class="thesis">Every workspace is split into what is open and what is settled. Open calls (decisions, insights) sit on top as big tiles; the settled trip (day bar, map, route) is a compact ledger below. Each object is a tile colored by its kind, so the graph itself is visible.</p>
+          <dl class="facts">
+            <div><dt>Example trips</dt><dd>Southeast Asia on a backpack (the workspace), Chicago weekend, and a beach week waiting on "How long is the trip?".</dd></div>
+            <div><dt>Brand, and why it departs</dt><dd>It keeps the brand's existing marker colors (mint, sky, yellow, peach, pink) but promotes them to <strong>kind colors</strong>: place, leg, decision, insight, option. That only works on a neutral cool-grey board, so violet paper goes. Archivo at 125% width replaces Bricolage for numbers and questions that must stay short on narrow tiles. AI content gets a <strong>hatched top edge</strong> and a solid Nexui tag, like a draft stamped on a card; your own tiles are clean.</dd></div>
+            <div><dt>Dark mode</dt><dd>Pastel fills would glare on a dark board, so each kind color becomes a deep tint with a light ink of the same hue (mint #1E4536 with #B6F3D4, 8.6:1; peach #4D2E17 with #FFD3B0, 8.8:1). Decisions are the one exception: they stay <strong>solid yellow with dark ink</strong> (14.2:1) in both themes, so the open call is the brightest thing on the board. The hatch switches from dark lines to light lines. Checked: body 14.5–16.1:1, secondary 5.6–8.0:1, all kind pairs 8.8:1 or better. All text and controls pass WCAG AA in both themes.</dd></div>
+          </dl>
+        </div>
+        <dl class="facts">
+          <div><dt>Optimizes for</dt><dd><strong>Getting to the next call fast, and scaling to slice 2.</strong> Home becomes a list of calls across all intents, not a list of trips. Job search maps directly: a pipeline is a set of settled tiles, and "Which offer?" is the same yellow decision tile.</dd></div>
+          <div><dt>Risks and tradeoffs</dt><dd>Least spatial: the map is a small tile, not a place to plan. Kind colors are a small vocabulary to learn (a legend helps at first). Many colored tiles can look busy; the design depends on the discipline of one yellow thing at a time. "Open" must never read as a to-do list, so tiles hold questions and objects, never "Do X".</dd></div>
+          <div><dt>How the + sheet behaves</dt><dd>The sheet shows the board lane the results will land in. New tiles arrive hatched and settle into Open; the decision tile appears once all options are in.</dd></div>
+        </dl>
+      </div>
+
+      <div class="shots">
+        <!-- C1 Home -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="c-home">
+            <div class="sb"></div>
+            <div class="body">
+              <h3 class="c-x c-h1">Board</h3>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Needs a call<span class="c-count">2</span></span><span>Across all trips</span></div>
+              <div class="c-grid2">
+                <article class="c-t c-dec c-draft">
+                  <div class="c-kind"><span>Decision</span><span class="c-by"><svg><use href="#i-spark"/></svg>Nexui</span></div>
+                  <p class="c-x c-q">Where should the free day go?</p>
+                  <p class="c-sub">Southeast Asia, 3 options</p>
+                </article>
+                <article class="c-t c-dec c-draft">
+                  <div class="c-kind"><span>Decision</span><span class="c-by"><svg><use href="#i-spark"/></svg>Nexui</span></div>
+                  <p class="c-x c-q">How long is the trip?</p>
+                  <p class="c-sub">Beach week somewhere warm</p>
+                </article>
+              </div>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Trips<span class="c-count">3</span></span></div>
+              <div style="display:grid;gap:8px">
+                <article class="c-t c-trip"><b>Southeast Asia on a backpack</b><p>21 days, 5 stops, 1 day free</p>
+                  <div class="c-bar sm"><span style="flex:4"></span><span style="flex:4"></span><span style="flex:4"></span><span style="flex:4"></span><span style="flex:4"></span><span class="free" style="flex:1"></span></div></article>
+                <article class="c-t c-trip"><b>Chicago weekend</b><p>3 days, 3 neighborhoods, every day placed</p>
+                  <div class="c-bar sm"><span style="flex:1"></span><span style="flex:1"></span><span style="flex:1"></span></div></article>
+                <article class="c-t c-trip c-draft"><div class="c-kind"><b style="font-size:15.5px">Beach week somewhere warm</b><span class="c-by"><svg><use href="#i-spark"/></svg>Nexui</span></div><p style="margin-bottom:0">No days yet, waiting on one answer</p></article>
+              </div>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">What changed</span></div>
+              <div class="c-t c-feed" style="padding-block:2px">
+                <div class="c-fr"><span class="c-actor ai"><svg><use href="#i-spark"/></svg>Nexui</span><span>3 options for the free day</span><time>2 min</time></div>
+                <div class="c-fr"><span class="c-actor auto">Auto</span><span>Free days <b class="num">0 → 1</b></span><time>6 min</time></div>
+                <div class="c-fr"><span class="c-actor you">You</span><span>Bangkok <b class="num">5 → 4</b> days</span><time>6 min</time></div>
+              </div>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>1. Home</b><span>Calls across all intents come first; trips show as day bars.</span></figcaption>
+        </figure>
+
+        <!-- C2 Workspace -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" id="c-ws" data-screen="c-ws">
+            <div class="sb"></div>
+            <div class="body">
+              <div class="c-back"><svg class="ico"><use href="#i-back"/></svg>Board</div>
+              <h3 class="c-x c-h1" style="font-size:25px;line-height:1.05">Southeast Asia on a backpack</h3>
+              <p class="c-meta">Jan 6 – 26, solo, about $30 a day</p>
+              <div class="c-mets">
+                <div class="c-t c-met"><b class="c-x">21</b><span>days in total</span></div>
+                <div class="c-t c-met hot"><b class="c-x">1</b><span>day free</span></div>
+                <div class="c-t c-met"><b class="c-x">$1.6k</b><span>approximate cost</span></div>
+              </div>
+              <div style="margin-top:10px">
+                <div class="c-bar" role="img" aria-label="Days by stop: Bangkok 4, Chiang Mai 4, Luang Prabang 4, Hanoi 4, Hoi An 4, 1 free">
+                  <span style="flex:4">BKK 4</span><span style="flex:4">CNX 4</span><span style="flex:4">LPQ 4</span><span style="flex:4">HAN 4</span><span style="flex:4">Hoi An 4</span><span class="free" style="flex:2.2">1 free</span>
+                </div>
+                <div class="c-bar-l"><span>Jan 6</span><span>Jan 26</span></div>
+              </div>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Open<span class="c-count">1</span></span><span>Calls for you</span></div>
+              <article class="c-t c-ins">
+                <div class="c-kind"><span>Insight</span><span class="c-actor auto" style="background:transparent;border-color:currentColor;color:inherit">Auto-calculated</span></div>
+                <div class="c-ins-t"><b class="c-x" style="font-size:18px">1 day is free</b><p>Bangkok went from 5 to 4 days. Add it to a stop or ask for ideas.</p></div>
+                <div class="row"><span class="btn btn-p">Ask Nexui</span><span class="btn btn-s">Add to a stop</span></div>
+              </article>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Settled</span><span>5 places, 4 legs</span></div>
+              <div class="c-t c-map">
+                <svg viewBox="-40 0 260 170" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of the route through Thailand, Laos and Vietnam">
+                  <rect class="m-sea" x="-200" y="-200" width="600" height="600"/>
+                  <use href="#map-sea" width="180" height="170"/>
+                  <path class="m-route" d="M74 118L56 50L96 46L132 26L156 94" style="stroke-width:2.5"/>
+                  <circle class="m-pin" cx="74" cy="118" r="5"/><circle class="m-pin" cx="56" cy="50" r="5"/><circle class="m-pin" cx="96" cy="46" r="5"/><circle class="m-pin" cx="132" cy="26" r="5"/><circle class="m-pin" cx="156" cy="94" r="5"/>
+                  <text class="m-label" x="8" y="132" style="font-size:9px">Bangkok</text>
+                  <text class="m-label" x="4" y="62" style="font-size:9px">Chiang Mai</text>
+                  <text class="m-label" x="72" y="64" style="font-size:9px">Luang Prabang</text>
+                  <text class="m-label" x="140" y="22" style="font-size:9px">Hanoi</text>
+                  <text class="m-label" x="164" y="98" style="font-size:9px">Hoi An</text>
+                </svg>
+              </div>
+              <div class="c-legend" aria-hidden="true"><span><i style="background:var(--kPlace)"></i>Place</span><span><i style="background:var(--kLeg)"></i>Leg</span><span><i style="background:var(--kDecision)"></i>Decision</span><span><i style="background:var(--kInsight)"></i>Insight</span><span><i style="background:var(--kOption)"></i>Option</span></div>
+              <div class="c-route" style="margin-top:8px">
+                <div class="c-t c-place c-stop"><div><b>Bangkok</b><small>Thailand, you edited</small></div><div class="c-step"><span>−</span><span class="v">4 days<s>was 5</s></span><span>+</span></div></div>
+                <span class="c-legk c-leg"><svg><use href="#i-train"/></svg>Night train, 12h, ≈ $30</span>
+                <div class="c-t c-place c-stop"><div><b>Chiang Mai</b><small>Thailand</small></div><div class="c-step"><span>−</span><span class="v">4 days</span><span>+</span></div></div>
+                <span class="c-legk c-leg"><svg><use href="#i-plane"/></svg>Flight, 1h, ≈ $90</span>
+                <div class="c-t c-place c-stop c-draft"><div><b>Luang Prabang</b><small>Laos, <span class="c-by" style="vertical-align:1px"><svg><use href="#i-spark"/></svg>Nexui</span></small></div><div class="c-step"><span>−</span><span class="v">4 days</span><span>+</span></div></div>
+                <span class="c-legk c-leg"><svg><use href="#i-plane"/></svg>Flight, 1h, ≈ $110</span>
+                <div class="c-t c-place c-stop"><div><b>Hanoi</b><small>Vietnam</small></div><div class="c-step"><span>−</span><span class="v">4 days</span><span>+</span></div></div>
+                <span class="c-legk c-leg"><svg><use href="#i-train"/></svg>Sleeper train, 16h, ≈ $45</span>
+                <div class="c-t c-place c-stop"><div><b>Hoi An</b><small>Vietnam</small></div><div class="c-step"><span>−</span><span class="v">4 days</span><span>+</span></div></div>
+              </div>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>2. Workspace, after shortening Bangkok</b><span>metric and a proportional day bar, one open insight, then the settled map and route.</span></figcaption>
+        </figure>
+
+        <!-- C3 Decision -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="c-dec">
+            <div class="sb"></div>
+            <div class="body">
+              <div class="c-back"><svg class="ico"><use href="#i-back"/></svg>Board</div>
+              <h3 class="c-x c-h1" style="font-size:22px;line-height:1.05">Southeast Asia on a backpack</h3>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Open<span class="c-count">1</span></span><span>The insight became this decision</span></div>
+              <article class="c-t c-dec c-draft">
+                <div class="c-kind"><span>Decision</span><span class="c-by"><svg><use href="#i-spark"/></svg>Nexui</span></div>
+                <p class="c-ask">You asked <q>Could we use the extra time somewhere rural?</q></p>
+                <p class="c-x c-q" style="font-size:20px">Where should the free day go?</p>
+                <p class="c-trade"><b>Tradeoff</b>Ninh Binh is the only one that fits in a single day. Pai and Nong Khiaw are lovelier but take most of the day to reach, so you'd mostly be on the road.</p>
+                <div class="c-opts">
+                  <article class="c-t c-opt c-draft">
+                    <div class="c-o-h"><b class="c-x">Ninh Binh</b><small>Vietnam</small></div>
+                    <div class="c-bars"><span>Travel</span><i style="width:40%"></i><em>2h</em><span>Per day</span><i style="width:70%"></i><em>$35</em></div>
+                    <div class="c-o-f"><span class="c-fit">Fits 1 day, near Hanoi</span><span class="btn btn-p">Choose</span></div>
+                  </article>
+                  <article class="c-t c-opt c-draft">
+                    <div class="c-o-h"><b class="c-x">Pai</b><small>Thailand</small></div>
+                    <div class="c-bars"><span>Travel</span><i style="width:60%"></i><em>3h</em><span>Per day</span><i style="width:60%"></i><em>$30</em></div>
+                    <div class="c-o-f"><span class="c-fit">Mostly travel, from Chiang Mai</span><span class="btn btn-p">Choose</span></div>
+                  </article>
+                  <article class="c-t c-opt c-draft">
+                    <div class="c-o-h"><b class="c-x">Nong Khiaw</b><small>Laos</small></div>
+                    <div class="c-bars"><span>Travel</span><i style="width:70%"></i><em>3h 30m</em><span>Per day</span><i style="width:50%"></i><em>$25</em></div>
+                    <div class="c-o-f"><span class="c-fit">Mostly travel, from Luang Prabang</span><span class="btn btn-p">Choose</span></div>
+                  </article>
+                </div>
+                <div style="text-align:center;margin-top:8px"><span class="btn btn-t" style="color:var(--kDecisionInk)">Keep the day free</span></div>
+              </article>
+              <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Settled</span><span>Updates when you choose</span></div>
+              <div class="c-bar"><span style="flex:4">BKK 4</span><span style="flex:4">CNX 4</span><span style="flex:4">LPQ 4</span><span style="flex:4">HAN 4</span><span style="flex:4">Hoi An 4</span><span class="free" style="flex:2.2">1 free</span></div>
+            </div>
+            <div class="tabs" data-on="home"></div>
+          </div></div>
+          <figcaption><b>3. Decision with comparison</b><span>Options are tiles inside the decision; bars compare travel time and daily cost.</span></figcaption>
+        </figure>
+
+        <!-- C4 + sheet running -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="c-plus">
+            <div class="sb"></div>
+            <div class="body" aria-hidden="true">
+              <div class="c-back"><svg class="ico"><use href="#i-back"/></svg>Board</div>
+              <h3 class="c-x c-h1" style="font-size:25px;line-height:1.05">Southeast Asia on a backpack</h3>
+            </div>
+            <div class="scrim"></div>
+            <div class="c-sheet">
+              <div class="handle"></div>
+              <div class="c-sh-body">
+                <div class="c-sh-top"><span>Acting on <b>Southeast Asia on a backpack</b></span><svg class="ico"><use href="#i-close"/></svg></div>
+                <div class="c-me">Could we use the extra time somewhere rural?</div>
+                <div class="c-runbar"><span class="spin"></span><span>Finding rural places near your route<small>Tiles land in Open as they're found</small></span><span class="btn btn-s">Stop</span></div>
+                <div class="c-lane"><span style="color:var(--ink);font-weight:700;font-size:14px">Arriving in Open</span><span>2 of about 3</span></div>
+                <div style="display:grid;gap:8px">
+                  <article class="c-t c-opt c-draft"><div class="c-kind"><span>Option</span><span class="c-by"><svg><use href="#i-spark"/></svg>Nexui</span></div><b class="c-x" style="font-size:16px">Ninh Binh</b><p class="c-sub">Rice fields and river caves, 2h from Hanoi</p></article>
+                  <article class="c-t c-opt c-draft"><div class="c-kind"><span>Option</span><span class="c-by"><svg><use href="#i-spark"/></svg>Nexui</span></div><b class="c-x" style="font-size:16px">Pai</b><p class="c-sub">Canyon and hot springs, 3h from Chiang Mai</p></article>
+                  <article class="c-t c-skel-t"><div class="skel" style="width:40%;height:14px"></div><div class="skel" style="width:75%"></div></article>
+                </div>
+                <p style="font-size:12.5px;color:var(--muted);margin:12px 0 0">A decision tile appears once all options are in. Close this and the run keeps going.</p>
+              </div>
+              <div class="c-sh-foot"><div class="c-input"><span>Ask anything or change this trip</span><svg class="ico"><use href="#i-send"/></svg></div></div>
+            </div>
+          </div></div>
+          <figcaption><b>4. + inside a workspace, run in progress</b><span>Results are shown as the tiles they will become, hatched while drafting.</span></figcaption>
+        </figure>
+
+        <!-- C5 Changes -->
+        <figure class="shot">
+          <div class="phone"><div class="scr" data-screen="c-changes">
+            <div class="sb"></div>
+            <div class="body">
+              <h3 class="c-x c-h1">Changes</h3>
+              <p class="c-meta">Each card is one change set. Undo reverts the whole set.</p>
+              <article class="c-t c-cs">
+                <div class="c-cs-h"><div><span class="c-actor ai"><svg><use href="#i-spark"/></svg>Nexui</span><b>Proposed rural options</b><small>Southeast Asia, 2 min</small></div><span class="btn btn-s">Undo</span></div>
+                <ul class="c-ops">
+                  <li><i style="background:var(--kDecision)"></i><span>Added decision: Where should the free day go?</span></li>
+                  <li><i style="background:var(--kOption)"></i><span>Added options: Ninh Binh, Pai, Nong Khiaw</span></li>
+                  <li><i style="background:var(--kInsight)"></i><span>Linked the free-day insight to it</span></li>
+                </ul>
+              </article>
+              <article class="c-t c-cs">
+                <div class="c-cs-h"><div><span class="c-actor you">You</span><b>Bangkok <span class="num">5 → 4</span> days</b><small>Southeast Asia, 6 min</small></div><span class="btn btn-s">Undo</span></div>
+                <ul class="c-ops">
+                  <li><i style="background:var(--kPlace)"></i><span>Bangkok days <span class="num">5 → 4</span></span></li>
+                  <li><i style="background:var(--line)"></i><span><span class="c-actor auto">Auto</span> Free days <span class="num">0 → 1</span></span></li>
+                  <li><i style="background:var(--line)"></i><span><span class="c-actor auto">Auto</span> Cost <span class="num">$1,670 → $1,640</span></span></li>
+                  <li><i style="background:var(--kInsight)"></i><span><span class="c-actor auto">Auto</span> Added insight: 1 day is free</span></li>
+                </ul>
+              </article>
+              <article class="c-t c-cs">
+                <div class="c-cs-h"><div><span class="c-actor you">You</span><b>Moved Wicker Park before Hyde Park</b><small>Chicago weekend, yesterday</small></div><span class="btn btn-s">Undo</span></div>
+              </article>
+              <article class="c-t c-cs undone">
+                <div class="c-cs-h"><div><span class="c-actor ai"><svg><use href="#i-spark"/></svg>Nexui</span><b>Swapped the night bus for a flight</b><small>Undone by you, yesterday</small></div><span class="btn btn-s">Redo</span></div>
+              </article>
+            </div>
+            <div class="tabs" data-on="changes"></div>
+          </div></div>
+          <figcaption><b>5. Changes</b><span>Change sets, not single lines: the derived values sit inside the edit that caused them.</span></figcaption>
+        </figure>
+
+        <figure class="shot">
+          <div class="phone"><div class="scr ph-invert" data-clone="c-ws"></div></div>
+          <figcaption><b>2b. Workspace, <span class="inv-name">other</span> theme</b><span>Kind colors become deep tints with light ink; decisions stay solid yellow.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+    <section class="compare" aria-labelledby="cmp-h">
+      <h2 id="cmp-h">Side by side</h2>
+      <p>How the three directions trade off. "Scales to job search" asks whether slice 2 can add kinds, primitives (pipeline, timeline) and a template without a new screen.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th scope="col">Criterion</th><th scope="col">A. Itinerary Page<small>Document flow</small></th><th scope="col">B. Atlas<small>Map with one sheet</small></th><th scope="col">C. Decision Board<small>Open and settled tiles</small></th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Density</th><td><b>Medium</b>One section per row; long trips mean long pages.</td><td><b>Low on screen, high in the sheet</b>The map takes most pixels; details hide behind sheet heights.</td><td><b>High</b>Day bar, metric tiles and small legs pack the most onto one screen.</td></tr>
+            <tr><th scope="row">Learnability</th><td><b>Highest</b>Scroll a page, tap a stepper. Matches today's app.</td><td><b>Medium</b>Maps are familiar, but sheet heights and pin-to-card links need discovery.</td><td><b>Medium</b>Open versus settled is clear; kind colors take a few sessions to learn.</td></tr>
+            <tr><th scope="row">Scales to job search</th><td><b>Good</b>A pipeline is just another section in the page; decisions look the same.</td><td><b>Poor</b>No geography in job search, so the spatial model must be replaced, not extended.</td><td><b>Best</b>Pipeline stages are settled tiles; "Which offer?" is the same yellow decision.</td></tr>
+            <tr><th scope="row">Implementation cost in React Native</th><td><b>Low</b>A FlatList of primitives, a static map snapshot, a standard modal sheet.</td><td><b>High</b>react-native-maps, a gesture sheet with snap points (Reanimated), pin and card sync, plus a separate web fallback.</td><td><b>Medium</b>Plain Views and FlatList; the day bar and hatch are simple, and the map is a small static tile.</td></tr>
+            <tr><th scope="row">Dark mode fit</th><td><b>Good, with one rework</b>Solid yellow works on dark; the highlighter has to become a translucent wash.</td><td><b>Strong</b>A night map is a well-known pattern; route and pencil colors only need lifting.</td><td><b>Good, costs most tokens</b>Every kind needs a paired dark tint and ink (10 extra tokens), but contrast is the highest of the three.</td></tr>
+            <tr><th scope="row">AI versus you</th><td><b>Yellow highlighter</b>Warm and on-brand; weakest cue for colorblind users without the tag.</td><td><b>Pencil versus ink</b>Dashed versus solid works without color and matches "not committed yet".</td><td><b>Hatched edge and tag</b>Clear on every tile; adds visual noise when many drafts arrive.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="rec">
+        <h3>Recommendation</h3>
+        <p><strong>Build A for slice 1, and borrow two things from C.</strong> A is the cheapest to ship, closest to the brand, and its section list maps one-to-one onto the workspace doc, so the renderer stays trivial. From C, take the pinned Open area above the route and the proportional day bar, since "1 day free" is easier to see as a gap than as a number.</p>
+        <p>Keep B's pencil-versus-ink idea as the fallback AI cue under the highlighter (dashed outlines survive grayscale and colorblindness). Hold off on B's full-screen map until slice 1 has proven the graph. Of the three it costs the most to build and carries over worst to job search.</p>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+(function () {
+  var SB = '<span>9:41</span><span class="sbi"><svg viewBox="0 0 17 12"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" style="width:24px"><use href="#i-bat"/></svg></span>';
+  function tabs(on) {
+    return '<span class="tab' + (on === 'home' ? ' on' : '') + '"><svg><use href="#i-home"/></svg>Home</span>' +
+      '<span class="plus" aria-label="Ask or start something"><svg><use href="#i-plus"/></svg></span>' +
+      '<span class="tab' + (on === 'changes' ? ' on' : '') + '"><svg><use href="#i-changes"/></svg>Changes</span>';
+  }
+  function fill(root) {
+    root.querySelectorAll('.sb').forEach(function (el) { if (!el.innerHTML) { el.innerHTML = SB; } });
+    root.querySelectorAll('.tabs').forEach(function (el) { if (!el.innerHTML) { el.innerHTML = tabs(el.dataset.on); } });
+  }
+  document.querySelectorAll('[data-clone]').forEach(function (target) {
+    var src = document.getElementById(target.dataset.clone);
+    if (src) {
+      target.innerHTML = src.innerHTML;
+      target.querySelectorAll('[id]').forEach(function (n) { n.removeAttribute('id'); });
+      target.setAttribute('aria-label', 'Same workspace in the other theme');
+    }
+  });
+  fill(document);
+
+  // Option switcher
+  var tabsEls = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  function show(id) {
+    tabsEls.forEach(function (t) {
+      var on = t.getAttribute('aria-controls') === id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    try { localStorage.setItem('nexui-opt', id); } catch (e) {}
+  }
+  tabsEls.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(t.getAttribute('aria-controls')); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        var n = tabsEls[(i + (e.key === 'ArrowRight' ? 1 : tabsEls.length - 1)) % tabsEls.length];
+        n.focus();
+        show(n.getAttribute('aria-controls'));
+      }
+    });
+  });
+  var hash = (location.hash || '').replace('#', '');
+  var start = { a: 'opt-a', b: 'opt-b', c: 'opt-c' }[hash];
+  if (!start) { try { start = localStorage.getItem('nexui-opt'); } catch (e) {} }
+  if (start && document.getElementById(start)) { show(start); } else { show('opt-a'); }
+
+  // Theme: system (no attribute), light, dark
+  var root = document.documentElement;
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  var themeBtns = Array.prototype.slice.call(document.querySelectorAll('[data-theme-set]'));
+  function effective() {
+    var t = root.getAttribute('data-theme');
+    if (t === 'dark' || t === 'light') { return t; }
+    return mq.matches ? 'dark' : 'light';
+  }
+  function syncInvert() {
+    var other = effective() === 'dark' ? 'light' : 'dark';
+    document.querySelectorAll('.ph-invert').forEach(function (el) {
+      el.classList.remove('ph-dark', 'ph-light');
+      el.classList.add('ph-' + other);
+    });
+    document.querySelectorAll('.inv-name').forEach(function (el) { el.textContent = other; });
+  }
+  function setTheme(mode) {
+    if (mode === 'system') { root.removeAttribute('data-theme'); } else { root.setAttribute('data-theme', mode); }
+    themeBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.themeSet === mode ? 'true' : 'false'); });
+    syncInvert();
+  }
+  themeBtns.forEach(function (b) { b.addEventListener('click', function () { setTheme(b.dataset.themeSet); }); });
+  var initial = root.getAttribute('data-theme');
+  themeBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.themeSet === (initial || 'system') ? 'true' : 'false'); });
+  if (mq.addEventListener) { mq.addEventListener('change', syncInvert); }
+  syncInvert();
+})();
+</script>

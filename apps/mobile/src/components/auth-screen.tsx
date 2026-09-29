@@ -5,13 +5,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, fonts } from '@/lib/theme';
+import { fonts } from '@/lib/theme';
+import { createThemedStyles, useColors } from '@/lib/use-theme';
 
 interface AuthScreenProps {
   title: string;
@@ -34,6 +34,8 @@ interface FormMessageProps {
 }
 
 export function AuthScreen({ title, subtitle, children }: AuthScreenProps): ReactElement {
+  const styles = useStyles();
+
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView
@@ -61,6 +63,8 @@ export function PrimaryButton({
   disabled,
   onPress,
 }: PrimaryButtonProps): ReactElement {
+  const styles = useStyles();
+  const colors = useColors();
   const inactive = disabled || busy;
 
   return (
@@ -81,6 +85,8 @@ export function PrimaryButton({
 }
 
 export function TextButton({ label, disabled, onPress }: ButtonProps): ReactElement {
+  const styles = useStyles();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -95,6 +101,8 @@ export function TextButton({ label, disabled, onPress }: ButtonProps): ReactElem
 }
 
 export function FormError({ message }: FormMessageProps): ReactElement | null {
+  const styles = useStyles();
+
   if (!message) {
     return null;
   }
@@ -107,6 +115,8 @@ export function FormError({ message }: FormMessageProps): ReactElement | null {
 }
 
 export function FormNotice({ message }: FormMessageProps): ReactElement | null {
+  const styles = useStyles();
+
   if (!message) {
     return null;
   }
@@ -118,7 +128,7 @@ export function FormNotice({ message }: FormMessageProps): ReactElement | null {
   );
 }
 
-export const authStyles = StyleSheet.create({
+export const useAuthStyles = createThemedStyles((colors) => ({
   input: {
     fontFamily: fonts.input,
     fontSize: 18,
@@ -131,9 +141,9 @@ export const authStyles = StyleSheet.create({
     marginTop: 8,
   },
   label: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
-});
+}));
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.paper },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 36 },
   content: { width: '100%', maxWidth: 440, alignSelf: 'center' },
@@ -182,4 +192,4 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   dimmed: { opacity: 0.6 },
-});
+}));
