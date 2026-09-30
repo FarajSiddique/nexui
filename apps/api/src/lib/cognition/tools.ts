@@ -1,0 +1,36 @@
+import { tool, type ToolSet } from 'ai';
+
+import type { Stager } from '../capabilities/stage.ts';
+import type { Capability } from '../capabilities/types.ts';
+
+/**
+ * Model APIs allow only letters, digits, `_` and `-` in tool names.
+ *
+ * @example
+ * toolNameFor('trip.setPlaceDays') // 'trip_setPlaceDays'
+ */
+export function toolNameFor(capability: string): string {
+  return capability.replaceAll('.', '_');
+}
+
+/**
+ * The model's tools: each capability it may use, staged through `stager`. A refused call throws,
+ * and the AI SDK hands the model the message as a tool error to correct.
+ */
+export function toModelTools(capabilities: readonly Capability[], stager: Stager): ToolSet {
+  const tools: ToolSet = {};
+
+  for (const capability of capabilities) {
+    if (!capability.exposeToModel) {
+      continue;
+    }
+
+    tools[toolNameFor(capability.name)] = tool({
+      description: capability.description,
+      inputSchema: capability.input,
+      execute: async (input: unknown) => stager.call(capability.name, input),
+    });
+  }
+
+  return tools;
+}

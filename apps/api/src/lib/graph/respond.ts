@@ -1,3 +1,4 @@
+import { AiConfigurationError } from '../ai/config.ts';
 import { jsonError } from '../http/responses.ts';
 import { SupabaseConfigurationError } from '../supabase/clients.ts';
 import { ChangesetConflictError, ChangesetInvalidError, GraphNotFoundError } from './errors.ts';
@@ -9,8 +10,9 @@ function errorCode(error: unknown): string | null {
   return typeof code === 'string' && /^[A-Za-z0-9_]{1,20}$/.test(code) ? code : null;
 }
 
-function logLine(error: unknown, fallback: string): string {
-  if (error instanceof SupabaseConfigurationError) {
+/** The log line for an error: a configuration error's message, or `fallback` and a short code. */
+export function logLine(error: unknown, fallback: string): string {
+  if (error instanceof SupabaseConfigurationError || error instanceof AiConfigurationError) {
     return error.message;
   }
 

@@ -67,13 +67,16 @@ export async function commitChangeset(
   return { event: mapEventRow(result.data), snapshot: await loadSnapshot(db, input.intentId) };
 }
 
+const NOT_A_TRIP_SUMMARY = 'Nexui can plan trips so far.';
+
 /**
- * Creates a travel intent with its seed trip, workspace and derived state in one transaction.
- * Slice 1 has one template; the intelligence plan routes goals with Jev.
+ * Creates an intent in one transaction. A travel intent gets its seed trip, workspace and derived
+ * state; an intent with no template (Jev said it isn't a trip) gets only a summary line.
  */
 export async function createIntent(
   db: SupabaseClient,
   goal: string,
+  template: 'travel' | null = 'travel',
   clock: Date = new Date(),
   newId: () => string = randomUUID,
 ): Promise<GraphSnapshot> {
@@ -83,7 +86,7 @@ export async function createIntent(
     intent: {
       id: intentId,
       goal,
-      template: 'travel',
+      template,
       status: 'exploring',
       context: {},
       summary: { line: '' },
@@ -95,11 +98,21 @@ export async function createIntent(
     objects: [],
     relationships: [],
   };
-  const ops = prepareChangeset(empty, seedTravelOps(goal, newId), 'system', now, newId);
+  const seed: ChangesetOp[] =
+    template === 'travel'
+      ? seedTravelOps(goal, newId)
+      : [
+          {
+            op: 'update_intent',
+            patch: { summary: { line: NOT_A_TRIP_SUMMARY } },
+            origin: 'direct',
+          },
+        ];
+  const ops = prepareChangeset(empty, seed, 'system', now, newId);
   const { error } = await db.rpc('create_intent', {
     p_intent_id: intentId,
     p_goal: goal,
-    p_template: 'travel',
+    p_template: template,
     p_ops: ops,
   });
 

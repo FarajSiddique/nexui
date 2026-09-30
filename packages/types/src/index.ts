@@ -6,6 +6,7 @@ export * from './kinds/registry.ts';
 export * from './workspace.ts';
 export * from './graph.ts';
 export * from './ops.ts';
+export * from './runs.ts';
 export * from './api.ts';
 export * from './query.ts';
 export * from './apply-ops.ts';

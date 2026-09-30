@@ -8,10 +8,19 @@ import {
   templateSchema,
 } from './graph.ts';
 import { userOpSchema } from './ops.ts';
-import { idSchema, timestampSchema } from './primitives.ts';
+import { capabilityNameSchema, fitsFreeJson, idSchema, timestampSchema } from './primitives.ts';
+import { runRouteSchema } from './runs.ts';
 
 // POST /api/intents
 export const createIntentRequestSchema = z.object({ goal: z.string().trim().min(3).max(500) });
+
+// The new intent, and the run that fills it in. A goal that isn't a trip starts no run.
+export const createIntentResponseSchema = z.object({
+  snapshot: graphSnapshotSchema,
+  runId: idSchema.nullable(),
+});
+
+export type CreateIntentResponse = z.infer<typeof createIntentResponseSchema>;
 
 // GET /api/intents: Home's cards, most recently active first.
 export const intentListItemSchema = z.object({
@@ -63,3 +72,20 @@ export const changesResponseSchema = z.object({
 });
 
 export type ChangesResponse = z.infer<typeof changesResponseSchema>;
+
+// POST /api/intents/:id/ask: answers 202 while the run works in the background.
+export const askRequestSchema = z.object({ text: z.string().trim().min(2).max(1000) });
+
+export const askResponseSchema = z.object({ runId: idSchema, route: runRouteSchema });
+
+export type AskResponse = z.infer<typeof askResponseSchema>;
+
+// POST /api/intents/:id/capabilities: an insight's or decision's button. Answers like a changeset.
+export const capabilityRequestSchema = z.object({
+  name: capabilityNameSchema,
+  input: z.record(z.string(), z.json()).refine(fitsFreeJson, 'Too much input.'),
+});
+
+export type CapabilityRequest = z.infer<typeof capabilityRequestSchema>;
+
+// GET /api/runs/:id and POST /api/runs/:id/cancel answer with `runRecordSchema`.

@@ -33,6 +33,8 @@ export function mapRpcError(error: { code?: string }): Error {
       return new ChangesetConflictError('That was already undone.');
     case 'NXU11':
       return new ChangesetConflictError('That already exists.');
+    case 'NXU12':
+      return new ChangesetConflictError('Nexui is still working on this plan.');
     case 'NXU22':
       return new ChangesetInvalidError('That change is not valid.');
     default:

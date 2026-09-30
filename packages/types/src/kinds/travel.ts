@@ -24,6 +24,8 @@ export const tripDerivedSchema = z.strictObject({
 
 export type TripDerived = z.infer<typeof tripDerivedSchema>;
 
+// A data field ending in `Id` (such as a stay's `placeId`) holds a graph object id: the model
+// sees it as a ref, not a raw id, so don't use the `Id` suffix for an external id.
 export const tripDataSchema = z
   .strictObject({
     destinations: z.array(z.string().trim().min(1).max(100)).max(30),

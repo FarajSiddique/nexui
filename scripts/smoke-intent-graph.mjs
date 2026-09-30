@@ -2,7 +2,9 @@
 /**
  * Exercises the intent graph API end to end as the QA user: create a trip, shorten a stop,
  * check the derived insight, undo, redo, and read Changes. Needs the API running and a QA
- * session from `node scripts/qa-session.mjs > .qa/session.json`.
+ * session from `node scripts/qa-session.mjs > .qa/session.json`. Run the API with
+ * AI_PROVIDER=mock: the goal matches no fixture, so its run changes nothing and the counts
+ * below hold.
  *
  * node scripts/smoke-intent-graph.mjs [.qa/session.json] [http://localhost:3000]
  */
@@ -32,7 +34,27 @@ async function call(method, path, body) {
   return json;
 }
 
-const created = await call('POST', '/api/intents', { goal: 'Smoke test: a weekend in Chicago' });
+async function waitForRun(runId) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const run = await call('GET', `/api/runs/${runId}`);
+
+    if (run.status !== 'queued' && run.status !== 'running') {
+      return run;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+
+  throw new Error(`run ${runId} did not finish`);
+}
+
+const { snapshot: created, runId } = await call('POST', '/api/intents', {
+  goal: 'Smoke test: three quiet days away',
+});
+const createRun = await waitForRun(runId);
+
+assert.equal(createRun.status, 'succeeded', `the create run ${createRun.status}`);
+console.log(`create run ${runId}: ${createRun.status}`);
 const intentId = created.intent.id;
 const tripId = created.workspace.doc.anchorId;
 const trip = created.objects.find((o) => o.id === tripId);
@@ -118,4 +140,16 @@ const changes = await call('GET', `/api/changes?intentId=${intentId}`);
 console.log(`changes: ${changes.items.length} events, newest ${changes.items[0]?.actor}`);
 assert.equal(changes.items.length, 5);
 assert.equal(changes.items[1].revertedByEventId, redone.event.id);
+
+const asked = await call('POST', `/api/intents/${intentId}/ask`, {
+  text: 'Smoke test: nothing to change',
+});
+const answered = await waitForRun(asked.runId);
+
+console.log(`ask: routed to ${asked.route}, run ${answered.status}`);
+assert.equal(answered.status, 'succeeded');
+
+const cancelled = await call('POST', `/api/runs/${asked.runId}/cancel`);
+
+assert.equal(cancelled.status, 'succeeded', 'cancelling a finished run changes nothing');
 console.log('smoke test passed');
