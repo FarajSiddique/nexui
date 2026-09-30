@@ -1,6 +1,8 @@
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
+import { setRunScheduler } from '../../apps/api/src/lib/runs/schedule.ts';
+
 // Root tests have no dependencies of their own, so the AI SDK's test models load from the API.
 const fromApi = createRequire(new URL('../../apps/api/package.json', import.meta.url));
 
@@ -73,4 +75,16 @@ export function scriptedModel(steps, seen = []) {
       return steps[index - 1] ?? textStep();
     },
   });
+}
+
+/** Collects scheduled runs instead of handing them to `after()`; run them with `await task()`. */
+export function captureRuns(t) {
+  const tasks = [];
+
+  setRunScheduler((task) => {
+    tasks.push(task);
+  });
+  t.after(() => setRunScheduler(null));
+
+  return tasks;
 }

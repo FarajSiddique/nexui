@@ -1,0 +1,175 @@
+import { randomUUID } from 'node:crypto';
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import type { RunRecord, RunRoute } from '@nexui/types';
+
+import { CAPABILITIES } from '../capabilities/registry.ts';
+import { createStager, type Stager } from '../capabilities/stage.ts';
+import { CapabilityError, type Capability } from '../capabilities/types.ts';
+import { instructionsFor, promptFor } from '../cognition/prompts.ts';
+import {
+  runModel,
+  type ModelMode,
+  type StepDecision,
+  type StepReport,
+} from '../cognition/run-model.ts';
+import { toModelTools } from '../cognition/tools.ts';
+import { commitChangeset } from '../graph/commit.ts';
+import {
+  ChangesetConflictError,
+  ChangesetInvalidError,
+  GraphNotFoundError,
+} from '../graph/errors.ts';
+import { logLine } from '../graph/respond.ts';
+import { loadSnapshot } from '../graph/snapshot.ts';
+import { finishRun, recordRunStep } from './store.ts';
+import type { AiSession, ModelTier } from '../ai/session.ts';
+
+export interface RunJob {
+  db: SupabaseClient;
+  run: RunRecord;
+  session: AiSession;
+}
+
+export interface RunDeps {
+  clock?: () => Date;
+  newId?: () => string;
+  capabilities?: readonly Capability[];
+}
+
+// Spec section F: edit and fast take one fast-tier step (plus one correction); reasoning plans
+// with tools for up to 8 steps.
+const ROUTES: Record<RunRoute, { tier: ModelTier; mode: ModelMode; maxSteps: number }> = {
+  edit: { tier: 'fast', mode: 'single', maxSteps: 2 },
+  fast: { tier: 'fast', mode: 'single', maxSteps: 2 },
+  reasoning: { tier: 'reasoning', mode: 'loop', maxSteps: 8 },
+};
+
+export const INVALID_RUN_ERROR = "Nexui couldn't make a valid change.";
+export const FAILED_RUN_ERROR = "Nexui couldn't finish this.";
+
+function runErrorMessage(error: unknown): string {
+  if (error instanceof GraphNotFoundError) {
+    return 'This plan no longer exists.';
+  }
+
+  if (
+    error instanceof ChangesetInvalidError ||
+    error instanceof ChangesetConflictError ||
+    error instanceof CapabilityError
+  ) {
+    return error.message;
+  }
+
+  return FAILED_RUN_ERROR;
+}
+
+// AI SDK errors have stable names such as AI_APICallError, which are safe to log.
+function describeFailure(error: unknown): string {
+  if (error instanceof Error && error.name.startsWith('AI_')) {
+    return `A run failed (${error.name}).`;
+  }
+
+  return logLine(error, 'A run failed');
+}
+
+interface StepContext {
+  db: SupabaseClient;
+  intentId: string;
+  runId: string;
+  stager: Stager;
+  clock: () => Date;
+  newId: () => string;
+}
+
+// Commits the step's ops as one changeset, then records the step. A commit error is recorded
+// first and then thrown, which fails the run with its steps so far kept.
+async function commitStep(step: StepContext, report: StepReport): Promise<StepDecision> {
+  const ops = step.stager.takeOps();
+  const entries = step.stager.takeEntries().map((entry) => ({ ...entry, step: report.step }));
+  let failure: { error: unknown } | null = null;
+
+  if (ops.length > 0) {
+    try {
+      const committed = await commitChangeset(
+        step.db,
+        { intentId: step.intentId, actor: 'ai', runId: step.runId, ops },
+        step.clock(),
+        step.newId,
+      );
+
+      step.stager.reset(committed.snapshot);
+    } catch (error) {
+      failure = { error };
+    }
+  }
+
+  const status = await recordRunStep(step.db, step.runId, entries, report.usage);
+
+  if (failure) {
+    throw failure.error;
+  }
+
+  return status === 'running' ? 'continue' : 'stop';
+}
+
+/**
+ * Runs one AI request to the end (spec section F). Each model step's calls commit as one
+ * changeset, so Undo in Changes reverts a step; a cancel stops the run after its current step;
+ * a failure keeps the committed steps. Never throws: the outcome is written to the run.
+ */
+export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void> {
+  const { db, run, session } = job;
+  const clock = deps.clock ?? ((): Date => new Date());
+  const newId = deps.newId ?? randomUUID;
+  const capabilities = deps.capabilities ?? CAPABILITIES;
+
+  try {
+    const intentId = run.intentId;
+
+    if (!intentId) {
+      throw new GraphNotFoundError('Not found.');
+    }
+
+    if ((await recordRunStep(db, run.id, [], null)) !== 'running') {
+      return;
+    }
+
+    const snapshot = await loadSnapshot(db, intentId);
+    const stager = createStager({
+      capabilities,
+      snapshot,
+      actor: 'ai',
+      runId: run.id,
+      newId,
+      clock,
+    });
+    const route = ROUTES[run.input.route];
+    const step: StepContext = { db, intentId, runId: run.id, stager, clock, newId };
+    const outcome = await runModel({
+      model: session.languageModel(route.tier),
+      providerOptions: session.providerOptions(route.tier),
+      instructions: instructionsFor(run.kind, run.input.route),
+      prompt: promptFor(snapshot, stager.refs, run.input.text),
+      tools: toModelTools(capabilities, stager),
+      mode: route.mode,
+      maxSteps: route.maxSteps,
+      onStep: (report) => commitStep(step, report),
+    });
+
+    if (outcome === 'invalid') {
+      await finishRun(db, run.id, 'failed', INVALID_RUN_ERROR);
+    } else {
+      await finishRun(db, run.id, 'succeeded', null);
+    }
+  } catch (error) {
+    console.error('[runs]', describeFailure(error));
+
+    try {
+      await finishRun(db, run.id, 'failed', runErrorMessage(error));
+    } catch {
+      console.error('[runs]', 'Could not record a failed run.');
+    }
+  }
+}
