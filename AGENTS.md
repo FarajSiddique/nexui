@@ -4,7 +4,7 @@
 
 This pnpm/Turborepo monorepo contains four private workspaces:
 
-- `apps/mobile/src/app/`: Expo Router screens and root layout. API/query helpers live in `src/lib/`; local Zustand stores live in `src/stores/`.
+- `apps/mobile/src/app/`: Expo Router screens and root layout. API/query helpers live in `src/lib/`; local Zustand stores live in `src/stores/` (see `docs/architecture/mobile.md`).
 - `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, and templates in `src/lib/templates/`; Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
 - `packages/types/src/`: shared Zod schemas and inferred TypeScript contracts, imported through `@nexui/types`.
 - `packages/config/`: strict TypeScript defaults, shared ESLint rules, and Prettier configuration.
