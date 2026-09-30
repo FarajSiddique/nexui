@@ -30,3 +30,47 @@ export function useMockAi(t) {
     }
   });
 }
+
+const stepUsage = {
+  inputTokens: { total: 12, noCache: 12, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 3, text: 3, reasoning: 0 },
+};
+
+/** One model step that calls tools: `[['object_create', { … }], …]`. */
+export function toolStep(calls) {
+  return {
+    content: calls.map(([toolName, input], index) => ({
+      type: 'tool-call',
+      toolCallId: `call-${index}`,
+      toolName,
+      input: JSON.stringify(input),
+    })),
+    finishReason: { unified: 'tool-calls', raw: undefined },
+    usage: stepUsage,
+    warnings: [],
+  };
+}
+
+/** One model step that only answers in text, which ends a tool loop. */
+export function textStep(text = 'Done.') {
+  return {
+    content: [{ type: 'text', text }],
+    finishReason: { unified: 'stop', raw: undefined },
+    usage: stepUsage,
+    warnings: [],
+  };
+}
+
+/** A language model that plays `steps` in order, then text. `seen` collects each call's options. */
+export function scriptedModel(steps, seen = []) {
+  let index = 0;
+
+  return new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      seen.push(options);
+      index += 1;
+
+      return steps[index - 1] ?? textStep();
+    },
+  });
+}
