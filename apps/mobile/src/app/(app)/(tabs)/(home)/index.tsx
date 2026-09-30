@@ -26,25 +26,81 @@ export default function HomeScreen(): ReactElement {
       return <SkeletonRows count={3} />;
     }
 
-    if (intents.isError) {
+    if (intents.isLoadingError) {
       return <ListError message={intents.error.message} onRetry={() => void intents.refetch()} />;
     }
 
-    if (intents.data.length === 0) {
+    return (
+      <>
+        {intents.isRefetchError ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void intents.refetch()}
+            style={styles.notice}
+          >
+            <Text accessibilityLiveRegion="polite" style={styles.noticeText}>
+              {"Couldn't refresh your plans. Showing what was last loaded. Tap to try again."}
+            </Text>
+          </Pressable>
+        ) : null}
+        {intents.data.length === 0 ? (
+          <ListEmpty text="Your plans will show here. Tap + and say what you're trying to do." />
+        ) : (
+          <View style={styles.cards}>
+            {intents.data.map((item) => (
+              <IntentCard
+                key={item.id}
+                item={item}
+                onPress={() => router.push({ pathname: '/intent/[id]', params: { id: item.id } })}
+              />
+            ))}
+          </View>
+        )}
+      </>
+    );
+  };
+
+  const renderChanges = (): ReactElement | null => {
+    if (recent.isError) {
       return (
-        <ListEmpty text="Your plans will show here. Tap + and say what you're trying to do." />
+        <View style={styles.changes}>
+          <Text accessibilityRole="header" style={styles.subhead}>
+            What changed
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void recent.refetch()}
+            style={styles.changesError}
+          >
+            <Text style={styles.changesErrorText}>
+              {"Couldn't load recent changes. Tap to try again."}
+            </Text>
+          </Pressable>
+        </View>
       );
     }
 
+    if (rows.length === 0) {
+      return null;
+    }
+
     return (
-      <View style={styles.cards}>
-        {intents.data.map((item) => (
-          <IntentCard
-            key={item.id}
-            item={item}
-            onPress={() => router.push({ pathname: '/intent/[id]', params: { id: item.id } })}
-          />
-        ))}
+      <View style={styles.changes}>
+        <Text accessibilityRole="header" style={styles.subhead}>
+          What changed
+        </Text>
+        <View style={styles.feed}>
+          {rows.map((row) => (
+            <ChangeRowView key={row.key} row={row} now={now} compact />
+          ))}
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.navigate('/changes')}
+            style={styles.more}
+          >
+            <Text style={styles.moreText}>See all changes</Text>
+          </Pressable>
+        </View>
       </View>
     );
   };
@@ -63,25 +119,7 @@ export default function HomeScreen(): ReactElement {
         />
         <ConnectionBanner />
         {renderPlans()}
-        {rows.length > 0 ? (
-          <View style={styles.changes}>
-            <Text accessibilityRole="header" style={styles.subhead}>
-              What changed
-            </Text>
-            <View style={styles.feed}>
-              {rows.map((row) => (
-                <ChangeRowView key={row.key} row={row} now={now} compact />
-              ))}
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => router.navigate('/changes')}
-                style={styles.more}
-              >
-                <Text style={styles.moreText}>See all changes</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
+        {renderChanges()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -106,6 +144,8 @@ const useStyles = createThemedStyles((colors) => ({
   list: { flex: 1, width: '100%', maxWidth: 488, alignSelf: 'center' },
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
   wordmark: { fontFamily: fonts.display, fontSize: 16, letterSpacing: -0.3, color: colors.muted },
+  notice: { marginTop: 12, minHeight: 44, justifyContent: 'center' },
+  noticeText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
   cards: { gap: 12, marginTop: 12 },
   changes: { gap: 8, marginTop: 24 },
   subhead: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink },
@@ -122,6 +162,8 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.ink,
     textDecorationLine: 'underline',
   },
+  changesError: { minHeight: 44, justifyContent: 'center' },
+  changesErrorText: { fontFamily: fonts.body, fontSize: 14, color: colors.danger },
   gear: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   tooth: {
     position: 'absolute',
