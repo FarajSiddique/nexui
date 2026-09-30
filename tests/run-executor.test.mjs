@@ -6,6 +6,7 @@ import {
   executeRun,
   FAILED_RUN_ERROR,
   INVALID_RUN_ERROR,
+  SKIPPED_STEP_ERROR,
 } from '../apps/api/src/lib/runs/execute.ts';
 import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
@@ -59,6 +60,8 @@ function askFixture(route, steps) {
 }
 
 const setDays = (ref, days) => ({ capability: 'trip.setPlaceDays', input: { placeId: ref, days } });
+
+const entriesOf = (state) => state.steps.flatMap((step) => step.p_entries);
 
 function start(t, row, fakeOptions = {}) {
   const fake = graphDb(row, fakeOptions);
@@ -174,9 +177,10 @@ test('two invalid steps in a row fail the run and write nothing', async (t) => {
   });
 });
 
-test('a user edit mid-run fails that step, keeps what committed and says why', async (t) => {
+test('a stop the user deletes mid-run is skipped by the step, and progress says so', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
-  // Reads: 1 at the start, 2 and 3 around the first commit, 4 before the second commit.
+  // Reads: 1 at the start, 2 and 3 around the first commit, 4 before the second commit (deletes
+  // Kyoto, moving lastActivityAt), 5 to refresh the stager once restage drops every call.
   const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
     onLoad: (state, n) => {
       if (n === 4) {
@@ -190,13 +194,13 @@ test('a user edit mid-run fails that step, keeps what committed and says why', a
   await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 1);
-  assert.deepEqual(fake.state.finished, {
-    p_run_id: RUN_ID,
-    p_status: 'failed',
-    p_error: 'That item no longer exists.',
-  });
-  assert.equal(fake.state.steps.length, 3);
-  assert.deepEqual(logged.mock.calls.at(-1).arguments, ['[runs]', 'A run failed.']);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+
+  const kyotoEntry = entriesOf(fake.state).find((entry) => entry.step === 1);
+
+  assert.equal(kyotoEntry.ok, false);
+  assert.equal(kyotoEntry.error, SKIPPED_STEP_ERROR);
+  assert.equal(logged.mock.calls.length, 0);
 });
 
 test('a model error fails the run, keeps the steps before it and logs no detail', async (t) => {
@@ -273,6 +277,13 @@ test('a step call that would undo the field the user just changed is dropped', a
   assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
   assert.equal(placeData(fake.state, KYOTO_ID).days, 5);
   assert.equal(fake.state.finished.p_status, 'succeeded');
+
+  const entries = entriesOf(fake.state).filter((entry) => entry.capability === 'trip.setPlaceDays');
+
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].ok, false);
+  assert.equal(entries[0].error, SKIPPED_STEP_ERROR);
+  assert.equal(entries[1].ok, true);
 });
 
 test('a step whose every call was superseded commits nothing and the run goes on', async (t) => {

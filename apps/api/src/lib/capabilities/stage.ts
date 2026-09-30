@@ -44,7 +44,10 @@ export interface Stager {
   takeOps(): ChangesetOp[];
   /** The calls made since the last take, for the run's progress. */
   takeEntries(): StagedEntry[];
-  /** Continues from a committed snapshot, which includes derived changes. Refs are kept. */
+  /**
+   * Continues from a committed snapshot, which includes derived changes. Refs are kept, and this
+   * snapshot becomes restage's new base: its refs and recorded calls reset here too.
+   */
   reset(snapshot: GraphSnapshot): void;
   /**
    * Rebuilds the ops staged since the last reset over a newer snapshot, when the intent changed
@@ -52,6 +55,8 @@ export interface Stager {
    * a field the user changed since then is dropped. Null when nothing changed.
    */
   restage(current: GraphSnapshot): ChangesetOp[] | null;
+  /** The entry indexes of calls `restage` dropped since the last take, for the run's progress. */
+  takeSkipped(): number[];
 }
 
 // Progress keeps each call's input, so a run can be recorded as a fixture, up to this size.
@@ -112,6 +117,8 @@ interface StagedCall {
   input: unknown;
   /** The ids the call generated, handed back in order when it replays. */
   ids: string[];
+  /** The index of this call's entry in the step's progress, marked if a replay drops it. */
+  entryIndex: number;
 }
 
 /** A step's call that no longer applies to the intent as it now is. */
@@ -190,14 +197,19 @@ function touchesEdited(
   }
 
   const fields = edited.get(op.id);
-  const object = staged.objects.find((candidate) => candidate.id === op.id);
 
-  if (!fields || !object) {
+  if (!fields) {
     return false;
   }
 
   if (fields.has('*')) {
     return true;
+  }
+
+  const object = staged.objects.find((candidate) => candidate.id === op.id);
+
+  if (!object) {
+    return false;
   }
 
   const columnClash = COLUMNS.some(
@@ -234,12 +246,14 @@ export function createStager(options: StagerOptions): Stager {
   let pending: ChangesetOp[] = [];
   let entries: StagedEntry[] = [];
   let calls: StagedCall[] = [];
+  let skipped: number[] = [];
 
   // Parses and validates everything before keeping anything, so a refused call leaves only its
   // progress entry behind.
   function stage(
     name: string,
     input: unknown,
+    entryIndex: number,
     replay?: { ids: string[]; accept: (ops: ChangesetOp[]) => boolean },
   ): CapabilityResult {
     const capability = options.capabilities.find((candidate) => candidate.name === name);
@@ -286,7 +300,7 @@ export function createStager(options: StagerOptions): Stager {
     staged = applyOps(staged, ops, now);
     pending.push(...ops);
     claimRefs(refs, result.refs ?? {});
-    calls.push({ name, input, ids });
+    calls.push({ name, input, ids, entryIndex });
 
     return result;
   }
@@ -296,9 +310,10 @@ export function createStager(options: StagerOptions): Stager {
     graph: () => staged,
     call(name, input) {
       const started = performance.now();
+      const entryIndex = entries.length;
 
       try {
-        const result = stage(name, input);
+        const result = stage(name, input, entryIndex);
 
         entries.push({
           capability: name,
@@ -348,6 +363,7 @@ export function createStager(options: StagerOptions): Stager {
       baseRefs = copyRefs(refs);
       pending = [];
       calls = [];
+      skipped = [];
     },
     restage(current) {
       if (current.intent.lastActivityAt === base.intent.lastActivityAt) {
@@ -367,11 +383,13 @@ export function createStager(options: StagerOptions): Stager {
         const before = staged;
 
         try {
-          stage(call.name, call.input, {
+          stage(call.name, call.input, call.entryIndex, {
             ids: call.ids,
             accept: (ops) => !ops.some((op) => touchesEdited(op, before, edited, workspaceMoved)),
           });
         } catch (error) {
+          skipped.push(call.entryIndex);
+
           if (safeMessage(error) === null && !(error instanceof SupersededError)) {
             console.error('[capabilities]', `${call.name} failed unexpectedly on replay.`);
           }
@@ -379,6 +397,13 @@ export function createStager(options: StagerOptions): Stager {
       }
 
       return [...pending];
+    },
+    takeSkipped() {
+      const taken = skipped;
+
+      skipped = [];
+
+      return taken;
     },
   };
 }

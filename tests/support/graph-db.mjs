@@ -62,10 +62,16 @@ export function toSnapshotRow(snapshot) {
   };
 }
 
-/** Deletes an object and its links, as the user would from another device. */
+/**
+ * Deletes an object and its links, as the user would from another device: the intent's
+ * `lastActivityAt` moves, as `apply_changeset` would move it.
+ */
 export function removeObject(state, id) {
+  const stamp = new Date(Date.now() + 1000).toISOString();
+
   state.snapshot = {
     ...state.snapshot,
+    intent: { ...state.snapshot.intent, lastActivityAt: stamp },
     objects: state.snapshot.objects.filter((object) => object.id !== id),
     relationships: state.snapshot.relationships.filter(
       (edge) => edge.sourceId !== id && edge.targetId !== id,
