@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { mapSnapshotRow } from '../../apps/api/src/lib/graph/mappers.ts';
 import { applyOps } from '../../packages/types/src/apply-ops.ts';
-import { postgrest } from './graph-api.mjs';
+import { pgError, postgrest } from './graph-api.mjs';
 import { eventRow, runRow, USER_ID } from './graph.mjs';
 
 /** A contract-shaped snapshot as `get_intent_snapshot` returns it. */
@@ -101,20 +101,27 @@ export function editObject(state, id, changes) {
  * A stateful PostgREST stand-in for one user and one intent. Commits apply their ops to the
  * in-memory intent, and the run functions keep one run, so a whole run can execute against it.
  * `onApply(state, n)` runs after the nth commit and `onLoad(state, n)` before the nth snapshot
- * read, to simulate a cancel or an edit from elsewhere.
+ * read, to simulate a cancel or an edit from elsewhere. `failApplyOnce` fails the first
+ * `apply_changeset` call with that SQLSTATE (e.g. `'NXU08'`) instead of applying it, so a test can
+ * exercise `commitChangeset`'s single automatic retry; every later call applies as normal.
  */
-export function graphDb(initialRow = null, { run = runRow(), onApply, onLoad } = {}) {
+export function graphDb(
+  initialRow = null,
+  { run = runRow(), onApply, onLoad, failApplyOnce } = {},
+) {
   const now = () => new Date().toISOString();
   const state = {
     snapshot: initialRow ? mapSnapshotRow(initialRow) : null,
     run: { ...run },
     applied: [],
+    attempts: [],
     steps: [],
     loads: 0,
     created: null,
     createdRun: null,
     finished: null,
   };
+  let pendingFailure = failApplyOnce ?? null;
   const active = () => state.run.status === 'queued' || state.run.status === 'running';
 
   const fetch = postgrest({
@@ -152,6 +159,16 @@ export function graphDb(initialRow = null, { run = runRow(), onApply, onLoad } =
       return {};
     },
     apply_changeset: (args) => {
+      state.attempts.push(args);
+
+      if (pendingFailure) {
+        const code = pendingFailure;
+
+        pendingFailure = null;
+
+        return pgError(code);
+      }
+
       const stamp = now();
 
       state.applied.push(args);

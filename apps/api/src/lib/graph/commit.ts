@@ -41,7 +41,7 @@ async function applyFromSnapshot(
   const before = await loadSnapshot(db, input.intentId);
   const staged = input.restage?.(before) ?? input.ops;
 
-  if (staged.length === 0) {
+  if (input.restage && staged.length === 0) {
     throw new NothingToCommitError('Newer changes replaced everything in this step.');
   }
 

@@ -299,3 +299,60 @@ test('a step whose every call was superseded commits nothing and the run goes on
   assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
   assert.equal(fake.state.finished.p_status, 'succeeded');
 });
+
+const osaka = { name: 'Osaka', country: 'JP', placeType: 'city', lat: 34.69, lng: 135.5, days: 1 };
+
+// The objects a commit attempt touched (not relationships, workspaces or the intent, which have
+// ids or none of their own that don't identify an object).
+const objectIdsOf = (args) =>
+  args.p_ops
+    .filter((op) => ['insert_object', 'update_object', 'delete_object'].includes(op.op))
+    .map((op) => op.id)
+    .sort();
+
+test('a double restage after NXU08 keeps the edit and reuses the same ids', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+    failApplyOnce: 'NXU08',
+  });
+  const run = askRun('reasoning');
+  // Tokyo (o2) is already at 6 days (the concurrent edit); Kyoto (o1) to 1 and the new Osaka at
+  // 1 keep the trip's 8 days fully allocated, so no derived "unallocated days" insight is
+  // created — which would otherwise mint its own id on every attempt and break the id check
+  // below for a reason that has nothing to do with the model's own calls.
+  const fixture = askFixture('reasoning', [
+    [
+      { capability: 'object.create', input: { ref: 'osaka', kind: 'place', data: osaka } },
+      { capability: 'object.update', input: { ref: 'o2', data: { why: 'Best ramen' } } },
+      setDays('o1', 1),
+    ],
+  ]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  // The first apply_changeset attempt is refused with NXU08 (the user's edit landed underneath
+  // it); commitChangeset reloads and restages a second time, which is the one that lands.
+  assert.equal(fake.state.attempts.length, 2);
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+
+  // The user's edit survives the restage, and the step's own edit of the same place (a field
+  // the user didn't touch) still merges in around it.
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(placeData(fake.state, TOKYO_ID).why, 'Best ramen');
+  // The step's other surviving call (setDays on Kyoto) still committed once.
+  assert.equal(placeData(fake.state, KYOTO_ID).days, 1);
+
+  const osakaObjects = fake.state.snapshot.objects.filter((object) => object.data.name === 'Osaka');
+
+  // The created place lands exactly once: the second restage didn't duplicate it.
+  assert.equal(osakaObjects.length, 1);
+  // Both attempts staged the same object ids (the retry replayed the same calls, not fresh
+  // ones), and the ref the model picked ("osaka") wasn't refused as already used on the second
+  // restage — no "ref already used" failure.
+  assert.deepEqual(objectIdsOf(fake.state.attempts[0]), objectIdsOf(fake.state.attempts[1]));
+  assert.deepEqual(
+    objectIdsOf(fake.state.attempts[1]),
+    [TOKYO_ID, KYOTO_ID, osakaObjects[0].id].sort(),
+  );
+});
