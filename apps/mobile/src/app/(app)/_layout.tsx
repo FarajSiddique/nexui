@@ -9,13 +9,13 @@ export default function AppLayout(): ReactElement {
   const styles = useStyles();
   const colors = useColors();
 
-  // The + sheet rises over everything, tab bar included. iOS gets a form sheet sized to its
-  // content; Android and web get a modal, which keeps the keyboard behavior predictable.
+  // The + sheet rises over everything, tab bar included. iOS gets a tall form sheet (the run
+  // streams into it); Android and web get a modal, which keeps the keyboard behavior predictable.
   const composeOptions =
     Platform.OS === 'ios'
       ? ({
           presentation: 'formSheet',
-          sheetAllowedDetents: 'fitToContents',
+          sheetAllowedDetents: [0.92] as number[],
           sheetGrabberVisible: true,
           sheetCornerRadius: 26,
           contentStyle: { backgroundColor: colors.card },
