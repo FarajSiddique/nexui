@@ -25,7 +25,8 @@ const DATA_HELP =
   'Fields by kind. place: name, country (ISO 3166-1 alpha-2 such as JP), placeType ' +
   '(city|region|town|area|site), lat, lng, days (whole days, 0 or more), estDailyCost? ' +
   '{amount, currency}, why? (one short sentence). leg: mode (flight|train|bus|car|ferry|other), ' +
-  'estHours?, estCost?. stay: name, placeId (a place ref), nights, estNightly?, url?. ' +
+  'estHours?, estCost? {amount, currency}. stay: name, placeId (a place ref), nights, ' +
+  'estNightly? {amount, currency}, url?. ' +
   'thing: fields [{label, value}].';
 
 const objectCreate = defineCapability({
