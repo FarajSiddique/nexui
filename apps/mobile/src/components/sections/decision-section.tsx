@@ -77,13 +77,14 @@ export function DecisionSection({
     highlight: aiMarkFor(entry.option).highlight,
     tentative: true,
   }));
+  const mark = aiMarkFor(decision);
 
   return (
     <SectionFrame accent>
-      {decision.source?.type === 'ai' ? <NexuiTag label={proposedBy} /> : null}
+      {mark.highlight ? <NexuiTag label={proposedBy} /> : null}
       <AiText
         text={details.question}
-        highlight={decision.source?.type === 'ai'}
+        highlight={mark.highlight}
         tag={false}
         style={styles.question}
       />
