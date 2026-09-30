@@ -88,3 +88,33 @@ test('a slow Jev is abandoned after the timeout', async (t) => {
   });
   assert.ok(Date.now() - started < 1_000);
 });
+
+test('a slow Jev is abandoned after the timeout when routing an ask', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+
+  const slow = new Experimental_EvaluationMockModelV4({
+    doEvaluate: ({ abortSignal }) =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => resolve({ answers: { route: { type: 'choice', choice: 'edit' } }, warnings: [] }),
+          10_000,
+        );
+
+        abortSignal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('aborted'));
+        });
+      }),
+  });
+  const started = Date.now();
+  const ask = { text: 'Make Kyoto 3 days', goal: 'Plan Japan', summary: '' };
+
+  assert.deepEqual(await routeAsk(slow, ask, { timeoutMs: 20 }), {
+    value: 'reasoning',
+    source: 'fallback',
+  });
+  assert.ok(Date.now() - started < 1_000);
+  assert.equal(logged.mock.callCount(), 1);
+  assert.equal(logged.mock.calls[0].arguments[0], '[perception]');
+  assert.equal(logged.mock.calls[0].arguments[1], 'Ask routing failed; using the reasoning tier.');
+});

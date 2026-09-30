@@ -284,3 +284,17 @@ test('an intent without a workspace has nothing to stage', () => {
     refused(/^Nexui can only change trips so far\.$/),
   );
 });
+
+test('the help text gives every money field the {amount, currency} shape', () => {
+  const capability = (name) => GRAPH_CAPABILITIES.find((candidate) => candidate.name === name);
+
+  const dataHelp = capability('object.create').input.shape.data.description;
+
+  for (const field of ['estDailyCost', 'estCost', 'estNightly']) {
+    assert.match(dataHelp, new RegExp(`${field}\\? \\{amount, currency\\}`));
+  }
+
+  const updateHelp = capability('object.update').input.shape.data.description;
+
+  assert.match(updateHelp, /budget\? \{amount, currency\}/);
+});

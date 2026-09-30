@@ -16,11 +16,11 @@ model; this doc cites the code that implements it.
 
 ## Tables and writers
 
-Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are in
-`20260929000000_runs.sql`): `intents`,
-`objects`, `relationships`, `events` (append-only), `workspaces`, and `runs` (one per AI request; see "AI runs"). Every table is owner-scoped by RLS. Clients get no
-direct `insert`/`update`/`delete` — the migration `revoke`s those and only `grant`s `select` to
-`authenticated`. All writes go through `security definer` functions:
+Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are
+in `20260929000000_runs.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
+`workspaces`, and `runs` (one per AI request; see "AI runs"). Every table is owner-scoped by RLS.
+Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s those and only `grant`s
+`select` to `authenticated`. All writes go through `security definer` functions:
 
 - `create_intent(id, goal, template, ops)`: inserts the intent, then applies its seed changeset
   as actor `system`.
@@ -174,13 +174,14 @@ with the user's token, so RLS applies to everything it writes.
   answers one choice question within 5 seconds. A goal is `travel` or `none`; an ask is `edit`,
   `fast` or `reasoning`. If Jev fails, the goal is a trip and the ask gets `reasoning`. A
   `none` goal gets an intent with no template, no workspace and no run.
-- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`): `create_run` refuses while another run
-  on the intent is queued or running (NXU12, 409). `record_run_step` appends each step's calls
-  to `runs.progress` (`{ step, capability, label, ok, ms, input, error? }`, first 100 kept) and
-  its tokens to `runs.model_usage`, and returns the status, so `cancel_run` stops a run after
-  its current step. `finish_run` never overwrites a cancel. A run still queued or running
-  15 minutes after it was created reads as failed ("This run stopped unexpectedly."). Home
-  shows "Drafting" on intents with a working run.
+- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`): `create_run` refuses while another run on
+  the intent is queued or running (NXU12, 409). `record_run_step` appends each step's calls to
+  `runs.progress` (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries
+  would take `progress` past 100 is not recorded, so it holds at most 100 entries. It also
+  appends the step's tokens to `runs.model_usage`, and returns the status, so `cancel_run` stops
+  a run after its current step. `finish_run` never overwrites a cancel. A run still queued or
+  running 15 minutes after it was created reads as failed ("This run stopped unexpectedly.").
+  Home shows "Drafting" on intents with a working run.
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
   correction; `reasoning` and the create run use `NEXUI_MODEL_REASONING` for up to 8 steps.

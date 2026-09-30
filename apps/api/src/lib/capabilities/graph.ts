@@ -23,11 +23,11 @@ const LINK_TYPES = z.enum(['part_of', 'option_of', 'leg_from', 'leg_to']);
 
 const DATA_HELP =
   'Fields by kind. place: name, country (ISO 3166-1 alpha-2 such as JP), placeType ' +
-  '(city|region|town|area|site), lat, lng, days (whole days, 0 or more), estDailyCost? ' +
-  '{amount, currency}, why? (one short sentence). leg: mode (flight|train|bus|car|ferry|other), ' +
-  'estHours?, estCost? {amount, currency}. stay: name, placeId (a place ref), nights, ' +
-  'estNightly? {amount, currency}, url?. ' +
-  'thing: fields [{label, value}].';
+  '(city|region|town|area|site), lat (-90 to 90), lng (-180 to 180), days (whole days, 0 or ' +
+  'more), estDailyCost? {amount, currency}, why? (one short sentence). leg: mode ' +
+  '(flight|train|bus|car|ferry|other), estHours?, estCost? {amount, currency}. stay: name, ' +
+  'placeId (a place ref), nights (1 or more), estNightly? {amount, currency}, url? ' +
+  '(absolute URL). thing: fields [{label, value}].';
 
 const objectCreate = defineCapability({
   name: 'object.create',
@@ -94,8 +94,10 @@ const objectUpdate = defineCapability({
       .record(z.string(), z.unknown())
       .optional()
       .describe(
-        'The fields to change. Trip: destinations, startDate and endDate (together), ' +
-          'totalDays, travelers, budget, pace, currency. Others: see object_create.',
+        'The fields to change. Trip: destinations? [string], startDate?/endDate? (ISO date ' +
+          'YYYY-MM-DD, both or neither), totalDays? (1-365), travelers? (1-50), budget? ' +
+          '{amount, currency}, pace? (slow|balanced|fast), currency? (3-letter ISO 4217 such ' +
+          'as JPY). Others: see object_create.',
       ),
   }),
   policy: 'internal',
