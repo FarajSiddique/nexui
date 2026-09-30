@@ -168,3 +168,15 @@ export function runRow(overrides = {}) {
     ...overrides,
   };
 }
+
+/**
+ * What `get_intent_snapshot` returns for a trip the travel template just seeded: no places yet.
+ * Pass the travel workspace doc (`travelWorkspace(TRIP_ID)`).
+ */
+export function seedRow(doc, goal = 'Plan Japan in December') {
+  return snapshotRow(doc, {
+    intent: { ...intentRow, goal, summary: { line: '' } },
+    objects: [objectRow(TRIP_ID, 'trip', { destinations: [], currency: 'USD' }, { title: goal })],
+    relationships: [],
+  });
+}
