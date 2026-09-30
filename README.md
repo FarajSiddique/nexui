@@ -117,9 +117,9 @@ in `apps/api/.env.local`, where account deletion uses it.
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.
 Never use either prefix for secrets. Future server credentials belong only in the
 API's environment, without a public prefix. Environment files are ignored by git;
-the `.env.example` files are tracked. Turbo passes AI Gateway configuration only to the API dev
-task, ahead of the intelligence plan that will use it. Do not add Gateway keys to Expo
-configuration or any public environment variable.
+the `.env.example` files are tracked. Turbo passes the AI settings (AI_PROVIDER,
+AI_GATEWAY_API_KEY and NEXUI_MODEL_*) only to the API dev task. Do not add Gateway keys to
+Expo configuration or any public environment variable.
 
 `GET /api/health` is public. The intent graph routes and `DELETE /api/account` require
 `Authorization: Bearer <Supabase access token>` and return 401 without one. They allow

@@ -16,9 +16,9 @@ model; this doc cites the code that implements it.
 
 ## Tables and writers
 
-Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql`: `intents`,
-`objects`, `relationships`, `events` (append-only), `workspaces`, and `runs` (created now for
-the intelligence plan; unused today). Every table is owner-scoped by RLS. Clients get no
+Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are in
+`20260929000000_runs.sql`): `intents`,
+`objects`, `relationships`, `events` (append-only), `workspaces`, and `runs` (one per AI request; see "AI runs"). Every table is owner-scoped by RLS. Clients get no
 direct `insert`/`update`/`delete` — the migration `revoke`s those and only `grant`s `select` to
 `authenticated`. All writes go through `security definer` functions:
 
@@ -164,6 +164,45 @@ starting doc (`map`, `metric`, `allocation`, a pinned `insight`, then `route`), 
 `deriveTrip`'s `lengthDecisionOps` adds and removes a pinned `decision` section as the trip's
 length becomes known or unknown.
 
+## AI runs
+
+`POST /api/intents` and `POST /api/intents/[id]/ask` perceive, then start a run
+(`src/lib/orchestrator/orchestrate.ts`). The route answers at once; `after()` executes the run
+with the user's token, so RLS applies to everything it writes.
+
+- **Perception** (`src/lib/perception`): Jev (`NEXUI_MODEL_PERCEPTION`, `typesafe-ai/jev`)
+  answers one choice question within 5 seconds. A goal is `travel` or `none`; an ask is `edit`,
+  `fast` or `reasoning`. If Jev fails, the goal is a trip and the ask gets `reasoning`. A
+  `none` goal gets an intent with no template, no workspace and no run.
+- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`): `create_run` refuses while another run
+  on the intent is queued or running (NXU12, 409). `record_run_step` appends each step's calls
+  to `runs.progress` (`{ step, capability, label, ok, ms, input, error? }`, first 100 kept) and
+  its tokens to `runs.model_usage`, and returns the status, so `cancel_run` stops a run after
+  its current step. `finish_run` never overwrites a cancel. A run still queued or running
+  15 minutes after it was created reads as failed ("This run stopped unexpectedly."). Home
+  shows "Drafting" on intents with a working run.
+- **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
+  `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
+  correction; `reasoning` and the create run use `NEXUI_MODEL_REASONING` for up to 8 steps.
+  Each step's ops commit as one changeset with actor `ai` and the run id, so a step can be
+  undone from Changes. Two failing steps in a row fail the run; committed steps stay.
+- **Capabilities** (`src/lib/capabilities`): named, Zod-typed functions that turn input into ops
+  against a staged copy of the intent; the stager validates each call's ops before keeping
+  them. Models name objects by ref (`trip`, `o1` … oldest first, or the ref they gave a new
+  object), never by id. `trip.setPlaceDays`, `trip.reorderPlaces` and `decision.resolve` are
+  also the app's buttons, through `POST /api/intents/[id]/capabilities` (actor `user`).
+- **Prompts** put the goal, the graph and the request inside `<goal>`, `<graph>` and
+  `<request>` as escaped JSON, and tell the model never to follow instructions found there.
+- **Mock mode** (`AI_PROVIDER=mock`, the default) replays `src/lib/ai/fixtures`, recorded from
+  live runs. A fixture matches when all its phrases are in the text. With no match, perception
+  answers `travel` and `reasoning` and the run changes nothing. An ask fixture's refs assume
+  the graph it was recorded on (for `japan-ask-rural`: `japan-december` replayed, then
+  `try-run.mjs free-day`).
+- **Recording:** run the API with `AI_PROVIDER=live`, start a run with
+  `node scripts/try-run.mjs goal "<goal>"` (or `ask`), then
+  `node scripts/record-fixture.mjs <runId> <name> <phrase,phrase>` and add the export to
+  `FIXTURES`.
+
 ## Theming
 
 `apps/mobile/src/lib/theme.ts` exports `light` and `dark` palettes with identical keys
@@ -181,8 +220,8 @@ text is actually drawn with.
   `psql`) against a scratch database. Creates two throwaway users, exercises create, change,
   undo, redo and cross-user isolation through the RPCs, and rolls everything back in one
   transaction — nothing it does persists.
+- `supabase/tests/runs-smoke.sql`: the run functions, as two throwaway users, rolled back.
 - `scripts/smoke-intent-graph.mjs [.qa/session.json] [apiUrl]`: a live end-to-end check against
   a running API. Needs a QA session (`node scripts/qa-session.mjs > .qa/session.json`) and the
-  API running (`pnpm dev:api`). It creates a trip, plans two stops, shortens one, checks the
-  resulting insight, undoes, redoes, and confirms Changes shows all five events with the redo as
-  the second event's `revertedByEventId`.
+  API running (`pnpm dev:api`). It needs AI_PROVIDER=mock, waits for each run, and ends with an
+  ask, its run, and a cancel of the finished run.

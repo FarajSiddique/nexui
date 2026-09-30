@@ -23,7 +23,9 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `pnpm build`: build Next.js and export Expo web; does not build native binaries.
 - `pnpm lint` / `pnpm typecheck`: check all applicable workspaces.
 - `pnpm test`: run the Node test suite.
-- `node scripts/smoke-intent-graph.mjs`: exercise the graph API as the QA user (API must be running).
+- `node scripts/smoke-intent-graph.mjs`: exercise the graph API as the QA user (API running with `AI_PROVIDER=mock`).
+- `node scripts/try-run.mjs goal "<goal>"`: start a run as the QA user and print what it did (`ask` and `free-day` too).
+- `node scripts/record-fixture.mjs <runId> <name> <phrases>`: save a succeeded live run as a mock fixture.
 - `pnpm lint:fix`: apply ESLint fixes across the workspaces.
 - `pnpm fix`: apply ESLint fixes, then Prettier formatting.
 - `pnpm format` / `pnpm format:check`: apply or verify formatting.
