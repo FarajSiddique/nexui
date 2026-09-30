@@ -38,16 +38,16 @@ import { ApiError } from './api-request';
 
 export const queryKeys = {
   intents: ['intents'] as const,
-  intent: (id: string) => ['intent', id] as const,
+  intent: (id: string): readonly ['intent', string] => ['intent', id] as const,
   runs: ['run'] as const,
-  run: (id: string) => ['run', id] as const,
+  run: (id: string): readonly ['run', string] => ['run', id] as const,
   changes: ['changes'] as const,
   changesFeed: ['changes', 'feed'] as const,
   recentChanges: ['changes', 'recent'] as const,
 };
 
 /** Every workspace edit on one intent shares this key; they run one at a time, in tap order. */
-export const editKey = (intentId: string) => ['edit', intentId] as const;
+export const editKey = (intentId: string): readonly ['edit', string] => ['edit', intentId] as const;
 
 export function isRunActive(run: RunRecord | undefined): boolean {
   return run?.status === 'queued' || run?.status === 'running';
@@ -127,7 +127,9 @@ export interface WorkspaceEdit {
 /**
  * Sends workspace edits one at a time, in tap order (a shared mutation scope). Each shows at
  * once through its optimistic ops. Only the last edit to finish writes the server's snapshot,
- * so an earlier answer never wipes a later tap. A failure refetches the server's state.
+ * so an earlier answer never wipes a later tap. Only the last edit to fail refetches the
+ * server's state too; an earlier failure leaves later taps' optimistic ops in place, since their
+ * own success or error settles the cache.
  */
 export function useWorkspaceEdit(
   intentId: string,
@@ -155,7 +157,9 @@ export function useWorkspaceEdit(
       }
     },
     onError: () => {
-      void client.invalidateQueries({ queryKey: key });
+      if (client.isMutating({ mutationKey: editKey(intentId) }) === 1) {
+        void client.invalidateQueries({ queryKey: key });
+      }
     },
     onSettled: () => refreshLists(client),
   });
