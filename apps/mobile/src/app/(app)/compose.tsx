@@ -51,7 +51,7 @@ export default function ComposeSheet(): ReactElement {
 
   const working = isRunActive(run.data) || create.isPending || ask.isPending;
   const canSend = text.trim().length >= (target ? 2 : 3) && !working;
-  const error = create.error ?? ask.error;
+  const error = create.error ?? ask.error ?? cancel.error;
   const goal = context.data?.intent.goal;
 
   const send = (message: string): void => {
@@ -99,7 +99,11 @@ export default function ComposeSheet(): ReactElement {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.sheet}
     >
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.chip}>
           <Text style={styles.chipTitle}>{target ? (goal ?? 'This plan') : 'New plan'}</Text>
           <Text style={styles.chipDetail}>
@@ -160,6 +164,7 @@ export default function ComposeSheet(): ReactElement {
 
 const useStyles = createThemedStyles((colors) => ({
   sheet: { flex: 1, backgroundColor: colors.card },
+  scroll: { flex: 1 },
   body: { gap: 12, padding: 20, paddingBottom: 24 },
   chip: { gap: 2, padding: 12, borderRadius: 14, backgroundColor: colors.soft },
   chipTitle: { fontFamily: fonts.heading, fontSize: 17, color: colors.ink },
