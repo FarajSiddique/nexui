@@ -104,6 +104,7 @@ const textPairs = [
   ['aiChipInk', 'aiChip'],
   ['ink', 'aiMark'],
   ['success', 'card'],
+  ['success', 'soft'],
   ['danger', 'card'],
   ['card', 'userMark'],
 ];
