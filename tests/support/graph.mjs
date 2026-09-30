@@ -142,3 +142,29 @@ export const eventRow = {
   payload: {},
   created_at: LATER,
 };
+
+export const RUN_ID = 'c0000000-0000-4000-8000-000000000001';
+
+/** A `runs` row. It is created now, so it isn't stale unless a test says so. */
+export function runRow(overrides = {}) {
+  return {
+    id: RUN_ID,
+    user_id: USER_ID,
+    intent_id: INTENT_ID,
+    kind: 'create_intent',
+    status: 'queued',
+    input: {
+      text: 'Plan Japan in December',
+      route: 'reasoning',
+      template: 'travel',
+      perception: 'model',
+    },
+    progress: [],
+    error: null,
+    model_usage: {},
+    started_at: null,
+    finished_at: null,
+    created_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
