@@ -120,6 +120,7 @@ export default function ComposeSheet(): ReactElement {
             stopping={cancel.isPending}
             onStop={(runId) => cancel.mutate(runId)}
             onRetry={() => send(sent.text)}
+            retrying={ask.isPending || create.isPending}
             onSeeChanges={seeChanges}
           />
         ) : null}

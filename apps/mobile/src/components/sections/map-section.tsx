@@ -66,7 +66,7 @@ export function MapSection({ section, data }: SectionProps<'map'>): ReactElement
         ) : null}
         {data.pins.map((pin) => (
           <Marker
-            key={`${pin.id}-${scheme}`}
+            key={`${pin.id}-${pin.order}-${scheme}`}
             coordinate={{ latitude: pin.lat, longitude: pin.lng }}
             title={pin.label}
             tracksViewChanges={false}

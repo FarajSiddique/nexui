@@ -117,7 +117,7 @@ test('Nexui proposing a decision names the question and its options', () => {
 
   assert.deepEqual(
     [rows[0].who, rows[0].text],
-    ['Nexui', 'proposed 3 options for "Where should the free day go?"'],
+    ['Nexui', 'proposed 3 options for “Where should the free day go?”'],
   );
 });
 
@@ -145,11 +145,11 @@ test('other changes get plain sentences', () => {
 
   assert.deepEqual(
     [created.who, created.text, created.revert],
-    ['You', 'started "Japan in December"', null],
+    ['You', 'started “Japan in December”', null],
   );
   assert.equal(added.text, 'added 2 places');
   assert.equal(reordered.text, 'reordered the route');
-  assert.equal(settled.text, 'dismissed "Where?"');
+  assert.equal(settled.text, 'dismissed “Where?”');
 });
 
 test('filters keep one actor, and Auto-calculated keeps only derived rows', () => {

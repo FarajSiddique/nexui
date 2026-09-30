@@ -45,12 +45,14 @@ export function RunCard({
   onStop,
   stopping,
   onRetry,
+  retrying,
   onSeeChanges,
 }: {
   run: RunRecord | undefined;
   onStop: (runId: string) => void;
   stopping: boolean;
   onRetry: () => void;
+  retrying: boolean;
   onSeeChanges: () => void;
 }): ReactElement {
   const styles = useStyles();
@@ -84,7 +86,7 @@ export function RunCard({
         <View style={styles.footer}>
           {run.error ? <Text style={styles.error}>{run.error}</Text> : null}
           <View style={styles.row}>
-            <Button label="Try again" variant="primary" onPress={onRetry} />
+            <Button label="Try again" variant="primary" busy={retrying} onPress={onRetry} />
             <Button label="Undo in Changes" variant="text" onPress={onSeeChanges} />
           </View>
         </View>

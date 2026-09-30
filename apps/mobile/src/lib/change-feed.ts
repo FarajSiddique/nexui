@@ -59,7 +59,7 @@ function nameOf(op: StoredOp): string {
   return typeof row?.title === 'string' && row.title.length > 0 ? row.title : 'an item';
 }
 
-const quote = (text: unknown): string => `"${String(text)}"`;
+const quote = (text: unknown): string => `“${String(text)}”`;
 
 const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
