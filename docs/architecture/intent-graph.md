@@ -174,13 +174,13 @@ with the user's token, so RLS applies to everything it writes.
   answers one choice question within 5 seconds. A goal is `travel` or `none`; an ask is `edit`,
   `fast` or `reasoning`. If Jev fails, the goal is a trip and the ask gets `reasoning`. A
   `none` goal gets an intent with no template, no workspace and no run.
-- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`): `create_run` refuses while another run on
+- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`, `20260930000000_run_cutoff.sql`): `create_run` refuses while another run on
   the intent is queued or running (NXU12, 409). `record_run_step` appends each step's calls to
   `runs.progress` (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries
   would take `progress` past 100 is not recorded, so it holds at most 100 entries. It also
   appends the step's tokens to `runs.model_usage`, and returns the status, so `cancel_run` stops
   a run after its current step. `finish_run` never overwrites a cancel. A run still queued or
-  running 15 minutes after it was created reads as failed ("This run stopped unexpectedly.").
+  running 6 minutes after it was created (a function instance stops after 300 s) reads as failed ("This run stopped unexpectedly.").
   Home shows "Drafting" on intents with a working run.
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
