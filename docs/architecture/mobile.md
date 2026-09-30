@@ -94,15 +94,38 @@ current while the server writes to it without the client asking — a run fillin
 device's edit. It subscribes to `objects`, `relationships`, `workspaces`, `runs` and `events`,
 filtered to `intent_id=eq.<id>`, scoped by RLS. A burst of row changes collapses into one refetch
 per 300 ms: the run, intents and changes lists always refetch, but the intent snapshot itself
-waits (re-arming the timer) while the user's own edit is still in flight, so a refetch can't
-briefly undo an optimistic change. Each mount opens a channel with a unique topic
-(`intent-<id>-<random>`), because `supabase.channel` returns an existing channel for a topic
+waits (re-arming only its own retry, not the lists') while the user's own edit is still in flight,
+so a refetch can't briefly undo an optimistic change. Each mount opens a channel with a unique
+topic (`intent-<id>-<random>`), because `supabase.channel` returns an existing channel for a topic
 already in use, which would throw on a second `.on(...)` for a remount of the same intent.
 
-Two polls cover what Realtime doesn't: `useIntents` (Home's cards) polls every 4 s while any
-intent's summary badge reads `running`, since `intents` isn't a table `useIntentLive` watches;
+`subscribe` takes a status callback: on every `SUBSCRIBED` — including a rejoin after
+`CHANNEL_ERROR` or `TIMED_OUT`, or the socket dropping and reconnecting — it runs the same
+catch-up (lists plus the intent key), since `postgres_changes` gives no other sign that events
+were missed while disconnected.
+
+Three polls cover what Realtime and a rejoin don't:
+
+- `useIntents` (Home's cards) polls every 4 s while any intent's summary badge reads `running`,
+  since `intents` isn't a table `useIntentLive` watches. When that goes from some plan Drafting to
+  none, it invalidates `changes` once more, to catch a run's last change even if it landed just
+  before this poll saw the plan settle.
+- `useIntent(id, { poll })` polls every 4 s while its workspace screen passes `poll: true` (set
+  from `drafting`, the same "any intent's badge is `running`" check), for the one intent on
+  screen — Realtime already covers a run's own writes, but this is the fallback for a missed
+  event. It skips a tick while a workspace edit (`editKey(id)`) is in flight, so it can't overwrite
+  an optimistic change. The workspace screen also invalidates the intent key and `changes` once,
+  directly, the moment `drafting` flips from true to false.
+- `useRecentChanges` (Home's "What changed") polls on the same 4 s cadence as `useIntents`, reading
+  its cached data to decide whether any plan is Drafting, since a run's changes aren't on Realtime
+  when no workspace is open for it.
+
 `useRun` polls every 3 s while its run is `queued` or `running`, as a fallback for a dropped
-socket.
+socket, unrelated to the polls above.
+
+The Changes tab (`apps/mobile/src/app/(app)/(tabs)/changes.tsx`) doesn't poll — the feed
+(`useChangesFeed`) instead refetches whenever the tab regains focus (`useFocusEffect`), which is
+enough since visiting the tab is exactly when a stale feed would otherwise show.
 
 ## The + sheet
 
@@ -112,17 +135,26 @@ opening `+` acts on that plan instead of starting a new one. `apps/mobile/src/ap
 reads `intentId`/`prompt` from its route params (set when a section's `ask` action pushes to `+`
 with a prompt already filled in) and otherwise from nothing, in which case it starts a new intent.
 Once a run starts, `RunCard` (`apps/mobile/src/components/run-card.tsx`) streams it: a spinner and
-elapsed time while active, one line per succeeded step as it lands, and Stop, Retry or "See
-changes" depending on the run's status. Closing the sheet doesn't stop the run — what it's
-written stays and can be undone from Changes.
+elapsed time while active, one line per succeeded capability call (not per step — a step can make
+several calls) as it lands, and Stop, Retry or "See changes" depending on the run's status.
+Closing the sheet doesn't stop the run — what it's written stays and can be undone from Changes.
+
+"Try again" after a failed run calls `onRetry`, which re-sends the same text through `send()`. For
+an ask, or for a new plan whose run failed after the intent was already created, `target` is
+already set, so this re-sends the goal as an `ask` on that plan — there's no API to re-run the
+original `create_intent` run itself. While the retry is in flight, `RunCard`'s `retrying` prop
+(`ask.isPending || create.isPending`) puts the Try again button in its `busy` state, so a second
+tap can't fire a second retry underneath the first.
 
 ## Error display
 
 Home and the workspace show a full `ListError` (with retry) only when nothing has loaded yet
 (`isLoadingError`, or a 404 as "This plan no longer exists."). Once something has loaded, a
-failed refetch (`isRefetchError`) shows a small inline notice — "Couldn't refresh your plans/this
-plan. Showing what was last loaded." — over the stale data instead of replacing it, and tapping
-it retries.
+failed refetch (`isRefetchError`) shows a small inline notice — a 44 pt `Pressable` reading
+"Couldn't refresh your plans/this plan. Showing what was last loaded. Tap to try again." — over
+the stale data instead of replacing it; tapping it calls `refetch()` again. The Changes tab shows
+the equivalent notice as plain (non-interactive) text, since its feed already refetches on its own
+whenever the tab regains focus.
 
 ## The map
 
