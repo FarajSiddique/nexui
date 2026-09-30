@@ -11,7 +11,7 @@ import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { failingEvaluationModel, MockLanguageModelV4, toolStep } from './support/ai.mjs';
-import { graphDb, removeObject } from './support/graph-db.mjs';
+import { editObject, graphDb, removeObject } from './support/graph-db.mjs';
 import {
   idSequence,
   KYOTO_ID,
@@ -19,6 +19,7 @@ import {
   runRow,
   seedRow,
   snapshotRow,
+  TOKYO_ID,
   TRIP_ID,
 } from './support/graph.mjs';
 import { mockSupabaseAuth, signToken } from './support/supabase-auth.mjs';
@@ -228,4 +229,62 @@ test('a model error fails the run, keeps the steps before it and logs no detail'
   for (const call of logged.mock.calls) {
     assert.doesNotMatch(call.arguments.join(' '), /secret detail/);
   }
+});
+
+// Load 1 is the run's first snapshot; load 2 is the one step 0 commits against.
+const editTokyoDuringStep = (changes) => (state, n) => {
+  if (n === 2) {
+    editObject(state, TOKYO_ID, changes);
+  }
+};
+
+const placeData = (state, id) => state.snapshot.objects.find((object) => object.id === id).data;
+
+test('a user edit made while a step runs survives, and the step merges around it', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+  });
+  const run = askRun('reasoning');
+  const fixture = askFixture('reasoning', [
+    [
+      { capability: 'object.update', input: { ref: 'o2', data: { why: 'Best ramen' } } },
+      setDays('o1', 5),
+    ],
+  ]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(placeData(fake.state, TOKYO_ID).why, 'Best ramen');
+  assert.equal(placeData(fake.state, KYOTO_ID).days, 5);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+});
+
+test('a step call that would undo the field the user just changed is dropped', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+  });
+  const run = askRun('reasoning');
+  const fixture = askFixture('reasoning', [[setDays('o2', 3), setDays('o1', 5)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(placeData(fake.state, KYOTO_ID).days, 5);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+});
+
+test('a step whose every call was superseded commits nothing and the run goes on', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+  });
+  const run = askRun('reasoning');
+  const fixture = askFixture('reasoning', [[setDays('o2', 3)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(fake.state.applied.length, 0);
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
 });

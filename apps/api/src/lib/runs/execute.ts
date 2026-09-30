@@ -15,7 +15,7 @@ import {
   type StepReport,
 } from '../cognition/run-model.ts';
 import { toModelTools } from '../cognition/tools.ts';
-import { commitChangeset } from '../graph/commit.ts';
+import { commitChangeset, NothingToCommitError } from '../graph/commit.ts';
 import {
   ChangesetConflictError,
   ChangesetInvalidError,
@@ -83,8 +83,9 @@ interface StepContext {
   newId: () => string;
 }
 
-// Commits the step's ops as one changeset, then records the step. A commit error is recorded
-// first and then thrown, which fails the run with its steps so far kept.
+// Commits the step's ops as one changeset, then records the step. If the user changed the intent
+// meanwhile, the step is replayed over their changes first. A commit error is recorded first and
+// then thrown, which fails the run with its steps so far kept.
 async function commitStep(step: StepContext, report: StepReport): Promise<StepDecision> {
   const ops = step.stager.takeOps();
   const entries = step.stager.takeEntries().map((entry) => ({ ...entry, step: report.step }));
@@ -94,14 +95,24 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
     try {
       const committed = await commitChangeset(
         step.db,
-        { intentId: step.intentId, actor: 'ai', runId: step.runId, ops },
+        {
+          intentId: step.intentId,
+          actor: 'ai',
+          runId: step.runId,
+          ops,
+          restage: (current) => step.stager.restage(current),
+        },
         step.clock(),
         step.newId,
       );
 
       step.stager.reset(committed.snapshot);
     } catch (error) {
-      failure = { error };
+      if (error instanceof NothingToCommitError) {
+        step.stager.reset(await loadSnapshot(step.db, step.intentId));
+      } else {
+        failure = { error };
+      }
     }
   }
 

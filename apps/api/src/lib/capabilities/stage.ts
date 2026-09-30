@@ -46,6 +46,12 @@ export interface Stager {
   takeEntries(): StagedEntry[];
   /** Continues from a committed snapshot, which includes derived changes. Refs are kept. */
   reset(snapshot: GraphSnapshot): void;
+  /**
+   * Rebuilds the ops staged since the last reset over a newer snapshot, when the intent changed
+   * underneath the step. Calls replay with the same ids and refs; a call whose patch would change
+   * a field the user changed since then is dropped. Null when nothing changed.
+   */
+  restage(current: GraphSnapshot): ChangesetOp[] | null;
 }
 
 // Progress keeps each call's input, so a run can be recorded as a fixture, up to this size.
@@ -101,6 +107,113 @@ function requireAnchor(snapshot: GraphSnapshot): string {
   return anchorId;
 }
 
+interface StagedCall {
+  name: string;
+  input: unknown;
+  /** The ids the call generated, handed back in order when it replays. */
+  ids: string[];
+}
+
+/** A step's call that no longer applies to the intent as it now is. */
+class SupersededError extends Error {}
+
+const COLUMNS = ['title', 'status', 'position'] as const;
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function copyRefs(table: RefTable): RefTable {
+  return { byRef: new Map(table.byRef), byId: new Map(table.byId) };
+}
+
+function restoreRefs(table: RefTable, saved: RefTable): void {
+  table.byRef.clear();
+  table.byId.clear();
+  saved.byRef.forEach((id, ref) => table.byRef.set(ref, id));
+  saved.byId.forEach((ref, id) => table.byId.set(id, ref));
+}
+
+// The fields of each object that changed between two snapshots: columns by name, data keys as
+// `data.<key>`, and `*` for an object that is gone. `derived` is recalculated on every commit,
+// so it never counts as a user's change.
+function editedFields(base: GraphSnapshot, current: GraphSnapshot): Map<string, Set<string>> {
+  const edited = new Map<string, Set<string>>();
+
+  for (const before of base.objects) {
+    const after = current.objects.find((object) => object.id === before.id);
+    const fields = new Set<string>();
+
+    if (!after) {
+      fields.add('*');
+    } else {
+      for (const column of COLUMNS) {
+        if (!sameValue(before[column], after[column])) {
+          fields.add(column);
+        }
+      }
+
+      const keys = new Set([...Object.keys(before.data), ...Object.keys(after.data)]);
+
+      for (const key of keys) {
+        if (key !== 'derived' && !sameValue(before.data[key], after.data[key])) {
+          fields.add(`data.${key}`);
+        }
+      }
+    }
+
+    if (fields.size > 0) {
+      edited.set(before.id, fields);
+    }
+  }
+
+  return edited;
+}
+
+// True when an op would change something the user changed since the step began.
+function touchesEdited(
+  op: ChangesetOp,
+  staged: GraphSnapshot,
+  edited: Map<string, Set<string>>,
+  workspaceMoved: boolean,
+): boolean {
+  if (op.op === 'set_workspace') {
+    return workspaceMoved;
+  }
+
+  if (op.op === 'delete_object') {
+    return edited.has(op.id);
+  }
+
+  if (op.op !== 'update_object') {
+    return false;
+  }
+
+  const fields = edited.get(op.id);
+  const object = staged.objects.find((candidate) => candidate.id === op.id);
+
+  if (!fields || !object) {
+    return false;
+  }
+
+  if (fields.has('*')) {
+    return true;
+  }
+
+  const columnClash = COLUMNS.some(
+    (column) =>
+      op.patch[column] !== undefined &&
+      !sameValue(op.patch[column], object[column]) &&
+      fields.has(column),
+  );
+  const data = op.patch.data ?? {};
+  const dataClash = Object.keys(data).some(
+    (key) => !sameValue(data[key], object.data[key]) && fields.has(`data.${key}`),
+  );
+
+  return columnClash || dataClash;
+}
+
 /**
  * @example
  * const stager = createStager({ capabilities: CAPABILITIES, snapshot, actor: 'ai', runId, newId });
@@ -116,12 +229,19 @@ export function createStager(options: StagerOptions): Stager {
       ? { type: 'ai', runId: options.runId }
       : { type: 'user' };
   let staged = options.snapshot;
+  let base = options.snapshot;
+  let baseRefs = copyRefs(refs);
   let pending: ChangesetOp[] = [];
   let entries: StagedEntry[] = [];
+  let calls: StagedCall[] = [];
 
   // Parses and validates everything before keeping anything, so a refused call leaves only its
   // progress entry behind.
-  function stage(name: string, input: unknown): CapabilityResult {
+  function stage(
+    name: string,
+    input: unknown,
+    replay?: { ids: string[]; accept: (ops: ChangesetOp[]) => boolean },
+  ): CapabilityResult {
     const capability = options.capabilities.find((candidate) => candidate.name === name);
 
     if (!capability) {
@@ -134,6 +254,15 @@ export function createStager(options: StagerOptions): Stager {
       throw new CapabilityError(describeIssue(parsed.error));
     }
 
+    const replayIds = replay ? [...replay.ids] : [];
+    const ids: string[] = [];
+    const newId = (): string => {
+      const id = replayIds.shift() ?? options.newId();
+
+      ids.push(id);
+
+      return id;
+    };
     const result = capability.execute(parsed.data, {
       actor: options.actor,
       runId: options.runId,
@@ -141,7 +270,7 @@ export function createStager(options: StagerOptions): Stager {
       anchorId,
       refs,
       source,
-      newId: options.newId,
+      newId,
     });
     const now = clock().toISOString();
     const ops = validateOps(
@@ -150,9 +279,14 @@ export function createStager(options: StagerOptions): Stager {
       now,
     );
 
+    if (replay && !replay.accept(ops)) {
+      throw new SupersededError(`${name} no longer applies.`);
+    }
+
     staged = applyOps(staged, ops, now);
     pending.push(...ops);
     claimRefs(refs, result.refs ?? {});
+    calls.push({ name, input, ids });
 
     return result;
   }
@@ -210,7 +344,41 @@ export function createStager(options: StagerOptions): Stager {
     },
     reset(snapshot) {
       staged = snapshot;
+      base = snapshot;
+      baseRefs = copyRefs(refs);
       pending = [];
+      calls = [];
+    },
+    restage(current) {
+      if (current.intent.lastActivityAt === base.intent.lastActivityAt) {
+        return null;
+      }
+
+      const replayed = calls;
+      const edited = editedFields(base, current);
+      const workspaceMoved = current.workspace?.version !== base.workspace?.version;
+
+      staged = current;
+      pending = [];
+      calls = [];
+      restoreRefs(refs, baseRefs);
+
+      for (const call of replayed) {
+        const before = staged;
+
+        try {
+          stage(call.name, call.input, {
+            ids: call.ids,
+            accept: (ops) => !ops.some((op) => touchesEdited(op, before, edited, workspaceMoved)),
+          });
+        } catch (error) {
+          if (safeMessage(error) === null && !(error instanceof SupersededError)) {
+            console.error('[capabilities]', `${call.name} failed unexpectedly on replay.`);
+          }
+        }
+      }
+
+      return [...pending];
     },
   };
 }

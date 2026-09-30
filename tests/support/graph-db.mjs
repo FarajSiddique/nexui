@@ -74,6 +74,24 @@ export function removeObject(state, id) {
 }
 
 /**
+ * Changes an object's data as the user would from another device: the object's `updatedAt` and
+ * the intent's `lastActivityAt` move, as `apply_changeset` would move them.
+ */
+export function editObject(state, id, changes) {
+  const stamp = new Date(Date.now() + 1000).toISOString();
+
+  state.snapshot = {
+    ...state.snapshot,
+    intent: { ...state.snapshot.intent, lastActivityAt: stamp },
+    objects: state.snapshot.objects.map((object) =>
+      object.id === id
+        ? { ...object, data: { ...object.data, ...changes }, updatedAt: stamp }
+        : object,
+    ),
+  };
+}
+
+/**
  * A stateful PostgREST stand-in for one user and one intent. Commits apply their ops to the
  * in-memory intent, and the run functions keep one run, so a whole run can execute against it.
  * `onApply(state, n)` runs after the nth commit and `onLoad(state, n)` before the nth snapshot
