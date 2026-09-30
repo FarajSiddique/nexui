@@ -95,7 +95,7 @@ export default function WorkspaceScreen(): ReactElement {
       return <SkeletonRows count={4} />;
     }
 
-    if (intent.isError) {
+    if (intent.isLoadingError) {
       return intent.error instanceof ApiError && intent.error.status === 404 ? (
         <ListEmpty text="This plan no longer exists." />
       ) : (
@@ -115,9 +115,19 @@ export default function WorkspaceScreen(): ReactElement {
           {meta ? <Text style={styles.meta}>{meta}</Text> : null}
           {drafting ? <Pill text="Drafting" tone="running" /> : null}
         </View>
+        {intent.isRefetchError ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            Couldn&apos;t refresh this plan. Showing what was last loaded.
+          </Text>
+        ) : null}
         {edit.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
             Couldn&apos;t save that. {edit.error.message}
+          </Text>
+        ) : null}
+        {undo.isError ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            Couldn&apos;t undo that. {undo.error.message}
           </Text>
         ) : null}
         {data.workspace ? null : (
@@ -125,7 +135,7 @@ export default function WorkspaceScreen(): ReactElement {
         )}
         {blocks.map((block) =>
           block.kind === 'open' ? (
-            <View key="open" style={styles.open} accessibilityLabel="Needs your attention">
+            <View key="open" style={styles.open}>
               {block.entries.map((entry) => (
                 <SectionView
                   key={entry.section.id}
