@@ -149,3 +149,24 @@ export function tripFigures(snapshot: GraphSnapshot, tripId: string): TripDerive
     costIncomplete,
   };
 }
+
+const monthDay = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
+/**
+ * @example
+ * formatDateRange('2026-12-12', '2026-12-20') // 'Dec 12 – 20'
+ */
+export function formatDateRange(start: string, end: string): string {
+  const from = new Date(`${start}T00:00:00Z`);
+  const to = new Date(`${end}T00:00:00Z`);
+
+  if (from.getUTCMonth() === to.getUTCMonth() && from.getUTCFullYear() === to.getUTCFullYear()) {
+    return `${monthDay.format(from)} – ${to.getUTCDate()}`;
+  }
+
+  return `${monthDay.format(from)} – ${monthDay.format(to)}`;
+}
