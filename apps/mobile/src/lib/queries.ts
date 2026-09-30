@@ -9,6 +9,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
 import {
   applyOps,
@@ -53,24 +54,56 @@ export function isRunActive(run: RunRecord | undefined): boolean {
   return run?.status === 'queued' || run?.status === 'running';
 }
 
-/** Home's cards. Polls while any plan is Drafting, since `intents` isn't on Realtime. */
-export function useIntents(): UseQueryResult<IntentListItem[], Error> {
-  return useQuery({
-    queryKey: queryKeys.intents,
-    queryFn: ({ signal }) => listIntents(signal),
-    refetchInterval: (query) =>
-      query.state.data?.some((item) => item.summary.badge?.tone === 'running') ? 4_000 : false,
-  });
+function anyDrafting(items: IntentListItem[] | undefined): boolean {
+  return items?.some((item) => item.summary.badge?.tone === 'running') ?? false;
 }
 
-/** One intent's snapshot: the cache every workspace section reads. */
-export function useIntent(id: string | null): UseQueryResult<GraphSnapshot, Error> {
+/**
+ * Home's cards. Polls while any plan is Drafting, since `intents` isn't on Realtime. Also
+ * invalidates `changes` once the moment nothing is Drafting any more, to catch a run's last
+ * change even if it landed just before this poll saw the plan settle.
+ */
+export function useIntents(): UseQueryResult<IntentListItem[], Error> {
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.intents,
+    queryFn: ({ signal }) => listIntents(signal),
+    refetchInterval: (current) => (anyDrafting(current.state.data) ? 4_000 : false),
+  });
+  const drafting = anyDrafting(query.data);
+  const wasDrafting = useRef(drafting);
+
+  useEffect(() => {
+    if (wasDrafting.current && !drafting) {
+      void client.invalidateQueries({ queryKey: queryKeys.changes });
+    }
+
+    wasDrafting.current = drafting;
+  }, [drafting, client]);
+
+  return query;
+}
+
+/**
+ * One intent's snapshot: the cache every workspace section reads. `poll` refetches every 4 s
+ * while the plan is Drafting, since only Realtime covers that otherwise, and skips a tick a
+ * workspace edit is in flight for, so a refetch can't overwrite an optimistic change.
+ */
+export function useIntent(
+  id: string | null,
+  options: { poll?: boolean } = {},
+): UseQueryResult<GraphSnapshot, Error> {
+  const client = useQueryClient();
+  const poll = options.poll ?? false;
+
   return useQuery({
     queryKey: queryKeys.intent(id ?? ''),
     queryFn: ({ signal }) => getIntent(id ?? '', signal),
     enabled: id !== null,
     retry: (failures, error) =>
       !(error instanceof ApiError && error.status === 404) && failures < 1,
+    refetchInterval: () =>
+      poll && client.isMutating({ mutationKey: editKey(id ?? '') }) === 0 ? 4_000 : false,
   });
 }
 
@@ -96,11 +129,18 @@ export function useChangesFeed(): UseInfiniteQueryResult<
   });
 }
 
-/** The newest few events, for Home's "What changed". */
+/**
+ * The newest few events, for Home's "What changed". Polls on the same cadence as `useIntents`
+ * while any plan is Drafting, since a run's changes aren't on Realtime when no workspace is open.
+ */
 export function useRecentChanges(): UseQueryResult<ChangesResponse, Error> {
+  const client = useQueryClient();
+
   return useQuery({
     queryKey: queryKeys.recentChanges,
     queryFn: ({ signal }) => listChanges({ limit: 10 }, signal),
+    refetchInterval: () =>
+      anyDrafting(client.getQueryData<IntentListItem[]>(queryKeys.intents)) ? 4_000 : false,
   });
 }
 

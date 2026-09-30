@@ -1,6 +1,7 @@
 import type { GraphSnapshot, TripData } from '@nexui/types';
+import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,7 +11,7 @@ import { SectionView } from '@/components/sections/registry';
 import { UndoToast } from '@/components/undo-toast';
 import { ApiError } from '@/lib/api-request';
 import { tripMeta } from '@/lib/format';
-import { useIntent, useIntents, useUndo, useWorkspaceEdit } from '@/lib/queries';
+import { queryKeys, useIntent, useIntents, useUndo, useWorkspaceEdit } from '@/lib/queries';
 import { layoutWorkspace } from '@/lib/sections';
 import { fonts } from '@/lib/theme';
 import { createThemedStyles } from '@/lib/use-theme';
@@ -40,14 +41,25 @@ function goBack(): void {
  */
 export default function WorkspaceScreen(): ReactElement {
   const styles = useStyles();
+  const client = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const intent = useIntent(id);
   const drafting =
     useIntents().data?.find((item) => item.id === id)?.summary.badge?.tone === 'running';
+  const intent = useIntent(id, { poll: drafting });
   const edit = useWorkspaceEdit(id);
   const undo = useUndo();
   const [undoable, setUndoable] = useState<string | null>(null);
   const hideUndo = useCallback(() => setUndoable(null), []);
+  const wasDrafting = useRef(drafting);
+
+  useEffect(() => {
+    if (wasDrafting.current && !drafting) {
+      void client.invalidateQueries({ queryKey: queryKeys.intent(id) });
+      void client.invalidateQueries({ queryKey: queryKeys.changes });
+    }
+
+    wasDrafting.current = drafting;
+  }, [drafting, client, id]);
 
   useIntentLive(id);
   useFocusEffect(
@@ -116,9 +128,15 @@ export default function WorkspaceScreen(): ReactElement {
           {drafting ? <Pill text="Drafting" tone="running" /> : null}
         </View>
         {intent.isRefetchError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            Couldn&apos;t refresh this plan. Showing what was last loaded.
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void intent.refetch()}
+            style={styles.notice}
+          >
+            <Text accessibilityLiveRegion="polite" style={styles.noticeText}>
+              {"Couldn't refresh this plan. Showing what was last loaded. Tap to try again."}
+            </Text>
+          </Pressable>
         ) : null}
         {edit.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
@@ -204,6 +222,8 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.ink,
   },
   meta: { fontFamily: fonts.body, fontSize: 15, color: colors.muted },
+  notice: { minHeight: 44, justifyContent: 'center' },
+  noticeText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },
   open: { gap: 12 },
 }));

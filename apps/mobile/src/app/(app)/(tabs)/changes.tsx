@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -23,8 +24,16 @@ export default function ChangesScreen(): ReactElement {
   const styles = useStyles();
   const colors = useColors();
   const feed = useChangesFeed();
+  const { refetch } = feed;
   const undo = useUndo();
   const [filter, setFilter] = useState<ChangeFilter>('all');
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
+
   const rows = useMemo(
     () => buildChangeRows(feed.data?.pages.flatMap((page) => page.items) ?? []),
     [feed.data],
@@ -138,7 +147,7 @@ const useStyles = createThemedStyles((colors) => ({
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
   filters: { gap: 8, paddingVertical: 12 },
   chip: {
-    minHeight: 36,
+    minHeight: 44,
     paddingHorizontal: 14,
     borderRadius: 999,
     justifyContent: 'center',

@@ -1,3 +1,4 @@
+import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -9,11 +10,13 @@ const TABLES = ['objects', 'relationships', 'workspaces', 'runs', 'events'] as c
 /**
  * Keeps an open intent current while the server writes to it without the client asking (a run
  * filling it in). Realtime, scoped by RLS, is only the signal: a burst of row changes becomes
- * one refetch of the API's snapshot, which stays the source of truth. The run, intents and
- * changes lists are always refetched, since they can't disturb an optimistic edit. The intent
- * snapshot itself waits while the user's own edits are in flight (so a refetch can't briefly
- * undo an optimistic change) by re-arming the timer until they settle, rather than dropping the
- * signal.
+ * one refresh. The run, intents and changes lists are always refetched, since they can't disturb
+ * an optimistic edit. The intent snapshot itself waits while the user's own edits are in flight
+ * (so a refetch can't briefly undo an optimistic change) by re-arming only its own retry until
+ * they settle, rather than dropping the signal or repeating the list refresh. `subscribe`'s
+ * status callback runs the same catch-up on every `SUBSCRIBED`, including a rejoin after a
+ * dropped socket or a `CHANNEL_ERROR`/`TIMED_OUT`, since `postgres_changes` gives no other sign
+ * that events were missed while disconnected.
  */
 export function useIntentLive(intentId: string | null): void {
   const client = useQueryClient();
@@ -23,27 +26,34 @@ export function useIntentLive(intentId: string | null): void {
       return;
     }
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let burstTimer: ReturnType<typeof setTimeout> | null = null;
+    let intentTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const refresh = (): void => {
-      if (timer) {
+    const catchUpIntent = (): void => {
+      if (client.isMutating({ mutationKey: editKey(intentId) }) > 0) {
+        intentTimer = setTimeout(catchUpIntent, 300);
+
         return;
       }
 
-      timer = setTimeout(() => {
-        timer = null;
+      void client.invalidateQueries({ queryKey: queryKeys.intent(intentId) });
+    };
 
-        void client.invalidateQueries({ queryKey: queryKeys.runs });
-        void client.invalidateQueries({ queryKey: queryKeys.intents });
-        void client.invalidateQueries({ queryKey: queryKeys.changes });
+    const catchUp = (): void => {
+      void client.invalidateQueries({ queryKey: queryKeys.runs });
+      void client.invalidateQueries({ queryKey: queryKeys.intents });
+      void client.invalidateQueries({ queryKey: queryKeys.changes });
+      catchUpIntent();
+    };
 
-        if (client.isMutating({ mutationKey: editKey(intentId) }) > 0) {
-          refresh();
+    const onRowChange = (): void => {
+      if (burstTimer) {
+        return;
+      }
 
-          return;
-        }
-
-        void client.invalidateQueries({ queryKey: queryKeys.intent(intentId) });
+      burstTimer = setTimeout(() => {
+        burstTimer = null;
+        catchUp();
       }, 300);
     };
 
@@ -56,15 +66,23 @@ export function useIntentLive(intentId: string | null): void {
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table, filter: `intent_id=eq.${intentId}` },
-        refresh,
+        onRowChange,
       );
     }
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+        catchUp();
+      }
+    });
 
     return () => {
-      if (timer) {
-        clearTimeout(timer);
+      if (burstTimer) {
+        clearTimeout(burstTimer);
+      }
+
+      if (intentTimer) {
+        clearTimeout(intentTimer);
       }
 
       void supabase.removeChannel(channel);
