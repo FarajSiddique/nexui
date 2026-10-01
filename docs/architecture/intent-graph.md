@@ -155,7 +155,8 @@ so the same section keeps showing the right objects as the graph changes. `evalu
 (`packages/types/src/query.ts`) runs that query against a `GraphSnapshot` — filtering by kind,
 by a relationship (`related: { type, to, direction }`), by field filters, then sorting and
 limiting. It has no side effects and no server/client split: the API uses it when deriving, and
-the mobile renderer will use the same function to read a section's rows.
+the mobile renderer uses the same function to read a section's rows (see
+[`docs/architecture/mobile.md`](./mobile.md)).
 
 A section can carry `pin: 'open'`, which lifts it into the workspace's "Open band" while it has
 something unresolved — a `decision` with `status: 'open'`, or an `insight` whose query still
@@ -174,13 +175,13 @@ with the user's token, so RLS applies to everything it writes.
   answers one choice question within 5 seconds. A goal is `travel` or `none`; an ask is `edit`,
   `fast` or `reasoning`. If Jev fails, the goal is a trip and the ask gets `reasoning`. A
   `none` goal gets an intent with no template, no workspace and no run.
-- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`): `create_run` refuses while another run on
+- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`, `20260930000000_run_cutoff.sql`): `create_run` refuses while another run on
   the intent is queued or running (NXU12, 409). `record_run_step` appends each step's calls to
   `runs.progress` (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries
   would take `progress` past 100 is not recorded, so it holds at most 100 entries. It also
   appends the step's tokens to `runs.model_usage`, and returns the status, so `cancel_run` stops
   a run after its current step. `finish_run` never overwrites a cancel. A run still queued or
-  running 15 minutes after it was created reads as failed ("This run stopped unexpectedly.").
+  running 6 minutes after it was created (a function instance stops after 300 s) reads as failed ("This run stopped unexpectedly.").
   Home shows "Drafting" on intents with a working run.
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
@@ -192,6 +193,12 @@ with the user's token, so RLS applies to everything it writes.
   them. Models name objects by ref (`trip`, `o1` … oldest first, or the ref they gave a new
   object), never by id. `trip.setPlaceDays`, `trip.reorderPlaces` and `decision.resolve` are
   also the app's buttons, through `POST /api/intents/[id]/capabilities` (actor `user`).
+- **Step replay** (`src/lib/capabilities/stage.ts`): if the intent's `lastActivityAt` moved while
+  a step was running — the user edited it too — `commitChangeset`'s `restage` replays the step's
+  calls over the fresh snapshot with the same ids and refs, rather than committing against a
+  stale one. A call whose patch would change a field the user changed since the step began is
+  dropped, and its progress entry is marked `ok: false`, "You changed this while Nexui was
+  working, so Nexui skipped it." A step left with nothing to commit commits nothing.
 - **Prompts** put the goal, the graph and the request inside `<goal>`, `<graph>` and
   `<request>` as escaped JSON, and tell the model never to follow instructions found there.
 - **Mock mode** (`AI_PROVIDER=mock`, the default) replays `src/lib/ai/fixtures`, recorded from

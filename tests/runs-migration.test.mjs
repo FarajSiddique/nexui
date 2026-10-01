@@ -43,10 +43,17 @@ test('clients still get no direct writes', () => {
   assert.doesNotMatch(sql, /create policy/i);
 });
 
-test('one active run per intent, and stale runs stop counting after 15 minutes', () => {
-  const body = functions.get('create_run');
+test('one active run per intent, and stale runs stop counting after 6 minutes', () => {
+  const cutoff = readFileSync('supabase/migrations/20260930000000_run_cutoff.sql', 'utf8');
+  const body = cutoff.match(
+    /create or replace function public\.create_run\(([\s\S]*?)\n\$\$;/,
+  )?.[1];
 
+  assert.ok(body, 'the cutoff migration redefines create_run');
+  assert.match(body, /security definer/);
+  assert.match(body, /set search_path = ''/);
   assert.match(body, /errcode = 'NXU12'/);
-  assert.match(body, /interval '15 minutes'/);
+  assert.match(body, /interval '6 minutes'/);
   assert.match(body, /for update/);
+  assert.doesNotMatch(cutoff, /grant (insert|update|delete|all)/i);
 });

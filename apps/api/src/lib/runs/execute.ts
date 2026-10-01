@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { RunRecord, RunRoute } from '@nexui/types';
+import type { RunProgressEntry, RunRecord, RunRoute } from '@nexui/types';
 
 import { CAPABILITIES } from '../capabilities/registry.ts';
 import { createStager, type Stager } from '../capabilities/stage.ts';
@@ -15,7 +15,7 @@ import {
   type StepReport,
 } from '../cognition/run-model.ts';
 import { toModelTools } from '../cognition/tools.ts';
-import { commitChangeset } from '../graph/commit.ts';
+import { commitChangeset, NothingToCommitError } from '../graph/commit.ts';
 import {
   ChangesetConflictError,
   ChangesetInvalidError,
@@ -48,6 +48,7 @@ const ROUTES: Record<RunRoute, { tier: ModelTier; mode: ModelMode; maxSteps: num
 
 export const INVALID_RUN_ERROR = "Nexui couldn't make a valid change.";
 export const FAILED_RUN_ERROR = "Nexui couldn't finish this.";
+export const SKIPPED_STEP_ERROR = 'You changed this while Nexui was working, so Nexui skipped it.';
 
 function runErrorMessage(error: unknown): string {
   if (error instanceof GraphNotFoundError) {
@@ -83,8 +84,21 @@ interface StepContext {
   newId: () => string;
 }
 
-// Commits the step's ops as one changeset, then records the step. A commit error is recorded
-// first and then thrown, which fails the run with its steps so far kept.
+// Flips each entry `restage` dropped to ok:false, so progress shows why nothing committed for it.
+function markSkipped(entries: RunProgressEntry[], indexes: readonly number[]): void {
+  const dropped = new Set(indexes);
+
+  entries.forEach((entry, index) => {
+    if (dropped.has(index)) {
+      entry.ok = false;
+      entry.error = SKIPPED_STEP_ERROR;
+    }
+  });
+}
+
+// Commits the step's ops as one changeset, then records the step. If the user changed the intent
+// meanwhile, the step is replayed over their changes first. A commit error is recorded first and
+// then thrown, which fails the run with its steps so far kept.
 async function commitStep(step: StepContext, report: StepReport): Promise<StepDecision> {
   const ops = step.stager.takeOps();
   const entries = step.stager.takeEntries().map((entry) => ({ ...entry, step: report.step }));
@@ -94,14 +108,26 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
     try {
       const committed = await commitChangeset(
         step.db,
-        { intentId: step.intentId, actor: 'ai', runId: step.runId, ops },
+        {
+          intentId: step.intentId,
+          actor: 'ai',
+          runId: step.runId,
+          ops,
+          restage: (current) => step.stager.restage(current),
+        },
         step.clock(),
         step.newId,
       );
 
+      markSkipped(entries, step.stager.takeSkipped());
       step.stager.reset(committed.snapshot);
     } catch (error) {
-      failure = { error };
+      if (error instanceof NothingToCommitError) {
+        markSkipped(entries, step.stager.takeSkipped());
+        step.stager.reset(await loadSnapshot(step.db, step.intentId));
+      } else {
+        failure = { error };
+      }
     }
   }
 

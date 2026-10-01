@@ -7,6 +7,10 @@ const appId = 'ai.faraj.nexui';
 // environment variable because .env isn't uploaded.
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME?.trim();
 
+// Google Maps key for Android builds (optional). Without one, Android shows the route as a list.
+// iOS uses Apple Maps, which needs no key.
+const googleMapsAndroidKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim();
+
 if (!googleIosUrlScheme) {
   const message =
     'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME is not set, so iOS builds cannot use Google sign-in.';
@@ -39,6 +43,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-font',
     'expo-secure-store',
+    [
+      'react-native-maps',
+      googleMapsAndroidKey ? { androidGoogleMapsApiKey: googleMapsAndroidKey } : {},
+    ] satisfies [string, unknown],
     ...(googleIosUrlScheme
       ? [
           [
@@ -57,6 +65,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     router: {},
+    mapsOnAndroid: Boolean(googleMapsAndroidKey),
     eas: {
       projectId: '2a0da270-390a-4e11-874f-6fa3a7f85d68',
     },

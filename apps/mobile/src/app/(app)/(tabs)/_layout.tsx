@@ -36,7 +36,7 @@ export default function TabsLayout(): ReactElement {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(home)"
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <TabIcon name="home" color={color} />,

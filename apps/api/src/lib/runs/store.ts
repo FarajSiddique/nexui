@@ -13,7 +13,7 @@ import {
 import { GraphNotFoundError, mapRpcError } from '../graph/errors.ts';
 
 /** A queued or running run older than this has stopped: its function instance ended. */
-export const RUN_STALE_MS = 15 * 60 * 1000;
+export const RUN_STALE_MS = 6 * 60 * 1000;
 
 export const STALE_RUN_ERROR = 'This run stopped unexpectedly.';
 

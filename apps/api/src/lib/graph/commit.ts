@@ -15,12 +15,20 @@ export interface CommitInput {
   actor: Actor;
   runId?: string | null;
   ops: readonly ChangesetOp[];
+  /**
+   * Rebuilds `ops` over the snapshot the commit is about to apply to, when the intent moved on
+   * since they were staged (a run's step). Null keeps `ops`.
+   */
+  restage?: (current: GraphSnapshot) => ChangesetOp[] | null;
 }
 
 export interface CommitResult {
   event: EventRecord;
   snapshot: GraphSnapshot;
 }
+
+/** Every op in the changeset was superseded by newer changes, so there is nothing to commit. */
+export class NothingToCommitError extends Error {}
 
 // Derives from a fresh snapshot and applies it. `apply_changeset` refuses with NXU08 if the
 // intent's last activity moved since that snapshot, so derived values are never stale.
@@ -31,7 +39,13 @@ async function applyFromSnapshot(
   newId: () => string,
 ): Promise<{ data: unknown; error: { code?: string } | null }> {
   const before = await loadSnapshot(db, input.intentId);
-  const ops = prepareChangeset(before, input.ops, input.actor, now, newId);
+  const staged = input.restage?.(before) ?? input.ops;
+
+  if (input.restage && staged.length === 0) {
+    throw new NothingToCommitError('Newer changes replaced everything in this step.');
+  }
+
+  const ops = prepareChangeset(before, staged, input.actor, now, newId);
 
   return db.rpc('apply_changeset', {
     p_intent_id: input.intentId,

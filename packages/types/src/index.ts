@@ -3,6 +3,7 @@ export * from './primitives.ts';
 export * from './kinds/travel.ts';
 export * from './kinds/trip-figures.ts';
 export * from './kinds/registry.ts';
+export * from './kinds/cards.ts';
 export * from './workspace.ts';
 export * from './graph.ts';
 export * from './ops.ts';

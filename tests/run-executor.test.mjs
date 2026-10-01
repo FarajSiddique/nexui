@@ -6,12 +6,13 @@ import {
   executeRun,
   FAILED_RUN_ERROR,
   INVALID_RUN_ERROR,
+  SKIPPED_STEP_ERROR,
 } from '../apps/api/src/lib/runs/execute.ts';
 import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { failingEvaluationModel, MockLanguageModelV4, toolStep } from './support/ai.mjs';
-import { graphDb, removeObject } from './support/graph-db.mjs';
+import { editObject, graphDb, removeObject } from './support/graph-db.mjs';
 import {
   idSequence,
   KYOTO_ID,
@@ -19,6 +20,7 @@ import {
   runRow,
   seedRow,
   snapshotRow,
+  TOKYO_ID,
   TRIP_ID,
 } from './support/graph.mjs';
 import { mockSupabaseAuth, signToken } from './support/supabase-auth.mjs';
@@ -58,6 +60,8 @@ function askFixture(route, steps) {
 }
 
 const setDays = (ref, days) => ({ capability: 'trip.setPlaceDays', input: { placeId: ref, days } });
+
+const entriesOf = (state) => state.steps.flatMap((step) => step.p_entries);
 
 function start(t, row, fakeOptions = {}) {
   const fake = graphDb(row, fakeOptions);
@@ -173,9 +177,10 @@ test('two invalid steps in a row fail the run and write nothing', async (t) => {
   });
 });
 
-test('a user edit mid-run fails that step, keeps what committed and says why', async (t) => {
+test('a stop the user deletes mid-run is skipped by the step, and progress says so', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
-  // Reads: 1 at the start, 2 and 3 around the first commit, 4 before the second commit.
+  // Reads: 1 at the start, 2 and 3 around the first commit, 4 before the second commit (deletes
+  // Kyoto, moving lastActivityAt), 5 to refresh the stager once restage drops every call.
   const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
     onLoad: (state, n) => {
       if (n === 4) {
@@ -189,13 +194,13 @@ test('a user edit mid-run fails that step, keeps what committed and says why', a
   await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 1);
-  assert.deepEqual(fake.state.finished, {
-    p_run_id: RUN_ID,
-    p_status: 'failed',
-    p_error: 'That item no longer exists.',
-  });
-  assert.equal(fake.state.steps.length, 3);
-  assert.deepEqual(logged.mock.calls.at(-1).arguments, ['[runs]', 'A run failed.']);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+
+  const kyotoEntry = entriesOf(fake.state).find((entry) => entry.step === 1);
+
+  assert.equal(kyotoEntry.ok, false);
+  assert.equal(kyotoEntry.error, SKIPPED_STEP_ERROR);
+  assert.equal(logged.mock.calls.length, 0);
 });
 
 test('a model error fails the run, keeps the steps before it and logs no detail', async (t) => {
@@ -228,4 +233,126 @@ test('a model error fails the run, keeps the steps before it and logs no detail'
   for (const call of logged.mock.calls) {
     assert.doesNotMatch(call.arguments.join(' '), /secret detail/);
   }
+});
+
+// Load 1 is the run's first snapshot; load 2 is the one step 0 commits against.
+const editTokyoDuringStep = (changes) => (state, n) => {
+  if (n === 2) {
+    editObject(state, TOKYO_ID, changes);
+  }
+};
+
+const placeData = (state, id) => state.snapshot.objects.find((object) => object.id === id).data;
+
+test('a user edit made while a step runs survives, and the step merges around it', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+  });
+  const run = askRun('reasoning');
+  const fixture = askFixture('reasoning', [
+    [
+      { capability: 'object.update', input: { ref: 'o2', data: { why: 'Best ramen' } } },
+      setDays('o1', 5),
+    ],
+  ]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(placeData(fake.state, TOKYO_ID).why, 'Best ramen');
+  assert.equal(placeData(fake.state, KYOTO_ID).days, 5);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+});
+
+test('a step call that would undo the field the user just changed is dropped', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+  });
+  const run = askRun('reasoning');
+  const fixture = askFixture('reasoning', [[setDays('o2', 3), setDays('o1', 5)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(placeData(fake.state, KYOTO_ID).days, 5);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+
+  const entries = entriesOf(fake.state).filter((entry) => entry.capability === 'trip.setPlaceDays');
+
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].ok, false);
+  assert.equal(entries[0].error, SKIPPED_STEP_ERROR);
+  assert.equal(entries[1].ok, true);
+});
+
+test('a step whose every call was superseded commits nothing and the run goes on', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+  });
+  const run = askRun('reasoning');
+  const fixture = askFixture('reasoning', [[setDays('o2', 3)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(fake.state.applied.length, 0);
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+});
+
+const osaka = { name: 'Osaka', country: 'JP', placeType: 'city', lat: 34.69, lng: 135.5, days: 1 };
+
+// The objects a commit attempt touched (not relationships, workspaces or the intent, which have
+// ids or none of their own that don't identify an object).
+const objectIdsOf = (args) =>
+  args.p_ops
+    .filter((op) => ['insert_object', 'update_object', 'delete_object'].includes(op.op))
+    .map((op) => op.id)
+    .sort();
+
+test('a double restage after NXU08 keeps the edit and reuses the same ids', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)), {
+    onLoad: editTokyoDuringStep({ days: 6 }),
+    failApplyOnce: 'NXU08',
+  });
+  const run = askRun('reasoning');
+  // Tokyo (o2) is already at 6 days (the concurrent edit); Kyoto (o1) to 1 and the new Osaka at
+  // 1 keep the trip's 8 days fully allocated, so no derived "unallocated days" insight is
+  // created — which would otherwise mint its own id on every attempt and break the id check
+  // below for a reason that has nothing to do with the model's own calls.
+  const fixture = askFixture('reasoning', [
+    [
+      { capability: 'object.create', input: { ref: 'osaka', kind: 'place', data: osaka } },
+      { capability: 'object.update', input: { ref: 'o2', data: { why: 'Best ramen' } } },
+      setDays('o1', 1),
+    ],
+  ]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  // The first apply_changeset attempt is refused with NXU08 (the user's edit landed underneath
+  // it); commitChangeset reloads and restages a second time, which is the one that lands.
+  assert.equal(fake.state.attempts.length, 2);
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+
+  // The user's edit survives the restage, and the step's own edit of the same place (a field
+  // the user didn't touch) still merges in around it.
+  assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
+  assert.equal(placeData(fake.state, TOKYO_ID).why, 'Best ramen');
+  // The step's other surviving call (setDays on Kyoto) still committed once.
+  assert.equal(placeData(fake.state, KYOTO_ID).days, 1);
+
+  const osakaObjects = fake.state.snapshot.objects.filter((object) => object.data.name === 'Osaka');
+
+  // The created place lands exactly once: the second restage didn't duplicate it.
+  assert.equal(osakaObjects.length, 1);
+  // Both attempts staged the same object ids (the retry replayed the same calls, not fresh
+  // ones), and the ref the model picked ("osaka") wasn't refused as already used on the second
+  // restage — no "ref already used" failure.
+  assert.deepEqual(objectIdsOf(fake.state.attempts[0]), objectIdsOf(fake.state.attempts[1]));
+  assert.deepEqual(
+    objectIdsOf(fake.state.attempts[1]),
+    [TOKYO_ID, KYOTO_ID, osakaObjects[0].id].sort(),
+  );
 });

@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import { Pressable, View, type ColorValue } from 'react-native';
 
 import { createThemedStyles } from '@/lib/use-theme';
+import { useFocusedIntentStore } from '@/stores/use-focused-intent-store';
 
 /** The tab bar's height above the bottom safe area. */
 export const TAB_BAR_HEIGHT = 64;
@@ -48,16 +49,22 @@ export function TabIcon({ name, color }: { name: TabIconName; color: ColorValue 
   );
 }
 
-/** The + in the middle of the tab bar. It opens the + sheet over the current screen. */
+/**
+ * The + in the middle of the tab bar. Inside a workspace it opens the + sheet on that plan;
+ * anywhere else it starts a new plan.
+ */
 export function PlusTabButton(): ReactElement {
   const styles = useStyles();
+  const intentId = useFocusedIntentStore((state) => state.intentId);
 
   return (
     <View style={styles.plusSlot}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Start or change a plan"
-        onPress={() => router.push('/compose')}
+        accessibilityLabel={intentId ? 'Ask about this plan' : 'Start a plan'}
+        onPress={() =>
+          router.push(intentId ? { pathname: '/compose', params: { intentId } } : '/compose')
+        }
         style={({ pressed }) => [styles.plus, pressed && styles.plusPressed]}
       >
         <View style={styles.plusBarWide} />

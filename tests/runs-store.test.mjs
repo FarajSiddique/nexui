@@ -125,10 +125,10 @@ test('getRun reads the caller’s run, or reports it missing', async (t) => {
   );
 });
 
-test('a run left queued or running for 15 minutes reads as failed', () => {
+test('a run left queued or running for 6 minutes reads as failed', () => {
   const now = new Date('2026-09-29T12:00:00Z');
-  const old = '2026-09-29T11:44:00Z';
-  const recent = '2026-09-29T11:50:00Z';
+  const old = '2026-09-29T11:53:00Z';
+  const recent = '2026-09-29T11:55:00Z';
 
   assert.deepEqual(
     (({ status, error }) => ({ status, error }))(
@@ -157,5 +157,5 @@ test('activeRunIntentIds finds intents with a recent queued or running run', asy
 
   assert.deepEqual([...(await activeRunIntentIds(db, now))], [INTENT_ID]);
   assert.equal(asked.searchParams.get('status'), 'in.(queued,running)');
-  assert.equal(asked.searchParams.get('created_at'), 'gte.2026-09-29T11:45:00.000Z');
+  assert.equal(asked.searchParams.get('created_at'), 'gte.2026-09-29T11:54:00.000Z');
 });
