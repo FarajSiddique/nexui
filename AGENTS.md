@@ -21,6 +21,7 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `pnpm dev:api` / `pnpm dev:mobile`: start apps separately.
 - `pnpm dev:web`: launch Expo's browser preview.
 - `pnpm build`: build Next.js and export Expo web; does not build native binaries.
+- `pnpm build:preview`: start an EAS iOS preview build (internal distribution, registered devices only).
 - `pnpm lint` / `pnpm typecheck`: check all applicable workspaces.
 - `pnpm test`: run the Node test suite.
 - `node scripts/smoke-intent-graph.mjs`: exercise the graph API as the QA user (API running with `AI_PROVIDER=mock`).
