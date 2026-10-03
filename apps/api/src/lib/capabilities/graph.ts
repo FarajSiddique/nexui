@@ -23,10 +23,10 @@ const LINK_TYPES = z.enum(['part_of', 'option_of', 'leg_from', 'leg_to']);
 
 const DATA_HELP =
   'Fields by kind. place: name, country (ISO 3166-1 alpha-2 such as JP), placeType ' +
-  '(city|region|town|area|site), lat (-90 to 90), lng (-180 to 180), days (whole days, 0 or ' +
-  'more), estDailyCost? {amount, currency}, why? (one short sentence). leg: mode ' +
-  '(flight|train|bus|car|ferry|other), estHours?, estCost? {amount, currency}. stay: name, ' +
-  'placeId (a place ref), nights (1 or more), estNightly? {amount, currency}, url? ' +
+  '(city|region|town|area|site), lat (-90 to 90), lng (-180 to 180), days (whole days, 0 to ' +
+  '365), estDailyCost? {amount, currency}, why? (one short sentence). leg: mode ' +
+  '(flight|train|bus|car|ferry|other), estHours? (0 to 200), estCost? {amount, currency}. ' +
+  'stay: name, placeId (a place ref), nights (1 to 365), estNightly? {amount, currency}, url? ' +
   '(absolute URL). thing: fields [{label, value}].';
 
 const objectCreate = defineCapability({
