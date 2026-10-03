@@ -12,10 +12,18 @@ import type { RunUsage } from '../runs/store.ts';
 /** `single`: one forced tool step plus one correction (edit, fast). `loop`: plan with tools. */
 export type ModelMode = 'single' | 'loop';
 
+/** A tool call the AI SDK refused before running it, because its input broke the tool's schema. */
+export interface RefusedCall {
+  toolName: string;
+  input: unknown;
+}
+
 export interface StepReport {
   step: number;
   /** Some tool call in the step was refused. */
   hadErrors: boolean;
+  /** Calls refused before they ran, which the stager never saw. */
+  refused: RefusedCall[];
   usage: RunUsage;
 }
 
@@ -69,6 +77,12 @@ export async function runModel(input: RunModelInput): Promise<ModelOutcome> {
         }
 
         const hadErrors = step.content.some((part) => part.type === 'tool-error');
+        // Every Nexui tool is static, so a dynamic tool error is a call the SDK refused.
+        const refused = step.content.flatMap((part): RefusedCall[] =>
+          part.type === 'tool-error' && part.dynamic === true
+            ? [{ toolName: part.toolName, input: part.input }]
+            : [],
+        );
 
         invalidStreak = hadErrors ? invalidStreak + 1 : 0;
         lastClean = !hadErrors;
@@ -77,6 +91,7 @@ export async function runModel(input: RunModelInput): Promise<ModelOutcome> {
           const decision = await input.onStep({
             step: step.stepNumber,
             hadErrors,
+            refused,
             usage: {
               inputTokens: step.usage.inputTokens ?? 0,
               outputTokens: step.usage.outputTokens ?? 0,

@@ -186,6 +186,24 @@ test('two invalid steps in a row fail the run and write nothing', async (t) => {
   });
 });
 
+test('a call refused for its schema still shows in progress, and the run goes on', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)));
+  const run = askRun('edit');
+  const fixture = askFixture('edit', [[setDays('o2', 400)], [setDays('o2', 3)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  const refused = entriesOf(fake.state).filter((entry) => !entry.ok);
+
+  assert.deepEqual(
+    refused.map((entry) => [entry.step, entry.capability, entry.input]),
+    [[0, 'trip.setPlaceDays', { placeId: 'o2', days: 400 }]],
+  );
+  assert.match(refused[0].error, /^days: /);
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+});
+
 test('a stop the user deletes mid-run is skipped by the step, and progress says so', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
   // Reads: 1 at the start, 2 and 3 around the first commit, 4 before the second commit (deletes
