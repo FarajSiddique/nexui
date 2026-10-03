@@ -203,9 +203,10 @@ with the user's token, so RLS applies to everything it writes.
   `<request>` as escaped JSON, and tell the model never to follow instructions found there.
 - **Mock mode** (`AI_PROVIDER=mock`, the default) replays `src/lib/ai/fixtures`, recorded from
   live runs. A fixture matches when all its phrases are in the text. With no match, perception
-  answers `travel` and `reasoning` and the run changes nothing. An ask fixture's refs assume
-  the graph it was recorded on (for `japan-ask-rural`: `japan-december` replayed, then
-  `try-run.mjs free-day`).
+  answers `travel` and `reasoning` and the run changes nothing. `japan-ask-free-days` matches
+  "i have free" and answers the unallocated insight's own prompt ("How should I use the N days
+  I have free?"). Its proposal names no existing objects, so it replays on any trip with a
+  free day.
 - **Recording:** run the API with `AI_PROVIDER=live`, start a run with
   `node scripts/try-run.mjs goal "<goal>"` (or `ask`), then
   `node scripts/record-fixture.mjs <runId> <name> <phrase,phrase>` and add the export to
