@@ -10,43 +10,11 @@
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+
+import { qaApi, readSession } from './lib/qa-api.mjs';
 
 const [sessionPath = '.qa/session.json', api = 'http://localhost:3000'] = process.argv.slice(2);
-const { session } = JSON.parse(readFileSync(sessionPath, 'utf8'));
-const headers = {
-  Authorization: `Bearer ${session.access_token}`,
-  'Content-Type': 'application/json',
-};
-
-async function call(method, path, body) {
-  const response = await fetch(`${api}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const json = await response.json();
-
-  if (!response.ok) {
-    throw new Error(`${method} ${path} → ${response.status} ${JSON.stringify(json)}`);
-  }
-
-  return json;
-}
-
-async function waitForRun(runId) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const run = await call('GET', `/api/runs/${runId}`);
-
-    if (run.status !== 'queued' && run.status !== 'running') {
-      return run;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-  }
-
-  throw new Error(`run ${runId} did not finish`);
-}
+const { call, waitForRun } = qaApi(readSession(sessionPath), api);
 
 const { snapshot: created, runId } = await call('POST', '/api/intents', {
   goal: 'Smoke test: three quiet days away',
