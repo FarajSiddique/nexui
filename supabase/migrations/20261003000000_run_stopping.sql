@@ -193,3 +193,32 @@ begin
   return to_jsonb(stopped);
 end;
 $$;
+
+-- Deletes one of the caller's intents that no run ever started on: a trip whose first run could
+-- not be created, so the user isn't left with a plan nothing will fill in. Its graph cascades.
+create function public.discard_intent(p_intent_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  caller uuid := auth.uid();
+begin
+  if caller is null then
+    raise exception 'Sign in to continue' using errcode = 'NXU04';
+  end if;
+
+  delete from public.intents i
+  where i.id = p_intent_id
+    and i.user_id = caller
+    and not exists (select 1 from public.runs r where r.intent_id = i.id);
+
+  if not found then
+    raise exception 'Not found' using errcode = 'NXU04';
+  end if;
+end;
+$$;
+
+revoke execute on function public.discard_intent(uuid) from public, anon;
+grant execute on function public.discard_intent(uuid) to authenticated;

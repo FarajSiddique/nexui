@@ -99,6 +99,25 @@ test('a trip goal is seeded at once and filled in by a run after the response', 
   assert.equal(fake.state.finished.p_status, 'succeeded');
 });
 
+test('a trip whose run cannot start is discarded, and the error stands', async (t) => {
+  t.mock.method(console, 'error', () => {});
+
+  const fake = graphDb(null, { failCreateRun: 'XX000' });
+
+  mockSupabaseAuth(t, fake.fetch);
+
+  const tasks = captureRuns(t);
+  const deps = {
+    db: getUserClient(signToken()),
+    openSession: sessionOpener({ AI_PROVIDER: 'mock' }, fixtures),
+  };
+
+  await assert.rejects(startIntent(deps, 'A test trip to Lisbon'));
+  assert.deepEqual(fake.state.discarded, { p_intent_id: fake.state.created.p_intent_id });
+  assert.equal(fake.state.snapshot, null);
+  assert.equal(tasks.length, 0);
+});
+
 test('a goal that is not a trip gets a plain intent and no run', async (t) => {
   const { fake, tasks, deps } = setup(t);
   const started = await startIntent(deps, 'Find a new job');

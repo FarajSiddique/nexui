@@ -57,3 +57,15 @@ test('every function pins search_path, checks the caller and is for signed-in us
   assert.doesNotMatch(sql, /grant (insert|update|delete|all)/i);
   assert.doesNotMatch(sql, /create policy/i);
 });
+
+test('discard_intent deletes only the caller’s intent that no run started on', () => {
+  const body = sql.match(/create function public\.discard_intent\(([\s\S]*?)\n\$\$;/)?.[1];
+
+  assert.ok(body, 'the migration creates discard_intent');
+  assert.match(body, /security definer/);
+  assert.match(body, /set search_path = ''/);
+  assert.match(body, /i\.user_id = caller/);
+  assert.match(body, /not exists \(select 1 from public\.runs r where r\.intent_id = i\.id\)/);
+  assert.match(sql, /revoke execute on function public\.discard_intent\(uuid\) from public, anon;/);
+  assert.match(sql, /grant execute on function public\.discard_intent\(uuid\) to authenticated;/);
+});

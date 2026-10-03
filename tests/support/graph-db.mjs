@@ -105,10 +105,11 @@ export function editObject(state, id, changes) {
  * read, to simulate a cancel or an edit from elsewhere. `failApplyOnce` fails the first
  * `apply_changeset` call with that SQLSTATE (e.g. `'NXU08'`) instead of applying it, so a test can
  * exercise `commitChangeset`'s single automatic retry; every later call applies as normal.
+ * `failCreateRun` makes `create_run` fail with that SQLSTATE.
  */
 export function graphDb(
   initialRow = null,
-  { run = runRow(), onApply, onLoad, failApplyOnce } = {},
+  { run = runRow(), onApply, onLoad, failApplyOnce, failCreateRun } = {},
 ) {
   const now = () => new Date().toISOString();
   const state = {
@@ -120,6 +121,7 @@ export function graphDb(
     loads: 0,
     created: null,
     createdRun: null,
+    discarded: null,
     finished: null,
   };
   let pendingFailure = failApplyOnce ?? null;
@@ -189,6 +191,10 @@ export function graphDb(
       };
     },
     create_run: (args) => {
+      if (failCreateRun) {
+        return pgError(failCreateRun, 500);
+      }
+
       state.createdRun = args;
       state.run = {
         ...state.run,
@@ -199,6 +205,12 @@ export function graphDb(
       };
 
       return state.run;
+    },
+    discard_intent: (args) => {
+      state.discarded = args;
+      state.snapshot = null;
+
+      return null;
     },
     record_run_step: (args) => {
       state.steps.push(args);
