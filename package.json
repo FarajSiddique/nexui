@@ -11,6 +11,7 @@
     "dev:api": "pnpm --filter @nexui/api dev",
     "dev:web": "pnpm --filter @nexui/mobile web",
     "build": "turbo run build",
+    "build:preview": "pnpm --filter @nexui/mobile build:preview",
     "lint": "turbo run lint",
     "lint:fix": "pnpm -r --if-present run lint:fix",
     "fix": "pnpm lint:fix && pnpm format",

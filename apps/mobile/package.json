@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web --port 8081",
     "build": "expo export --platform web",
+    "build:preview": "npx eas-cli build --platform ios --profile preview",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "typecheck": "tsc --noEmit"
