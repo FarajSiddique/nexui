@@ -142,8 +142,9 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
 
 /**
  * Runs one AI request to the end (spec section F). Each model step's calls commit as one
- * changeset, so Undo in Changes reverts a step; a cancel stops the run after its current step;
- * a failure keeps the committed steps. Never throws: the outcome is written to the run.
+ * changeset, so Undo in Changes reverts a step; Stop lets the current step commit, then the
+ * run ends cancelled; a failure keeps the committed steps. Never throws: the outcome is
+ * written to the run.
  */
 export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void> {
   const { db, run, session } = job;
@@ -186,6 +187,8 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
 
     if (outcome === 'invalid') {
       await finishRun(db, run.id, 'failed', INVALID_RUN_ERROR);
+    } else if (outcome === 'stopped') {
+      await finishRun(db, run.id, 'cancelled', null);
     } else {
       await finishRun(db, run.id, 'succeeded', null);
     }

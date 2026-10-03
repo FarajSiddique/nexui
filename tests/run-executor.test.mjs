@@ -135,18 +135,27 @@ test('each model step commits one changeset as the run, and the run succeeds', a
   assert.deepEqual(state.finished, { p_run_id: RUN_ID, p_status: 'succeeded', p_error: null });
 });
 
-test('a cancel stops the run after the step that sees it', async (t) => {
+test('Stop lets the current step commit and record, then the run ends cancelled', async (t) => {
   const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'), {
     onApply: (state) => {
-      state.run = { ...state.run, status: 'cancelled' };
+      state.run = { ...state.run, status: 'stopping' };
     },
   });
   const run = createRun();
 
   await executeRun({ db, run, session: mockSession(run, [createFixture]) }, deps());
 
-  assert.equal(fake.state.applied.length, 1);
-  assert.equal(fake.state.run.status, 'cancelled');
+  const { state } = fake;
+
+  assert.equal(state.applied.length, 1);
+  // The start marker, then the step Stop let finish, with its three calls.
+  assert.deepEqual(
+    state.steps.map((step) => step.p_entries.length),
+    [0, 3],
+  );
+  assert.equal(state.run.progress.length, 3);
+  assert.deepEqual(state.finished, { p_run_id: RUN_ID, p_status: 'cancelled', p_error: null });
+  assert.equal(state.run.status, 'cancelled');
 });
 
 test('a run cancelled before it starts does nothing', async (t) => {
