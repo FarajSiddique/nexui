@@ -1,14 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactElement } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useRef, useState, type ReactElement } from 'react';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/buttons';
 import { RunCard } from '@/components/run-card';
@@ -23,6 +15,7 @@ import {
 import { fonts } from '@/lib/theme';
 import { createThemedStyles, useColors } from '@/lib/use-theme';
 import { useIntentLive } from '@/lib/use-intent-live';
+import { useKeyboardOverlap } from '@/lib/use-keyboard-overlap';
 
 interface Sent {
   text: string;
@@ -46,6 +39,8 @@ export default function ComposeSheet(): ReactElement {
   const create = useCreateIntent();
   const ask = useAsk();
   const cancel = useCancelRun();
+  const sheet = useRef<View>(null);
+  const keyboard = useKeyboardOverlap(sheet);
 
   useIntentLive(target);
 
@@ -95,9 +90,10 @@ export default function ComposeSheet(): ReactElement {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.sheet}
+    <View
+      ref={sheet}
+      onLayout={keyboard.onLayout}
+      style={[styles.sheet, { paddingBottom: keyboard.overlap }]}
     >
       <ScrollView
         style={styles.scroll}
@@ -159,7 +155,7 @@ export default function ComposeSheet(): ReactElement {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
