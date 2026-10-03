@@ -18,6 +18,7 @@ import { createThemedStyles } from '@/lib/use-theme';
 import { useIntentLive } from '@/lib/use-intent-live';
 import { capabilityFor, optimisticOps, type WorkspaceAction } from '@/lib/workspace-actions';
 import { focusIntent } from '@/stores/use-focused-intent-store';
+import { revealOpenBand, useRevealStore } from '@/stores/use-reveal-store';
 
 function anchorMeta(snapshot: GraphSnapshot): string {
   const anchorId = snapshot.workspace?.doc.anchorId;
@@ -38,6 +39,7 @@ function goBack(): void {
  * One intent's workspace: the goal, its meta line, then the doc's sections drawn by their
  * primitives, with unresolved pinned sections in the Open band. Primitives report actions;
  * this screen turns them into capability calls (shown at once, undoable) or opens + for asks.
+ * The + sheet's See the choice scrolls the Open band into view.
  */
 export default function WorkspaceScreen(): ReactElement {
   const styles = useStyles();
@@ -51,6 +53,10 @@ export default function WorkspaceScreen(): ReactElement {
   const [undoable, setUndoable] = useState<string | null>(null);
   const hideUndo = useCallback(() => setUndoable(null), []);
   const wasDrafting = useRef(drafting);
+  const scroll = useRef<ScrollView>(null);
+  const pageY = useRef(0);
+  const [openY, setOpenY] = useState<number | null>(null);
+  const reveal = useRevealStore((state) => state.intentId === id);
 
   useEffect(() => {
     if (wasDrafting.current && !drafting) {
@@ -75,6 +81,23 @@ export default function WorkspaceScreen(): ReactElement {
     () => (snapshot?.workspace ? layoutWorkspace(snapshot.workspace.doc, snapshot) : []),
     [snapshot],
   );
+  const hasOpenBand = blocks.some((block) => block.kind === 'open');
+  const bandY = hasOpenBand ? openY : null;
+
+  // "See the choice" in the + sheet: bring the Open band into view once it's laid out, or give
+  // up when the loaded plan has nothing open (it was settled meanwhile).
+  useEffect(() => {
+    if (!reveal) {
+      return;
+    }
+
+    if (bandY !== null) {
+      scroll.current?.scrollTo({ y: Math.max(0, pageY.current + bandY - 8), animated: true });
+      revealOpenBand(null);
+    } else if (!hasOpenBand && intent.isSuccess && !intent.isFetching) {
+      revealOpenBand(null);
+    }
+  }, [reveal, bandY, hasOpenBand, intent.isSuccess, intent.isFetching]);
 
   const handleAction = (action: WorkspaceAction): void => {
     if (action.type === 'ask') {
@@ -119,7 +142,12 @@ export default function WorkspaceScreen(): ReactElement {
     const meta = anchorMeta(data);
 
     return (
-      <View style={styles.page}>
+      <View
+        style={styles.page}
+        onLayout={(event) => {
+          pageY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <View style={styles.header}>
           <Text accessibilityRole="header" style={styles.title}>
             {data.intent.goal}
@@ -153,7 +181,11 @@ export default function WorkspaceScreen(): ReactElement {
         )}
         {blocks.map((block) =>
           block.kind === 'open' ? (
-            <View key="open" style={styles.open}>
+            <View
+              key="open"
+              style={styles.open}
+              onLayout={(event) => setOpenY(event.nativeEvent.layout.y)}
+            >
               {block.entries.map((entry) => (
                 <SectionView
                   key={entry.section.id}
@@ -180,7 +212,7 @@ export default function WorkspaceScreen(): ReactElement {
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
-      <ScrollView style={styles.list} contentContainerStyle={styles.content}>
+      <ScrollView ref={scroll} style={styles.list} contentContainerStyle={styles.content}>
         <Pressable
           accessibilityRole="link"
           accessibilityLabel="Back to plans"

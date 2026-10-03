@@ -112,9 +112,12 @@ export function RunCard({
     }
 
     return (
-      <Text style={styles.note}>
-        {lines.length === 1 ? '1 change' : `${lines.length} changes`} saved to the plan.
-      </Text>
+      <View style={styles.footer}>
+        <Text style={styles.note}>
+          {lines.length === 1 ? '1 change' : `${lines.length} changes`} saved to the plan.
+        </Text>
+        <Button label="See changes" variant="text" onPress={onSeeChanges} />
+      </View>
     );
   };
 

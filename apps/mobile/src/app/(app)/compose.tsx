@@ -12,10 +12,12 @@ import {
   useIntent,
   useRun,
 } from '@/lib/queries';
+import { afterAsk } from '@/lib/run-outcome';
 import { fonts } from '@/lib/theme';
 import { createThemedStyles, useColors } from '@/lib/use-theme';
 import { useIntentLive } from '@/lib/use-intent-live';
 import { useKeyboardOverlap } from '@/lib/use-keyboard-overlap';
+import { revealOpenBand } from '@/stores/use-reveal-store';
 
 interface Sent {
   text: string;
@@ -25,7 +27,8 @@ interface Sent {
 /**
  * The + sheet. Opened on a workspace it asks about that plan; opened anywhere else it starts a
  * new plan, then keeps acting on it. The run streams in as a card, and closing the sheet
- * doesn't stop it.
+ * doesn't stop it. After an ask about the plan underneath, it offers See the choice (when Nexui
+ * proposed one) or Back to plan.
  */
 export default function ComposeSheet(): ReactElement {
   const styles = useStyles();
@@ -42,12 +45,15 @@ export default function ComposeSheet(): ReactElement {
   const sheet = useRef<View>(null);
   const keyboard = useKeyboardOverlap(sheet);
 
-  useIntentLive(target);
+  // A plan open underneath keeps its own Realtime channel, so the sheet only listens for a plan
+  // it started.
+  useIntentLive(params.intentId ? null : target);
 
   const working = isRunActive(run.data) || create.isPending || ask.isPending;
   const canSend = text.trim().length >= (target ? 2 : 3) && !working;
   const error = create.error ?? ask.error ?? cancel.error;
   const goal = context.data?.intent.goal;
+  const next = params.intentId ? afterAsk(run.data) : null;
 
   const send = (message: string): void => {
     const trimmed = message.trim();
@@ -89,6 +95,14 @@ export default function ComposeSheet(): ReactElement {
     router.navigate('/changes');
   };
 
+  const seeChoice = (): void => {
+    if (target) {
+      revealOpenBand(target);
+    }
+
+    router.dismiss();
+  };
+
   return (
     <View
       ref={sheet}
@@ -119,6 +133,12 @@ export default function ComposeSheet(): ReactElement {
             retrying={ask.isPending || create.isPending}
             onSeeChanges={seeChanges}
           />
+        ) : null}
+        {next === 'choice' ? (
+          <Button label="See the choice" variant="primary" onPress={seeChoice} />
+        ) : null}
+        {next === 'plan' ? (
+          <Button label="Back to plan" variant="primary" onPress={() => router.dismiss()} />
         ) : null}
         {sent && !params.intentId ? (
           <Button label="Open plan" variant="primary" onPress={openPlan} />
