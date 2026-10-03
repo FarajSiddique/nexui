@@ -83,6 +83,57 @@ const proposal = {
   ],
 };
 
+// Two options with places: Nara (suggests 2 days, with a train from Kyoto) and Koyasan.
+const koyasan = { name: 'Koyasan', country: 'JP', placeType: 'town', lat: 34.21, lng: 135.59 };
+const twoPlaces = {
+  ref: 'spare',
+  question: 'Where should the spare time go?',
+  options: [
+    {
+      label: 'Nara',
+      summary: 'Temples and deer.',
+      place: { ...nara, days: 2 },
+      leg: { mode: 'train', estHours: 0.75, estCost: { amount: 7, currency: 'USD' } },
+    },
+    { label: 'Koyasan', summary: 'A temple stay.', place: koyasan },
+  ],
+};
+
+// The plan-1 trip (Tokyo 3 days, then Kyoto) with this many free days.
+function proposedWithFree(unallocatedDays) {
+  const snapshot = mapSnapshotRow(
+    snapshotRow(travelWorkspace(TRIP_ID), {
+      objects: [
+        objectRow(
+          TRIP_ID,
+          'trip',
+          { ...tripData, derived: { ...tripData.derived, unallocatedDays } },
+          { title: 'Plan Japan in December' },
+        ),
+        objectRow(TOKYO_ID, 'place', { ...tokyoData, days: 3 }, { title: 'Tokyo', position: 1 }),
+        kyotoRow,
+      ],
+    }),
+  );
+  const s = createStager({
+    capabilities: CAPABILITIES,
+    snapshot,
+    actor: 'user',
+    runId: null,
+    newId: idSequence(),
+    clock,
+  });
+
+  s.call('decision.propose', twoPlaces);
+  s.takeOps();
+
+  return s;
+}
+
+const placeUpdate = (ops, id) => ops.find((op) => op.op === 'update_object' && op.id === id);
+const newLeg = (ops) => ops.find((op) => op.op === 'insert_object' && op.kind === 'leg');
+const deletedIds = (ops) => ops.filter((op) => op.op === 'delete_object').map((op) => op.id);
+
 test('the registry holds the slice-1 capabilities, and only three are for buttons', () => {
   const names = CAPABILITIES.map((capability) => capability.name);
 
@@ -309,17 +360,106 @@ test('choosing an option puts its place on the route with the free days and a le
   );
 });
 
-test('dismissing a decision closes it and removes its section', () => {
+test('dismissing a decision closes it, deletes its candidate and removes its section', () => {
   const s = stager();
 
   s.call('decision.propose', proposal);
   s.takeOps();
   s.call('decision.resolve', { decisionId: 'rural' });
 
-  const [decision, workspace] = s.takeOps();
+  const [decision, deleted, workspace] = s.takeOps();
 
   assert.equal(decision.patch.data.status, 'dismissed');
+  assert.deepEqual(deleted, {
+    op: 'delete_object',
+    id: s.refs.byRef.get('rural-1-place'),
+    origin: 'direct',
+  });
   assert.equal(workspace.doc.sections.length, 5);
+});
+
+test('a pick takes the free days, and the leg hint while its stop is still last', () => {
+  const s = proposedWithFree(3);
+
+  s.call('decision.resolve', { decisionId: 'spare', optionId: 'spare-1' });
+
+  const ops = s.takeOps();
+
+  assert.equal(placeUpdate(ops, s.refs.byRef.get('spare-1-place')).patch.data.days, 3);
+  assert.equal(newLeg(ops).title, 'Kyoto → Nara');
+  assert.deepEqual(newLeg(ops).data, {
+    mode: 'train',
+    estHours: 0.75,
+    estCost: { amount: 7, currency: 'USD' },
+  });
+});
+
+test('with no free days a pick takes the suggested days, then 1', () => {
+  const cases = [
+    [null, 'spare-1', 2],
+    [-2, 'spare-1', 2],
+    [0, 'spare-2', 1],
+    [null, 'spare-2', 1],
+  ];
+
+  for (const [free, optionId, days] of cases) {
+    const s = proposedWithFree(free);
+
+    s.call('decision.resolve', { decisionId: 'spare', optionId });
+
+    const placeId = s.refs.byRef.get(`${optionId}-place`);
+
+    assert.equal(
+      placeUpdate(s.takeOps(), placeId).patch.data.days,
+      days,
+      `${free} free, ${optionId}`,
+    );
+  }
+});
+
+test('a leg hint from a stop that is no longer last is not used', () => {
+  const s = proposedWithFree(1);
+
+  s.call('trip.reorderPlaces', { placeIds: [KYOTO_ID, TOKYO_ID] });
+  s.takeOps();
+  s.call('decision.resolve', { decisionId: 'spare', optionId: 'spare-1' });
+
+  const leg = newLeg(s.takeOps());
+
+  assert.equal(leg.title, 'Tokyo → Nara');
+  assert.deepEqual(leg.data, { mode: 'other' });
+});
+
+test('a pick deletes the candidates nobody chose and keeps the decision as a record', () => {
+  const s = proposedWithFree(1);
+  const naraId = s.refs.byRef.get('spare-1-place');
+  const koyasanId = s.refs.byRef.get('spare-2-place');
+
+  s.call('decision.resolve', { decisionId: 'spare', optionId: 'spare-1' });
+
+  assert.deepEqual(deletedIds(s.takeOps()), [koyasanId]);
+  assert.ok(s.graph().objects.some((object) => object.id === naraId));
+  assert.equal(s.graph().objects.filter((object) => object.kind === 'option').length, 2);
+  assert.equal(
+    s
+      .graph()
+      .objects.find((object) => object.kind === 'decision' && object.title === twoPlaces.question)
+      .data.status,
+    'resolved',
+  );
+});
+
+test('dismissing deletes every candidate except one the user put on the route', () => {
+  const s = proposedWithFree(1);
+  const naraId = s.refs.byRef.get('spare-1-place');
+  const koyasanId = s.refs.byRef.get('spare-2-place');
+
+  s.call('relationship.create', { from: 'spare-1-place', type: 'part_of', to: 'trip' });
+  s.takeOps();
+  s.call('decision.resolve', { decisionId: 'spare' });
+
+  assert.deepEqual(deletedIds(s.takeOps()), [koyasanId]);
+  assert.ok(s.graph().objects.some((object) => object.id === naraId));
 });
 
 test('decisions settle only through their own options, and derived ones settle themselves', () => {

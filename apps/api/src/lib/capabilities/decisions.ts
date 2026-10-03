@@ -6,6 +6,7 @@ import {
   type ChangesetOp,
   type DecisionData,
   type GraphObject,
+  type LegData,
   type OptionData,
   type Section,
   type TripData,
@@ -21,6 +22,7 @@ import {
   requireDoc,
   setSections,
   tripPlaces,
+  unlinkOps,
   type SectionSlot,
 } from './helpers.ts';
 import { checkNewRef, resolveRef } from './refs.ts';
@@ -188,16 +190,49 @@ const propose = defineCapability({
   },
 });
 
-// Puts the chosen option's place on the route: last, with the days nothing else uses, and a leg
-// from the stop before it. A place already on the route stays as it is.
-function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetOp[] {
-  const placeId = (option.data as OptionData).placeId;
+// The days a chosen place gets: the trip's free days, else what its option suggested, else 1.
+function chosenDays(ctx: CapabilityContext, option: OptionData): number {
+  const trip = ctx.graph.objects.find((object) => object.id === ctx.anchorId);
+  const free = (trip?.data as TripData | undefined)?.derived?.unallocatedDays ?? null;
 
-  if (!placeId) {
+  if (free !== null && free > 0) {
+    return free;
+  }
+
+  return option.suggestedDays ?? 1;
+}
+
+// The new leg's data: the option's hint while the stop it was measured from is still last.
+function chosenLeg(option: OptionData, last: GraphObject): LegData {
+  const hint = option.leg;
+
+  if (!hint || hint.fromPlaceId !== last.id) {
+    return { mode: 'other' };
+  }
+
+  const leg: LegData = { mode: hint.mode };
+
+  if (hint.estHours !== undefined) {
+    leg.estHours = hint.estHours;
+  }
+
+  if (hint.estCost) {
+    leg.estCost = hint.estCost;
+  }
+
+  return leg;
+}
+
+// Puts the chosen option's place on the route: last, with `chosenDays`, and a leg from the stop
+// before it. A place already on the route stays as it is.
+function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetOp[] {
+  const data = option.data as OptionData;
+
+  if (!data.placeId) {
     return [];
   }
 
-  const place = ctx.graph.objects.find((object) => object.id === placeId);
+  const place = ctx.graph.objects.find((object) => object.id === data.placeId);
 
   if (place?.kind !== 'place') {
     throw new CapabilityError('That option’s place no longer exists.');
@@ -212,14 +247,15 @@ function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetO
     return [];
   }
 
-  const trip = ctx.graph.objects.find((object) => object.id === ctx.anchorId);
-  const free = Math.max(0, (trip?.data as TripData | undefined)?.derived?.unallocatedDays ?? 0);
   const last = tripPlaces(ctx).at(-1);
   const ops: ChangesetOp[] = [
     {
       op: 'update_object',
       id: place.id,
-      patch: { data: { ...place.data, days: free }, position: nextPosition(ctx) },
+      patch: {
+        data: { ...place.data, days: chosenDays(ctx, data) },
+        position: nextPosition(ctx),
+      },
       origin: 'direct',
     },
     link(ctx, place.id, 'part_of', ctx.anchorId),
@@ -233,7 +269,7 @@ function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetO
         id: legId,
         kind: 'leg',
         title: `${nameOf(last)} → ${nameOf(place)}`,
-        data: { mode: 'other' },
+        data: chosenLeg(data, last),
         position: null,
       }),
       link(ctx, legId, 'part_of', ctx.anchorId),
@@ -245,12 +281,38 @@ function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetO
   return ops;
 }
 
+// Deletes the candidate places of a settled decision's options, except the chosen one's and any
+// the user already put on the route. Undo of the changeset restores them.
+function removeCandidates(
+  ctx: CapabilityContext,
+  decisionId: string,
+  chosenOptionId: string | null,
+): ChangesetOp[] {
+  const onRoute = new Set(tripPlaces(ctx).map((place) => place.id));
+  const gone = ctx.graph.relationships
+    .filter((edge) => edge.type === 'option_of' && edge.targetId === decisionId)
+    .filter((edge) => edge.sourceId !== chosenOptionId)
+    .map((edge) => ctx.graph.objects.find((object) => object.id === edge.sourceId))
+    .map((option) => (option?.data as Partial<OptionData> | undefined)?.placeId)
+    .filter((placeId): placeId is string => typeof placeId === 'string')
+    .filter(
+      (placeId) =>
+        !onRoute.has(placeId) &&
+        ctx.graph.objects.some((object) => object.id === placeId && object.kind === 'place'),
+    );
+
+  return [
+    ...gone.map((id): ChangesetOp => ({ op: 'delete_object', id, origin: 'direct' })),
+    ...unlinkOps(ctx, gone),
+  ];
+}
+
 const resolve = defineCapability({
   name: 'decision.resolve',
   description:
     'Settle an open decision with one of its options, or dismiss it by leaving optionId out. ' +
     'Choosing an option with a place adds that place to the end of the route with the free ' +
-    'days, and a leg to it.',
+    'days (or its suggested days), and a leg to it. Candidates nobody chose are removed.',
   input: z.strictObject({ decisionId: refInput, optionId: refInput.optional() }),
   policy: 'internal',
   exposeToModel: true,
@@ -296,9 +358,11 @@ const resolve = defineCapability({
       placeOps.push(...addChosenPlace(ctx, option));
     }
 
+    const chosenOptionId = next.status === 'resolved' ? (next.chosenOptionId ?? null) : null;
     const ops: ChangesetOp[] = [
       { op: 'update_object', id: decision.id, patch: { data: next }, origin: 'direct' },
       ...placeOps,
+      ...removeCandidates(ctx, decision.id, chosenOptionId),
     ];
     const doc = ctx.graph.workspace?.doc;
 
