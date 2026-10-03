@@ -178,6 +178,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       snapshot,
       actor: 'ai',
       runId: run.id,
+      request: run.input.text,
       newId,
       clock,
     });

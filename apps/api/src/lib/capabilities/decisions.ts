@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  legDataSchema,
   placeDataSchema,
   type ChangesetOp,
   type DecisionData,
@@ -41,16 +42,26 @@ const optionInput = z.strictObject({
     .describe('Up to 12 numbers to compare, such as {"hoursFromKyoto": 1}'),
   fit: z.string().max(120).optional().describe('One line on how it fits this trip'),
   place: placeDataSchema
-    .omit({ days: true })
+    .extend({
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(365)
+        .optional()
+        .describe("Days you'd suggest here if the trip has none free"),
+    })
     .optional()
     .describe('The place this option would add to the route'),
+  leg: legDataSchema.optional().describe('Getting to that place from the current last stop'),
 });
 
 const propose = defineCapability({
   name: 'decision.propose',
   description:
     'Put a choice to the user: a question with 2 to 4 options, pinned at the top of the plan. ' +
-    'Use it instead of choosing for them. An option that would add a place carries that place.',
+    'Use it instead of choosing for them. An option that would add a place carries that place, ' +
+    "the days you'd suggest there, and how to get there from the last stop.",
   input: z.strictObject({
     ref: z.string().describe('A new short ref for the decision, such as rural-stop'),
     question: z.string().min(1).max(200),
@@ -71,6 +82,11 @@ const propose = defineCapability({
       decision.tradeoff = input.tradeoff;
     }
 
+    if (ctx.actor === 'ai' && ctx.request) {
+      decision.asked = ctx.request.slice(0, 300);
+    }
+
+    const last = tripPlaces(ctx).at(-1);
     const ops: ChangesetOp[] = [
       insertObject(ctx, {
         id: decisionId,
@@ -101,16 +117,26 @@ const propose = defineCapability({
 
       // A candidate place is not part of the trip until the user picks it.
       if (option.place) {
+        const { days: suggestedDays, ...place } = option.place;
         const placeId = ctx.newId();
 
         data.placeId = placeId;
+
+        if (suggestedDays !== undefined) {
+          data.suggestedDays = suggestedDays;
+        }
+
+        if (option.leg && last) {
+          data.leg = { ...option.leg, fromPlaceId: last.id };
+        }
+
         refs[`${optionRef}-place`] = placeId;
         ops.push(
           insertObject(ctx, {
             id: placeId,
             kind: 'place',
-            title: option.place.name,
-            data: { ...option.place, days: 0 },
+            title: place.name,
+            data: { ...place, days: 0 },
             position: null,
           }),
         );

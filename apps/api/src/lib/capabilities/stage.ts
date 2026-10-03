@@ -24,6 +24,8 @@ export interface StagerOptions {
   snapshot: GraphSnapshot;
   actor: CapabilityActor;
   runId: string | null;
+  /** The run's request, handed to capabilities (a proposal shows it as "You asked …"). */
+  request?: string;
   newId: () => string;
   clock?: () => Date;
 }
@@ -285,6 +287,7 @@ export function createStager(options: StagerOptions): Stager {
     const result = capability.execute(parsed.data, {
       actor: options.actor,
       runId: options.runId,
+      request: options.request ?? null,
       graph: staged,
       anchorId,
       refs,

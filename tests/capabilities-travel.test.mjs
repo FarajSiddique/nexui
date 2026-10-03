@@ -203,6 +203,53 @@ test('decision.propose adds the question, its options and a pinned section', () 
   assert.throws(() => s.call('decision.propose', proposal), refused(/already used/));
 });
 
+test('an AI proposal remembers what was asked, and its options keep their hints', () => {
+  const s = createStager({
+    capabilities: CAPABILITIES,
+    snapshot: shortened,
+    actor: 'ai',
+    runId: RUN_ID,
+    newId: idSequence(),
+    clock,
+    request: 'How should I use the 1 day I have free?',
+  });
+
+  s.call('decision.propose', {
+    ...proposal,
+    options: [
+      {
+        ...proposal.options[0],
+        place: { ...nara, days: 2 },
+        leg: { mode: 'train', estHours: 0.75 },
+      },
+      { ...proposal.options[1], leg: { mode: 'bus' } },
+    ],
+  });
+
+  const [decision, , place, option1, , option2] = s.takeOps();
+
+  assert.equal(decision.data.asked, 'How should I use the 1 day I have free?');
+  assert.deepEqual(place.data, { ...nara, days: 0 });
+  assert.equal(option1.data.suggestedDays, 2);
+  assert.deepEqual(option1.data.leg, { mode: 'train', estHours: 0.75, fromPlaceId: KYOTO_ID });
+  // A leg hint means nothing without a place to go to.
+  assert.equal(option2.data.leg, undefined);
+  assert.equal(option2.data.suggestedDays, undefined);
+});
+
+test('a suggested length is a whole number of days from 1 to 365', () => {
+  const s = stager();
+
+  assert.throws(
+    () =>
+      s.call('decision.propose', {
+        ...proposal,
+        options: [{ ...proposal.options[0], place: { ...nara, days: 0 } }, proposal.options[1]],
+      }),
+    refused(/days/),
+  );
+});
+
 test('choosing an option puts its place on the route with the free days and a leg', () => {
   const s = stager('user');
 
