@@ -107,6 +107,7 @@ export default function ChangesScreen(): ReactElement {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.filterBar}
           contentContainerStyle={styles.filters}
         >
           {FILTERS.map((option) => {
@@ -145,6 +146,9 @@ const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.paper },
   list: { flex: 1, width: '100%', maxWidth: 488, alignSelf: 'center' },
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
+  // A horizontal ScrollView grows by default; in the growing column it would absorb the spare
+  // height whenever the filtered feed is short, stretching the chips.
+  filterBar: { flexGrow: 0 },
   filters: { gap: 8, paddingVertical: 12 },
   chip: {
     minHeight: 44,
