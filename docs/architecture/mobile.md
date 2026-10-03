@@ -170,3 +170,12 @@ route line in stop order.
 Changing anything under `ios`/`android`/`plugins` in `app.config.ts`, or the maps key, needs a new
 native dev client, not just a JS reload: `pnpm --filter @nexui/mobile exec expo run:ios` (or
 `run:android`).
+
+## iOS scene life cycle
+
+Apps built with the iOS 27 SDK must adopt the UIScene life cycle, or UIKit stops them at launch
+(`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`). Expo 57's app template doesn't
+yet, so the local config plugin `apps/mobile/plugins/with-scene-lifecycle.js` adds a scene manifest
+naming Expo's `EXExpoAppSceneDelegate` and makes `AppDelegate` an `ExpoReactNativeFactoryProvider`
+that leaves the window to the scene delegate. Prebuild fails with a pointer to the plugin if the
+template's `AppDelegate.swift` changes shape; remove the plugin once Expo's template adopts scenes.

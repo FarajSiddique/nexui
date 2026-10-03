@@ -55,6 +55,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           ] satisfies [string, unknown],
         ]
       : []),
+    // Required to launch on iOS 27; see the plugin for when to remove it.
+    './plugins/with-scene-lifecycle.js',
   ],
   experiments: {
     typedRoutes: true,
