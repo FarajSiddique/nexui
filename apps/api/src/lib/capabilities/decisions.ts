@@ -83,7 +83,8 @@ const propose = defineCapability({
     }
 
     if (ctx.actor === 'ai' && ctx.request) {
-      decision.asked = ctx.request.slice(0, 300);
+      // Cutting inside an emoji leaves half a surrogate pair, which Postgres rejects in jsonb.
+      decision.asked = ctx.request.slice(0, 300).replace(/[\uD800-\uDBFF]$/, '');
     }
 
     const last = tripPlaces(ctx).at(-1);

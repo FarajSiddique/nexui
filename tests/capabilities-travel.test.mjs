@@ -237,6 +237,25 @@ test('an AI proposal remembers what was asked, and its options keep their hints'
   assert.equal(option2.data.suggestedDays, undefined);
 });
 
+test('a remembered request never ends in half of an emoji', () => {
+  const s = createStager({
+    capabilities: CAPABILITIES,
+    snapshot: shortened,
+    actor: 'ai',
+    runId: RUN_ID,
+    newId: idSequence(),
+    clock,
+    request: 'a'.repeat(299) + '\u{1F600}' + 'more',
+  });
+
+  s.call('decision.propose', proposal);
+
+  const [decision] = s.takeOps();
+
+  assert.equal(decision.data.asked, 'a'.repeat(299));
+  assert.ok(decision.data.asked.isWellFormed());
+});
+
 test('a suggested length is a whole number of days from 1 to 365', () => {
   const s = stager();
 
