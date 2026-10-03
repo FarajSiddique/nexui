@@ -1,8 +1,8 @@
 import type { GraphSnapshot, TripData } from '@nexui/types';
 import { useQueryClient } from '@tanstack/react-query';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, type LayoutRectangle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ListEmpty, ListError, SkeletonRows } from '@/components/list-states';
@@ -27,6 +27,14 @@ function anchorMeta(snapshot: GraphSnapshot): string {
   return anchor?.kind === 'trip' ? tripMeta(anchor.data as Partial<TripData>) : '';
 }
 
+/**
+ * A view's top edge once it is laid out, else null. On Expo web the screen under the + sheet is
+ * display:none and reports a 0-height layout at y 0; that is "not measured", not a position.
+ */
+function measuredY(layout: LayoutRectangle): number | null {
+  return layout.height > 0 ? layout.y : null;
+}
+
 function goBack(): void {
   if (router.canGoBack()) {
     router.back();
@@ -39,7 +47,8 @@ function goBack(): void {
  * One intent's workspace: the goal, its meta line, then the doc's sections drawn by their
  * primitives, with unresolved pinned sections in the Open band. Primitives report actions;
  * this screen turns them into capability calls (shown at once, undoable) or opens + for asks.
- * The + sheet's See the choice scrolls the Open band into view.
+ * The + sheet's See the choice scrolls the Open band into view once the workspace is focused
+ * again and laid out, never while the sheet still covers it.
  */
 export default function WorkspaceScreen(): ReactElement {
   const styles = useStyles();
@@ -54,7 +63,8 @@ export default function WorkspaceScreen(): ReactElement {
   const hideUndo = useCallback(() => setUndoable(null), []);
   const wasDrafting = useRef(drafting);
   const scroll = useRef<ScrollView>(null);
-  const pageY = useRef(0);
+  const isFocused = useIsFocused();
+  const [pageY, setPageY] = useState<number | null>(null);
   const [openY, setOpenY] = useState<number | null>(null);
   const reveal = useRevealStore((state) => state.intentId === id);
 
@@ -82,22 +92,28 @@ export default function WorkspaceScreen(): ReactElement {
     [snapshot],
   );
   const hasOpenBand = blocks.some((block) => block.kind === 'open');
-  const bandY = hasOpenBand ? openY : null;
+  const bandTop = hasOpenBand && pageY !== null && openY !== null ? pageY + openY : null;
 
-  // "See the choice" in the + sheet: bring the Open band into view once it's laid out, or give
-  // up when the loaded plan has nothing open (it was settled meanwhile).
+  // A band that unmounts leaves no position behind for the next one to be mistaken for.
+  if (!hasOpenBand && openY !== null) {
+    setOpenY(null);
+  }
+
+  // "See the choice" in the + sheet: once this screen is focused again, bring the Open band into
+  // view when it's laid out, or give up when the loaded plan has nothing open (it was settled
+  // meanwhile).
   useEffect(() => {
-    if (!reveal) {
+    if (!reveal || !isFocused) {
       return;
     }
 
-    if (bandY !== null) {
-      scroll.current?.scrollTo({ y: Math.max(0, pageY.current + bandY - 8), animated: true });
+    if (bandTop !== null) {
+      scroll.current?.scrollTo({ y: Math.max(0, bandTop - 8), animated: true });
       revealOpenBand(null);
     } else if (!hasOpenBand && intent.isSuccess && !intent.isFetching) {
       revealOpenBand(null);
     }
-  }, [reveal, bandY, hasOpenBand, intent.isSuccess, intent.isFetching]);
+  }, [reveal, isFocused, bandTop, hasOpenBand, intent.isSuccess, intent.isFetching]);
 
   const handleAction = (action: WorkspaceAction): void => {
     if (action.type === 'ask') {
@@ -142,12 +158,7 @@ export default function WorkspaceScreen(): ReactElement {
     const meta = anchorMeta(data);
 
     return (
-      <View
-        style={styles.page}
-        onLayout={(event) => {
-          pageY.current = event.nativeEvent.layout.y;
-        }}
-      >
+      <View style={styles.page} onLayout={(event) => setPageY(measuredY(event.nativeEvent.layout))}>
         <View style={styles.header}>
           <Text accessibilityRole="header" style={styles.title}>
             {data.intent.goal}
@@ -184,7 +195,7 @@ export default function WorkspaceScreen(): ReactElement {
             <View
               key="open"
               style={styles.open}
-              onLayout={(event) => setOpenY(event.nativeEvent.layout.y)}
+              onLayout={(event) => setOpenY(measuredY(event.nativeEvent.layout))}
             >
               {block.entries.map((entry) => (
                 <SectionView
