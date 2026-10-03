@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+  ACTIVE_RUN_STATUSES,
+  isActiveRunStatus,
   runRecordSchema,
   runStatusSchema,
   type RunInput,
@@ -12,7 +14,7 @@ import {
 
 import { GraphNotFoundError, mapRpcError } from '../graph/errors.ts';
 
-/** A queued or running run older than this has stopped: its function instance ended. */
+/** A queued, running or stopping run older than this has stopped: its function instance ended. */
 export const RUN_STALE_MS = 6 * 60 * 1000;
 
 export const STALE_RUN_ERROR = 'This run stopped unexpectedly.';
@@ -28,8 +30,8 @@ type Row = Record<string, unknown>;
 
 /**
  * One `runs` row (snake_case, from a function's `to_jsonb` or a table read) in contract shape.
- * A run still queued or running after `RUN_STALE_MS` reads as failed, so a client never waits on
- * a run nothing is executing.
+ * A run still active after `RUN_STALE_MS` reads as failed, so a client never waits on a run
+ * nothing is executing.
  */
 export function mapRunRow(row: unknown, now: Date = new Date()): RunRecord {
   const run = row as Row;
@@ -46,7 +48,7 @@ export function mapRunRow(row: unknown, now: Date = new Date()): RunRecord {
     finishedAt: run.finished_at,
     createdAt: run.created_at,
   });
-  const active = record.status === 'queued' || record.status === 'running';
+  const active = isActiveRunStatus(record.status);
 
   if (active && now.getTime() - Date.parse(record.createdAt) > RUN_STALE_MS) {
     return { ...record, status: 'failed', error: STALE_RUN_ERROR };
@@ -96,11 +98,14 @@ export async function recordRunStep(
   return runStatusSchema.parse(data);
 }
 
-/** Ends the run. A cancelled run stays cancelled. `error` must be safe to show the user. */
+/**
+ * Ends the run. A stopping run ends cancelled, or failed when `status` is failed; a finished run
+ * keeps its status. `error` must be safe to show the user.
+ */
 export async function finishRun(
   db: SupabaseClient,
   runId: string,
-  status: 'succeeded' | 'failed',
+  status: 'succeeded' | 'failed' | 'cancelled',
   error: string | null,
 ): Promise<RunRecord> {
   const result = await db.rpc('finish_run', {
@@ -116,7 +121,10 @@ export async function finishRun(
   return mapRunRow(result.data);
 }
 
-/** Asks the run to stop after its current step. A finished run comes back unchanged. */
+/**
+ * Asks the run to stop. A running run moves to `stopping` and finishes the step it is taking;
+ * anything else not yet finished is cancelled at once. A finished run comes back unchanged.
+ */
 export async function cancelRun(db: SupabaseClient, runId: string): Promise<RunRecord> {
   const { data, error } = await db.rpc('cancel_run', { p_run_id: runId });
 
@@ -155,7 +163,7 @@ export async function activeRunIntentIds(
   const { data, error } = await db
     .from('runs')
     .select('intent_id')
-    .in('status', ['queued', 'running'])
+    .in('status', [...ACTIVE_RUN_STATUSES])
     .gte('created_at', since)
     .limit(100);
 

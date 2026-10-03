@@ -125,7 +125,7 @@ test('getRun reads the caller’s run, or reports it missing', async (t) => {
   );
 });
 
-test('a run left queued or running for 6 minutes reads as failed', () => {
+test('a run left queued, running or stopping for 6 minutes reads as failed', () => {
   const now = new Date('2026-09-29T12:00:00Z');
   const old = '2026-09-29T11:53:00Z';
   const recent = '2026-09-29T11:55:00Z';
@@ -137,14 +137,19 @@ test('a run left queued or running for 6 minutes reads as failed', () => {
     { status: 'failed', error: STALE_RUN_ERROR },
   );
   assert.equal(mapRunRow(runRow({ status: 'queued', created_at: old }), now).status, 'failed');
+  assert.equal(mapRunRow(runRow({ status: 'stopping', created_at: old }), now).status, 'failed');
   assert.equal(mapRunRow(runRow({ status: 'running', created_at: recent }), now).status, 'running');
+  assert.equal(
+    mapRunRow(runRow({ status: 'stopping', created_at: recent }), now).status,
+    'stopping',
+  );
   assert.equal(
     mapRunRow(runRow({ status: 'succeeded', created_at: old }), now).status,
     'succeeded',
   );
 });
 
-test('activeRunIntentIds finds intents with a recent queued or running run', async (t) => {
+test('activeRunIntentIds finds intents with a recent active run', async (t) => {
   let asked;
   const db = client(t, {
     'table:runs': (url) => {
@@ -156,6 +161,6 @@ test('activeRunIntentIds finds intents with a recent queued or running run', asy
   const now = new Date('2026-09-29T12:00:00Z');
 
   assert.deepEqual([...(await activeRunIntentIds(db, now))], [INTENT_ID]);
-  assert.equal(asked.searchParams.get('status'), 'in.(queued,running)');
+  assert.equal(asked.searchParams.get('status'), 'in.(queued,running,stopping)');
   assert.equal(asked.searchParams.get('created_at'), 'gte.2026-09-29T11:54:00.000Z');
 });

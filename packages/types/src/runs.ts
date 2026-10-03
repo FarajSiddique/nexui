@@ -9,6 +9,7 @@ export type RunKind = z.infer<typeof runKindSchema>;
 export const runStatusSchema = z.enum([
   'queued',
   'running',
+  'stopping',
   'awaiting_approval',
   'succeeded',
   'failed',
@@ -16,6 +17,25 @@ export const runStatusSchema = z.enum([
 ]);
 
 export type RunStatus = z.infer<typeof runStatusSchema>;
+
+/**
+ * A run in one of these statuses is still working on its intent, so no other run may start.
+ * Stop moves a running run to `stopping` until the step it was taking commits.
+ */
+export const ACTIVE_RUN_STATUSES = [
+  'queued',
+  'running',
+  'stopping',
+] as const satisfies readonly RunStatus[];
+
+/**
+ * @example
+ * isActiveRunStatus('stopping') // true
+ * isActiveRunStatus('cancelled') // false
+ */
+export function isActiveRunStatus(status: RunStatus | undefined): boolean {
+  return status !== undefined && (ACTIVE_RUN_STATUSES as readonly string[]).includes(status);
+}
 
 /** How much work an ask needs, as Jev routed it (spec section F). */
 export const runRouteSchema = z.enum(['edit', 'fast', 'reasoning']);

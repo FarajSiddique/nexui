@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 
 import {
   applyOps,
+  isActiveRunStatus,
   type AskResponse,
   type CapabilityRequest,
   type ChangesetOp,
@@ -51,7 +52,7 @@ export const queryKeys = {
 export const editKey = (intentId: string): readonly ['edit', string] => ['edit', intentId] as const;
 
 export function isRunActive(run: RunRecord | undefined): boolean {
-  return run?.status === 'queued' || run?.status === 'running';
+  return isActiveRunStatus(run?.status);
 }
 
 function anyDrafting(items: IntentListItem[] | undefined): boolean {
