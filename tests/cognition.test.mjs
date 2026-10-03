@@ -209,6 +209,13 @@ test('a forced step that answers in text changes nothing and finishes', async ()
   );
 });
 
+test('a forced step that fails and then answers in text is invalid', async () => {
+  const { tools } = setup();
+  const model = scriptedModel([toolStep([invalidDays]), textStep()]);
+
+  assert.equal(await run(model, tools, 'single', async () => 'continue'), 'invalid');
+});
+
 test('a stop from onStep ends the loop after that step', async () => {
   const { tools } = setup();
   const seen = [];

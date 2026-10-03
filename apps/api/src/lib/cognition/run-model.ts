@@ -110,9 +110,14 @@ export async function runModel(input: RunModelInput): Promise<ModelOutcome> {
       },
     });
   } catch (error) {
-    // A forced step answered in text: the model found nothing to change.
     if (!ToolChoiceViolationError.isInstance(error)) {
       throw error;
+    }
+
+    // A forced step answered in text. After a refused step, the model gave up on the change it
+    // was asked for; as the first step, it found nothing to change.
+    if (invalidStreak > 0 && outcome === null) {
+      outcome = 'invalid';
     }
   }
 

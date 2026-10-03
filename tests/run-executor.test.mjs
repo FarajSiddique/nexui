@@ -186,6 +186,21 @@ test('two invalid steps in a row fail the run and write nothing', async (t) => {
   });
 });
 
+test('an edit that fails and then gives up in text fails the run as invalid', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)));
+  const run = askRun('edit');
+  const fixture = askFixture('edit', [[setDays('o2', 400)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(fake.state.applied.length, 0);
+  assert.deepEqual(fake.state.finished, {
+    p_run_id: RUN_ID,
+    p_status: 'failed',
+    p_error: INVALID_RUN_ERROR,
+  });
+});
+
 test('a call refused for its schema still shows in progress, and the run goes on', async (t) => {
   const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)));
   const run = askRun('edit');
