@@ -1,8 +1,8 @@
 # Authentication
 
 Nexui supports email codes, native Google sign-in, and Sign in with Apple on iOS,
-all through Supabase. The mobile app owns the UI; Supabase owns the session. The API verifies a bearer token on each
-protected request and never stores a user session.
+all through Supabase. The mobile app owns the UI; Supabase owns the session. The API
+verifies a bearer token on each protected request and never stores a user session.
 
 ## Follow an operation
 
@@ -74,11 +74,14 @@ the user is gone (delete, then revoke):
 
 - On iOS, when `app_metadata.providers` includes `apple`, the Account screen opens
   Apple's sheet once more and sends its authorization code in the request body.
-  Cancelling the sheet keeps the account.
+  Cancelling the sheet keeps the account. If the sheet fails instead, deletion goes
+  ahead without a code, so an Apple account is never stuck undeletable on iOS.
 - The API looks the user up, deletes it, and only then exchanges the code with
   Apple (`src/lib/apple/revoke-access.ts`) and revokes the refresh token. It signs
   Apple's client secret per request with the `.p8` key in `APPLE_PRIVATE_KEY`, so
-  nothing needs rotating, and stores nothing from Apple.
+  nothing needs rotating, and stores nothing from Apple. A user who is already gone
+  counts as deleted, so a retry after a lost answer gets `200`; a code sent with it
+  still has the grant it just created revoked.
 - The answer is `200 { appleAccessRemains }`. Access remains when the account has an
   Apple identity and there was no code (web and Android), Apple failed or isn't
   configured, or the code came from a different Apple ID. Failures are logged by

@@ -214,11 +214,17 @@ test('the deletion confirmation returns Apple’s code, or null when cancelled',
   assert.equal(await actions.getAppleDeletionCode(), 'apple-code');
   apple.getCredential.mock.mockImplementation(async () => null);
   assert.equal(await actions.getAppleDeletionCode(), null);
+  assert.equal(auth.signInWithIdToken.mock.callCount(), 0);
+});
+
+test('when Apple can’t confirm, deletion goes ahead without a code', async (t) => {
+  const { actions, apple } = setup(t);
   apple.getCredential.mock.mockImplementation(async () =>
     appleCredential({ authorizationCode: null }),
   );
-  await assert.rejects(actions.getAppleDeletionCode, {
-    message: 'Apple did not confirm. Try again.',
+  assert.equal(await actions.getAppleDeletionCode(), undefined);
+  apple.getCredential.mock.mockImplementation(async () => {
+    throw new AuthActionError('Apple sign-in failed. Try again.');
   });
-  assert.equal(auth.signInWithIdToken.mock.callCount(), 0);
+  assert.equal(await actions.getAppleDeletionCode(), undefined);
 });

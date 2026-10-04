@@ -30,7 +30,7 @@ export interface AuthActions {
   verifyEmailCode(email: string, code: string): Promise<void>;
   signInWithGoogle(): Promise<boolean>;
   signInWithApple(): Promise<boolean>;
-  getAppleDeletionCode(): Promise<string | null>;
+  getAppleDeletionCode(): Promise<string | null | undefined>;
   signOut(): Promise<void>;
   clearDeletedAccount(): Promise<void>;
 }
@@ -186,19 +186,25 @@ export function createAuthActions(
     }
   }
 
-  /** Asks Apple to confirm an Apple account's deletion. Null when the sheet was cancelled. */
-  async function getAppleDeletionCode(): Promise<string | null> {
-    const credential = await apple.getCredential();
+  /**
+   * Asks Apple to confirm an Apple account's deletion. Returns Apple's code, `null` when the sheet
+   * was cancelled (keep the account), or `undefined` when Apple couldn't confirm: deletion then
+   * goes ahead without a code, and the app shows how to remove Nexui under Sign in with Apple.
+   */
+  async function getAppleDeletionCode(): Promise<string | null | undefined> {
+    let credential: AppleCredential | null;
+
+    try {
+      credential = await apple.getCredential();
+    } catch {
+      return undefined;
+    }
 
     if (credential === null) {
       return null;
     }
 
-    if (!credential.authorizationCode) {
-      throw new AuthActionError('Apple did not confirm. Try again.');
-    }
-
-    return credential.authorizationCode;
+    return credential.authorizationCode ?? undefined;
   }
 
   /** Tries local scope after a failed sign-out; offline refresh can still make both fail. */

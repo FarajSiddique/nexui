@@ -196,6 +196,56 @@ test('a failed deletion returns a generic 500 and never calls Apple', async (t) 
   assert.deepEqual(keys(), [LOOKUP, REMOVE]);
 });
 
+test('a retry after the account is already gone answers 200 and revokes a fresh confirmation', async (t) => {
+  const notFound = () =>
+    Response.json(
+      { code: 404, error_code: 'user_not_found', msg: 'User not found' },
+      { status: 404 },
+    );
+
+  await t.test('without a code', async (t) => {
+    useAppleEnv(t);
+    const { keys } = mockServices(t, { handlers: { [LOOKUP]: notFound } });
+    const response = await DELETE(request());
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { appleAccessRemains: false });
+    assert.deepEqual(keys(), [LOOKUP]);
+  });
+
+  await t.test('with a code', async (t) => {
+    useAppleEnv(t);
+    const { keys } = mockServices(t, { handlers: { [LOOKUP]: notFound } });
+    const response = await DELETE(request({ appleAuthorizationCode: 'code-1' }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { appleAccessRemains: false });
+    assert.deepEqual(keys(), [LOOKUP, TOKEN, REVOKE]);
+  });
+
+  await t.test('with a code Apple fails to revoke', async (t) => {
+    useAppleEnv(t);
+    captureErrors(t);
+    const { keys } = mockServices(t, {
+      handlers: { [LOOKUP]: notFound, [REVOKE]: () => new Response(null, { status: 503 }) },
+    });
+    const response = await DELETE(request({ appleAuthorizationCode: 'code-1' }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { appleAccessRemains: true });
+    assert.deepEqual(keys(), [LOOKUP, TOKEN, REVOKE]);
+  });
+
+  await t.test('gone between lookup and delete', async (t) => {
+    useAppleEnv(t);
+    const { keys } = mockServices(t, {
+      identities: [appleIdentity],
+      handlers: { [REMOVE]: notFound },
+    });
+    const response = await DELETE(request({ appleAuthorizationCode: 'code-1' }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { appleAccessRemains: false });
+    assert.deepEqual(keys(), [LOOKUP, REMOVE, TOKEN, REVOKE]);
+  });
+});
+
 test('a failed user lookup deletes nothing and returns a generic 500', async (t) => {
   useAppleEnv(t);
   captureErrors(t);
