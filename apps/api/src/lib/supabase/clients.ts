@@ -41,12 +41,15 @@ export function getAuthClient(env: Env = process.env): SupabaseClient {
   return cachedClient(projectUrl(env), key);
 }
 
-// Bypasses row-level security. Only use it for admin actions such as account deletion.
+// Bypasses row-level security. Only use it for admin actions (account deletion) and for the
+// shared place media cache, after the route has checked the caller owns the plan.
 export function getAdminClient(env: Env = process.env): SupabaseClient {
   const key = env.SUPABASE_SECRET_KEY?.trim();
 
   if (!key) {
-    throw new SupabaseConfigurationError('SUPABASE_SECRET_KEY is required for account deletion.');
+    throw new SupabaseConfigurationError(
+      'SUPABASE_SECRET_KEY is required for account deletion and place details.',
+    );
   }
 
   return cachedClient(projectUrl(env), key);
