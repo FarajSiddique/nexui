@@ -15,15 +15,20 @@ import { readRows, saveRow } from './cache.ts';
 import {
   failedRow,
   isFresh,
+  isUsableImage,
   lookupRow,
   matchArticle,
+  photoSource,
   retryAfterMs,
   toPlaceMedia,
+  type Article,
+  type CopiedPhoto,
   type LookupPlace,
   type MediaRow,
   type MediaStatus,
 } from './rules.ts';
-import { searchArticles, WikipediaError, WikipediaThrottledError } from './wikipedia.ts';
+import { copyPhoto, PhotoStorageError, publicPhotoUrl } from './storage.ts';
+import { fileInfo, searchArticles, WikipediaError, WikipediaThrottledError } from './wikipedia.ts';
 
 /** At most this many lookups start per request, four at a time (spec section 4). */
 export const MAX_LOOKUPS = 20;
@@ -115,16 +120,42 @@ async function store(deps: MediaDeps, row: MediaRow, now: Date): Promise<void> {
   }
 }
 
-// One lookup: search, match and cache. Never throws; a failure becomes a `failed` row.
+// The match's photo, copied into our bucket, or null when it has no usable lead image (spec
+// section 2's photo rules). Throws when Wikimedia or storage fails, like the search does.
+async function findPhoto(
+  deps: MediaDeps,
+  contact: string,
+  key: string,
+  match: Article,
+): Promise<CopiedPhoto | null> {
+  if (!match.image || !isUsableImage(match.image)) {
+    return null;
+  }
+
+  const info = await fileInfo(match.image, contact);
+  const source = info ? photoSource(info) : null;
+
+  if (!source) {
+    return null;
+  }
+
+  const photo = await copyPhoto(deps.db, contact, key, source);
+
+  return photo ? { photo, credit: source.credit } : null;
+}
+
+// One lookup: search, match, copy the photo and cache. Never throws; a failure becomes a
+// `failed` row.
 async function lookUp(deps: MediaDeps, contact: string, place: MediaPlace): Promise<LookupResult> {
   const now = deps.now?.() ?? new Date();
   let row: MediaRow;
   let retryAfter: number | null = null;
 
   try {
-    const articles = await searchArticles(place.name, contact);
+    const match = matchArticle(place, await searchArticles(place.name, contact));
+    const photo = match ? await findPhoto(deps, contact, place.key, match) : null;
 
-    row = lookupRow(place.key, matchArticle(place, articles), now);
+    row = lookupRow(place.key, match, now, photo);
   } catch (error) {
     if (error instanceof WikipediaThrottledError) {
       retryAfter = retryAfterMs(error.retryAfter, now);
@@ -133,12 +164,12 @@ async function lookUp(deps: MediaDeps, contact: string, place: MediaPlace): Prom
       row = failedRow(place.key, now);
     }
 
-    console.error(
-      '[media]',
-      error instanceof WikipediaError || error instanceof WikipediaThrottledError
-        ? error.message
-        : 'A lookup failed.',
-    );
+    const known =
+      error instanceof WikipediaError ||
+      error instanceof WikipediaThrottledError ||
+      error instanceof PhotoStorageError;
+
+    console.error('[media]', known ? error.message : 'A lookup failed.');
   }
 
   await store(deps, row, now);
@@ -226,7 +257,8 @@ async function lookUpWithin(
 
 /**
  * Each place's media for the app, by place id (spec section 4). A fresh cache row answers at
- * once. Missing or expired ones are looked up, at most 20 per request and four at a time;
+ * once; photos answer with our bucket's URLs. Missing or expired ones are looked up, at most
+ * 20 per request and four at a time;
  * those done within the budget answer `ready` and the rest `pending`. Lookups still running at
  * the deadline finish after the response through `defer`; ones never started wait for the
  * app's next request. Without a contact nothing is looked up, and an uncached place answers
@@ -248,6 +280,7 @@ export async function resolvePlaceMedia(
     return !row || !isFresh(row, now);
   });
   const { contact } = deps;
+  const photoUrl = (path: string): string => publicPhotoUrl(deps.db, path);
 
   if (!contact && stale.length > 0) {
     warnLookupsOff();
@@ -261,9 +294,9 @@ export async function resolvePlaceMedia(
     const row = cached.get(place.key);
 
     if (done) {
-      answers[place.id] = toPlaceMedia(done, () => '');
+      answers[place.id] = toPlaceMedia(done, photoUrl);
     } else if (row && (!contact || isFresh(row, now))) {
-      answers[place.id] = toPlaceMedia(row, () => '');
+      answers[place.id] = toPlaceMedia(row, photoUrl);
     } else {
       answers[place.id] = contact ? PENDING : NOTHING;
     }

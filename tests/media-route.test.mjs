@@ -291,3 +291,41 @@ test('the contract accepts only our bucket for photos and Wikipedia for articles
   );
   assert.equal(media({ status: 'pending' }).success, true);
 });
+
+test('a cached photo answers with our bucket URLs and its credit; a malformed one is left out', async (t) => {
+  useContact(t);
+
+  const stored = {
+    path: 'aaaa/bbbb-960.jpg',
+    thumbPath: 'aaaa/cccc-500.jpg',
+    width: 960,
+    height: 640,
+  };
+  const credit = {
+    author: 'Kasa Fue',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tokyo.jpg',
+  };
+  const { state } = setup(t, {
+    snapshot: plan(),
+    wikipedia,
+    rows: [
+      cacheRow(TOKYO_KEY, { photo: stored, credit }),
+      cacheRow(KYOTO_KEY, { photo: { ...stored, width: 0 }, credit }),
+    ],
+  });
+
+  const body = await (await get()).json();
+  const bucket = 'https://nexui-test.supabase.co/storage/v1/object/public/place-photos';
+
+  assert.equal(state.searches.length, 0);
+  assert.deepEqual(body.places[TOKYO_ID].photo, {
+    url: `${bucket}/aaaa/bbbb-960.jpg`,
+    thumbUrl: `${bucket}/aaaa/cccc-500.jpg`,
+    width: 960,
+    height: 640,
+    credit,
+  });
+  assert.equal(body.places[KYOTO_ID].photo, null);
+});

@@ -1,9 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
+import { photoCreditSchema } from '@nexui/types';
+
 import type { MediaRow } from './rules.ts';
 
-const COLUMNS = 'key, status, lookup_version, pinned, page_title, page_url, extract, expires_at';
+const COLUMNS =
+  'key, status, lookup_version, pinned, page_title, page_url, extract, photo, credit, expires_at';
 
 const rowSchema = z.object({
   key: z.string(),
@@ -13,7 +16,17 @@ const rowSchema = z.object({
   page_title: z.string().nullable(),
   page_url: z.string().nullable(),
   extract: z.string().nullable(),
+  photo: z.unknown(),
+  credit: z.unknown(),
   expires_at: z.string(),
+});
+
+// `place_media.photo`. An operator may edit it by hand, so it's checked like the rest.
+const storedPhotoSchema = z.object({
+  path: z.string().min(1).max(200),
+  thumbPath: z.string().min(1).max(200),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
 });
 
 /** A database error from the cache. Keeps only its code, for the log. */
@@ -51,6 +64,8 @@ export async function readRows(
 
     if (parsed.success) {
       const row = parsed.data;
+      const photo = storedPhotoSchema.safeParse(row.photo);
+      const credit = photoCreditSchema.safeParse(row.credit);
 
       rows.set(row.key, {
         key: row.key,
@@ -60,8 +75,8 @@ export async function readRows(
         pageTitle: row.page_title,
         pageUrl: row.page_url,
         extract: row.extract,
-        photo: null,
-        credit: null,
+        photo: photo.success ? photo.data : null,
+        credit: credit.success ? credit.data : null,
         expiresAt: row.expires_at,
       });
     }
@@ -79,8 +94,8 @@ export async function saveRow(db: SupabaseClient, row: MediaRow, now: Date): Pro
     page_title: row.pageTitle,
     page_url: row.pageUrl,
     extract: row.extract,
-    photo: null,
-    credit: null,
+    photo: row.photo,
+    credit: row.credit,
     fetched_at: now.toISOString(),
     expires_at: row.expiresAt,
   });
