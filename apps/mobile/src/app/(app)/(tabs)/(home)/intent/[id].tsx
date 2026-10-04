@@ -8,9 +8,11 @@ import type { GraphSnapshot, TripData } from '@nexui/types';
 
 import {
   ApiError,
+  mediaPlaceIds,
   queryKeys,
   useIntent,
   useIntents,
+  usePlaceMedia,
   useUndo,
   useWorkspaceEdit,
   useIntentLive,
@@ -88,6 +90,11 @@ export default function WorkspaceScreen(): ReactElement {
     () => (snapshot?.workspace ? layoutWorkspace(snapshot.workspace.doc, snapshot) : []),
     [snapshot],
   );
+  const placeIds = useMemo(() => (snapshot ? mediaPlaceIds(snapshot) : []), [snapshot]);
+
+  // Looks the plan's places up as soon as it's open, so a stop's sheet opens with its details.
+  usePlaceMedia(id, placeIds);
+
   const hasOpenBand = blocks.some((block) => block.kind === 'open');
   const band = useRevealOpenBand(scroll, {
     intentId: id,
