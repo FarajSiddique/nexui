@@ -30,6 +30,11 @@ and another feature only where a screen needs that area's piece (the + tab butto
 none of the others. Files in one folder import each other as `./name`; across folders, use the
 `@/` alias, except in the pure files below.
 
+`pnpm lint` enforces these directions with `import/no-restricted-paths` in
+`apps/mobile/eslint.config.js`, one zone per folder. `eslint-import-resolver-typescript` resolves
+the `@/` alias, so an aliased import is checked the same as a relative one. Lint doesn't police
+imports between features; keep those to what a screen needs.
+
 ## The Home stack and the workspace route
 
 `apps/mobile/src/app/(app)/(tabs)/(home)/` is its own `Stack`

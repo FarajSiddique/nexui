@@ -24,7 +24,7 @@ Read first: root `AGENTS.md` and `docs/architecture/authentication.md`. Run `pnp
 7. **Accessibility**: touchables have `accessibilityRole` and labels, text scales, touch targets are about 44pt, and colors come from `src/theme/theme.ts` with readable contrast.
 8. **Animation**: Reanimated worklets touch only shared values and don't close over large JS objects. JS-thread work goes through `runOnJS` (or the worklets equivalent).
 9. **Style**: components follow the conventions in root `AGENTS.md`: PascalCase names, kebab-case helper files, no nested ternaries, helpers near where they're used, and no generic action wrappers that hide a screen's error handling.
-10. **Placement**: files sit where "Where code lives" in `docs/architecture/mobile.md` puts them: routes only in `src/app/`, one area's code in `src/features/<area>/`, and imports that run one way (`ui` imports only `theme`; `data`, `theme` and `lib` import no other app folder).
+10. **Placement**: files sit where "Where code lives" in `docs/architecture/mobile.md` puts them: routes only in `src/app/`, one area's code in `src/features/<area>/`, and imports that run one way (`ui` imports only `theme`; `data`, `theme` and `lib` import no other app folder). Lint enforces the import directions (`import/no-restricted-paths`); check by hand that a new file is in the right folder and that imports between features stay to what a screen needs.
 
 ## Output
 
