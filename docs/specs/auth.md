@@ -67,8 +67,9 @@ Nexui's access when an Apple user deletes their account. Apple isn't offered on 
 3. **Supabase, dev then prod → Auth → Providers → Apple:** enable it, set Client IDs to
    `ai.faraj.nexui`, leave the secret key empty, and leave "Allow users without an email" off.
 4. **API env:** the four `APPLE_*` values in `apps/api/.env.local` and in Vercel (Production,
-   Preview and Development); see the table below. In `.env.local`, write the key on one line in
-   double quotes with `\n` for each line break.
+   Preview and Development); see the table below. `APPLE_PRIVATE_KEY` is the whole `.p8` file,
+   BEGIN and END lines included: in `.env.local`, paste it in double quotes as in `.env.example`;
+   in Vercel, paste it as is.
 5. **Before launch, once a domain is bought:** under Certificates, Identifiers & Profiles →
    Services → Sign in with Apple for Email Communication, register the sending domain and address
    so mail reaches Hide My Email (`privaterelay.appleid.com`) addresses.
