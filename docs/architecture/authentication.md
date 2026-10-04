@@ -20,7 +20,9 @@ contacting Supabase. The auth action exchanges the token for a Supabase session.
 Google sign-in is unavailable in the web preview.
 
 Apple sign-in is iOS only, so the sign-in screen shows its button only there, above
-Google. `apple-sign-in.ts` makes a random nonce, gives Apple's sheet its SHA-256
+Google. Both are `ProviderButton` (`features/auth/provider-button.tsx`), drawn alike
+from each brand's official logo file and the `provider*` theme colors, so they match;
+while one signs in it shows a spinner and the other dims. `apple-sign-in.ts` makes a random nonce, gives Apple's sheet its SHA-256
 hash, and returns the ID token with the raw nonce; Supabase hashes the raw nonce and
 compares. It asks for the name and email. Cancellation returns `null` without
 contacting Supabase. Apple sends the name only on the first authorization, so after

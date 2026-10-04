@@ -10,6 +10,7 @@ export {
   signOut,
   verifyEmailCode,
 } from './auth';
+export { ProviderButton } from './provider-button';
 export { startSessionLifecycle } from './session-lifecycle';
 export {
   dismissAppleAccessNotice,
