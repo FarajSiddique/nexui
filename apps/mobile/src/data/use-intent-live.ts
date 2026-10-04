@@ -29,7 +29,13 @@ export function useIntentLive(intentId: string | null): void {
     let burstTimer: ReturnType<typeof setTimeout> | null = null;
     let intentTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // One retry chain at a time, so cleanup always clears the live timer.
     const catchUpIntent = (): void => {
+      if (intentTimer) {
+        clearTimeout(intentTimer);
+        intentTimer = null;
+      }
+
       if (client.isMutating({ mutationKey: editKey(intentId) }) > 0) {
         intentTimer = setTimeout(catchUpIntent, 300);
 

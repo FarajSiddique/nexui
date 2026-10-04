@@ -38,6 +38,10 @@ export function mapRpcError(error: { code?: string }): Error {
       return new ChangesetConflictError('That already exists.');
     case 'NXU12':
       return new ChangesetConflictError('Nexui is still working on this plan.');
+    case 'NXU14':
+      return new ChangesetConflictError(
+        'Nexui is already working on a few of your plans. Try again in a minute.',
+      );
     case 'NXU13':
       return new RunLeaseLostError('This run moved on.');
     case 'NXU22':

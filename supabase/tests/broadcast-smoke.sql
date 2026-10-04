@@ -30,7 +30,8 @@ select public.create_intent(
       'source', '{"type":"user"}'::jsonb, 'position', null, 'origin', 'direct'))
 );
 
-select public.create_run('30000000-0000-4000-8000-000000000001', 'ask',
+reset role;
+select public.create_run('00000000-0000-4000-8000-0000000000d1', '30000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Add Cusco","route":"fast","perception":"model"}');
 
 reset role;

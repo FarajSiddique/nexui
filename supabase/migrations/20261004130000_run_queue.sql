@@ -5,6 +5,8 @@
 -- within 15 minutes of creation (two 330-second leases plus cron slack); RUN_STALE_MS in
 -- apps/api/src/lib/runs/store.ts uses the same cutoff.
 
+-- Owners can read lease_id through "Owners read runs". That is safe only because every function
+-- that takes a lease is granted to service_role alone; never grant one to a client role.
 alter table public.runs
   add column attempts integer not null default 0,
   add column lease_id uuid,
@@ -12,12 +14,17 @@ alter table public.runs
 
 create index runs_active_idx on public.runs (created_at)
   where status in ('queued', 'running', 'stopping');
+-- create_run counts each user's working runs.
+create index runs_user_active_idx on public.runs (user_id)
+  where status in ('queued', 'running', 'stopping');
 -- reap_runs checks whether a run committed anything.
 create index events_run_idx on public.events (run_id) where run_id is not null;
 
--- Only the worker records steps and finishes runs now.
+-- Only the worker records steps and finishes runs now, and only the API queues runs: a run
+-- queued straight from a client would skip the API's validation and perception, then execute.
 drop function public.record_run_step(uuid, jsonb, jsonb);
 drop function public.finish_run(uuid, text, text);
+drop function public.create_run(uuid, text, jsonb);
 
 -- Claims runs for a worker. With p_run_id, only that run (the request that created it); without,
 -- up to p_limit of the oldest runs nobody claimed for 10 seconds (the cron). Only queued, unleased
@@ -87,8 +94,8 @@ end;
 $$;
 
 -- Marks the run running and appends one step's progress entries and token usage, like the
--- record_run_step it replaces. A lease that isn't the run's is NXU13: the run was reaped or
--- claimed again, so this worker must stop without writing.
+-- record_run_step it replaces. A lease that isn't the run's, or has lapsed, is NXU13: the run
+-- was reaped or claimed again, so this worker must stop without writing.
 create function public.run_record_step(
   p_run_id uuid,
   p_lease_id uuid,
@@ -118,7 +125,10 @@ begin
     raise exception 'Not found' using errcode = 'NXU04';
   end if;
 
-  if found_run.lease_id is distinct from p_lease_id then
+  if p_lease_id is null
+    or found_run.lease_id is distinct from p_lease_id
+    or found_run.lease_expires_at <= now()
+  then
     raise exception 'This run moved on' using errcode = 'NXU13';
   end if;
 
@@ -176,7 +186,10 @@ begin
     raise exception 'Not found' using errcode = 'NXU04';
   end if;
 
-  if found_run.lease_id is distinct from p_lease_id then
+  if p_lease_id is null
+    or found_run.lease_id is distinct from p_lease_id
+    or found_run.lease_expires_at <= now()
+  then
     raise exception 'This run moved on' using errcode = 'NXU13';
   end if;
 
@@ -242,7 +255,9 @@ begin
   where r.id = p_run_id
   for update;
 
-  if found_run.lease_id is distinct from p_lease_id
+  if p_lease_id is null
+    or found_run.lease_id is distinct from p_lease_id
+    or found_run.lease_expires_at <= now()
     or found_run.status not in ('running', 'stopping')
   then
     raise exception 'This run moved on' using errcode = 'NXU13';
@@ -313,30 +328,36 @@ begin
 end;
 $$;
 
--- create_run and delete_intent count a run as working until the 15-minute deadline.
-create or replace function public.create_run(p_intent_id uuid, p_kind text, p_input jsonb)
+-- Queues a run for the API, on behalf of the user it verified. Refuses with NXU12 while another
+-- run on the intent is working, and with NXU14 while the user has 3 runs working across all
+-- their intents, so one account can't fill the shared cap. The input is checked here too, since
+-- the worker trusts it: a known route and 1 to 1000 characters of text.
+create function public.create_run(p_user_id uuid, p_intent_id uuid, p_kind text, p_input jsonb)
 returns jsonb
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  caller uuid := auth.uid();
   created public.runs;
 begin
-  if caller is null then
+  if p_user_id is null then
     raise exception 'Sign in to continue' using errcode = 'NXU04';
   end if;
 
   if p_kind is null or p_kind not in ('create_intent', 'ask')
     or p_input is null or jsonb_typeof(p_input) <> 'object'
+    or jsonb_typeof(p_input -> 'text') is distinct from 'string'
+    or char_length(p_input ->> 'text') not between 1 and 1000
+    or (p_input ->> 'route') is null
+    or (p_input ->> 'route') not in ('edit', 'fast', 'reasoning')
   then
     raise exception 'That run is not valid' using errcode = 'NXU22';
   end if;
 
   perform 1
   from public.intents i
-  where i.id = p_intent_id and i.user_id = caller
+  where i.id = p_intent_id and i.user_id = p_user_id
   for update;
 
   if not found then
@@ -347,21 +368,32 @@ begin
     select 1
     from public.runs r
     where r.intent_id = p_intent_id
-      and r.user_id = caller
+      and r.user_id = p_user_id
       and r.status in ('queued', 'running', 'stopping')
       and r.created_at > now() - interval '15 minutes'
   ) then
     raise exception 'A run is already working on this intent' using errcode = 'NXU12';
   end if;
 
+  if (
+    select count(*)
+    from public.runs r
+    where r.user_id = p_user_id
+      and r.status in ('queued', 'running', 'stopping')
+      and r.created_at > now() - interval '15 minutes'
+  ) >= 3 then
+    raise exception 'Too many runs are working' using errcode = 'NXU14';
+  end if;
+
   insert into public.runs (user_id, intent_id, kind, input)
-  values (caller, p_intent_id, p_kind, p_input)
+  values (p_user_id, p_intent_id, p_kind, p_input)
   returning * into created;
 
   return to_jsonb(created);
 end;
 $$;
 
+-- delete_intent counts a run as working until the 15-minute deadline, like create_run.
 create or replace function public.delete_intent(p_intent_id uuid)
 returns void
 language plpgsql
@@ -400,6 +432,9 @@ begin
 end;
 $$;
 
+revoke execute on function public.create_run(uuid, uuid, text, jsonb)
+  from public, anon, authenticated;
+grant execute on function public.create_run(uuid, uuid, text, jsonb) to service_role;
 revoke execute on function public.claim_runs(uuid, integer, integer, integer)
   from public, anon, authenticated;
 grant execute on function public.claim_runs(uuid, integer, integer, integer) to service_role;

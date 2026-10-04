@@ -8,7 +8,15 @@ import { getAdminClient, getUserClient } from '../apps/api/src/lib/supabase/clie
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { captureRuns, failingEvaluationModel } from './support/ai.mjs';
 import { graphDb } from './support/graph-db.mjs';
-import { INTENT_ID, KYOTO_ID, LEASE_ID, RUN_ID, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import {
+  INTENT_ID,
+  KYOTO_ID,
+  LEASE_ID,
+  RUN_ID,
+  snapshotRow,
+  TRIP_ID,
+  USER_ID,
+} from './support/graph.mjs';
 import { mockSupabaseAuth, signToken } from './support/supabase-auth.mjs';
 
 const tripFixture = {
@@ -57,6 +65,7 @@ function orchestrator() {
 
   return {
     db: getUserClient(signToken()),
+    userId: USER_ID,
     openSession,
     worker: { db: getAdminClient(), openSession, maxActive: 100 },
   };
@@ -82,6 +91,7 @@ test('a trip goal is seeded at once and filled in by a run after the response', 
   assert.equal(started.snapshot.intent.template, 'travel');
   assert.equal(fake.state.created.p_template, 'travel');
   assert.deepEqual(fake.state.createdRun, {
+    p_user_id: USER_ID,
     p_intent_id: started.snapshot.intent.id,
     p_kind: 'create_intent',
     p_input: {

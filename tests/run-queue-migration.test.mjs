@@ -6,8 +6,11 @@ import test from 'node:test';
 
 const sql = readFileSync('supabase/migrations/20261004130000_run_queue.sql', 'utf8');
 const bodyOf = (name) =>
-  sql.match(new RegExp(`function public\\.${name}\\(([\\s\\S]*?)\\n\\$\\$;`))?.[1];
+  sql.match(
+    new RegExp(`create (?:or replace )?function public\\.${name}\\(([\\s\\S]*?)\\n\\$\\$;`),
+  )?.[1];
 const workerFunctions = {
+  create_run: 'uuid, uuid, text, jsonb',
   claim_runs: 'uuid, integer, integer, integer',
   run_record_step: 'uuid, uuid, jsonb, jsonb',
   run_finish: 'uuid, uuid, text, text',
@@ -33,13 +36,30 @@ test('the worker functions pin search_path and are the service role’s alone', 
   }
 });
 
-test('every write as a run checks its lease', () => {
+test('every write as a run checks its lease, failing closed on a null or lapsed one', () => {
   for (const name of ['run_record_step', 'run_finish', 'run_apply_changeset']) {
     const body = bodyOf(name);
 
-    assert.match(body, /lease_id is distinct from p_lease_id/, name);
+    assert.match(
+      body,
+      /p_lease_id is null\s+or found_run\.lease_id is distinct from p_lease_id/,
+      name,
+    );
+    assert.match(body, /found_run\.lease_expires_at <= now\(\)/, name);
     assert.match(body, /errcode = 'NXU13'/, name);
   }
+});
+
+test('only the API queues runs, for the user it verified, with checked input', () => {
+  const body = bodyOf('create_run');
+
+  assert.match(sql, /drop function public\.create_run\(uuid, text, jsonb\);/);
+  assert.match(body, /i\.user_id = p_user_id/);
+  assert.match(body, /\(p_input ->> 'route'\) not in \('edit', 'fast', 'reasoning'\)/);
+  assert.match(body, /char_length\(p_input ->> 'text'\) not between 1 and 1000/);
+  assert.match(body, /errcode = 'NXU12'/);
+  assert.match(body, /\) >= 3 then/);
+  assert.match(body, /errcode = 'NXU14'/);
 });
 
 test('a run commits as itself: user, intent and actor come from the run row', () => {
@@ -86,8 +106,9 @@ test('create_run and delete_intent count a run as working for 15 minutes', () =>
     const body = bodyOf(name);
 
     assert.ok(body, name);
-    assert.match(body, /caller uuid := auth\.uid\(\);/, name);
     assert.match(body, /interval '15 minutes'/, name);
     assert.match(body, /errcode = 'NXU12'/, name);
   }
+
+  assert.match(bodyOf('delete_intent'), /caller uuid := auth\.uid\(\);/);
 });

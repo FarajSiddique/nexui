@@ -14,8 +14,10 @@ import { createRun, scheduleRun, workRun, type RunWorker } from '#lib/runs';
 import type { OpenSession } from '#lib/ai';
 
 export interface Orchestrator {
-  /** The user's client: every read and write is theirs, under RLS. */
+  /** The user's client: the plan's reads and writes are theirs, under RLS. */
   db: SupabaseClient;
+  /** The user the API verified, whom runs are queued for. */
+  userId: string;
   /** Opens the AI session that perceives the goal or ask. */
   openSession: OpenSession;
   /** Claims and executes the run after the response, with its own client and session. */
@@ -62,7 +64,8 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
   let run: RunRecord;
 
   try {
-    run = await createRun(deps.db, {
+    run = await createRun(deps.worker.db, {
+      userId: deps.userId,
       intentId: snapshot.intent.id,
       kind: 'create_intent',
       input: { text: goal, route: 'reasoning', template: 'travel', perception: template.source },
@@ -99,7 +102,8 @@ export async function startAsk(
     { text, goal: snapshot.intent.goal, summary: snapshot.intent.summary.line },
     { providerOptions: session.providerOptions('perception') },
   );
-  const run = await createRun(deps.db, {
+  const run = await createRun(deps.worker.db, {
+    userId: deps.userId,
     intentId,
     kind: 'ask',
     input: { text, route: route.value, perception: route.source },

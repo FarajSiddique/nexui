@@ -20,20 +20,20 @@ cheaper to change before launch than after.
 
 ## 0. Decisions
 
-| Topic                 | Decision                                                                                                                                                                                                                                |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Live updates          | **Broadcast from the database**: triggers call `realtime.send` on a private `intent:<id>` topic. One message per changeset and per run write, not per row. Clients still treat it as a signal and refetch.                              |
-| Who may listen        | An RLS policy on `realtime.messages` lets a signed-in user join `intent:<id>` only for their own intent. No insert policy, so clients can't send on it.                                                                                 |
-| `postgres_changes`    | Removed: the five tables leave the `supabase_realtime` publication in the same migration. No compatibility path (prototype rule).                                                                                                       |
-| Queue transport       | **The `runs` table is the queue.** Postgres leases (`claim_runs`, `for update skip locked`). No new vendor, and the same functions back an SQS or container worker on AWS later. Vercel Queues/Workflow, Inngest: see sections 5 and 6. |
-| Who executes          | A **worker** using the service-role key, scoped by the run: every worker write names the run and its lease, and the database takes the user and intent from the run row. Runs no longer need the user's token.                          |
-| Fast path             | Unchanged latency: the route still schedules the run with `after()`, which now claims it and executes it as the worker.                                                                                                                 |
-| Safety net            | A **Vercel Cron** hits `GET /api/cron/runs` every minute. It reaps dead leases and claims runs nobody claimed.                                                                                                                          |
-| Retries               | A run that **committed nothing** is retried once (2 attempts). A run that **committed a step** is failed, keeping its steps. Retrying mid-run would replay steps over its own changes. Step-level resume is phase 2.                    |
-| Concurrency cap       | `RUN_MAX_ACTIVE` (default 100) caps runs claimed at once across all instances. Over the cap, a run waits queued and the cron starts it. This protects Gateway rate limits and smooths cost spikes.                                      |
-| Deadline              | A run must finish within **15 minutes** of creation (two 330-second leases plus cron slack). Past that it reads as failed and stops blocking new runs. Replaces the 6-minute cutoff.                                                    |
-| Client writes to runs | `record_run_step` and `finish_run` are dropped. Only the worker functions (service role) can record steps or finish runs. Clients keep `create_run` (through the API) and `cancel_run`.                                                 |
-| Packaging             | One draft PR: spec, two migrations, API, mobile, docs, in that order.                                                                                                                                                                   |
+| Topic                 | Decision                                                                                                                                                                                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live updates          | **Broadcast from the database**: triggers call `realtime.send` on a private `intent:<id>` topic. One message per changeset and per run write, not per row. Clients still treat it as a signal and refetch.                                                                                              |
+| Who may listen        | An RLS policy on `realtime.messages` lets a signed-in user join `intent:<id>` only for their own intent. No insert policy, so clients can't send on it.                                                                                                                                                 |
+| `postgres_changes`    | Removed: the five tables leave the `supabase_realtime` publication in the same migration. No compatibility path (prototype rule).                                                                                                                                                                       |
+| Queue transport       | **The `runs` table is the queue.** Postgres leases (`claim_runs`, `for update skip locked`). No new vendor, and the same functions back an SQS or container worker on AWS later. Vercel Queues/Workflow, Inngest: see sections 5 and 6.                                                                 |
+| Who executes          | A **worker** using the service-role key, scoped by the run: every worker write names the run and its lease, and the database takes the user and intent from the run row. Runs no longer need the user's token.                                                                                          |
+| Fast path             | Unchanged latency: the route still schedules the run with `after()`, which now claims it and executes it as the worker.                                                                                                                                                                                 |
+| Safety net            | A **Vercel Cron** hits `GET /api/cron/runs` every minute. It reaps dead leases and claims runs nobody claimed.                                                                                                                                                                                          |
+| Retries               | A run that **committed nothing** is retried once (2 attempts). A run that **committed a step** is failed, keeping its steps. Retrying mid-run would replay steps over its own changes. Step-level resume is phase 2.                                                                                    |
+| Concurrency cap       | `RUN_MAX_ACTIVE` (default 100) caps runs claimed at once across all instances. Over the cap, a run waits queued and the cron starts it. This protects Gateway rate limits and smooths cost spikes.                                                                                                      |
+| Deadline              | A run must finish within **15 minutes** of creation (two 330-second leases plus cron slack). Past that it reads as failed and stops blocking new runs. Replaces the 6-minute cutoff.                                                                                                                    |
+| Client writes to runs | `record_run_step` and `finish_run` are dropped, and `create_run` becomes service-role only: a run a client queued directly would skip the API's checks, then execute. The API queues runs for the user it verified; SQL checks the input and allows 3 working runs per user. Clients keep `cancel_run`. |
+| Packaging             | One draft PR: spec, two migrations, API, mobile, docs, in that order.                                                                                                                                                                                                                                   |
 
 ## 1. Broadcast
 
@@ -106,7 +106,7 @@ Worker functions are all `security definer` and `search_path = ''`. Execute is r
     and `attempts + 1`.
 - `run_record_step(p_run_id, p_lease_id, p_entries, p_usage)` returns `text`. It works like the
   old `record_run_step` but checks the lease instead of `auth.uid()`. A run that is no longer
-  active returns its status, as before. A lease that isn't the run's raises `NXU13` (lease
+  active returns its status, as before. A lease that is null, lapsed or not the run's raises `NXU13` (lease
   lost), so a zombie worker stops without writing.
 - `run_finish(p_run_id, p_lease_id, p_status, p_error)` returns `jsonb`. It has `finish_run`'s
   status rules, a lease check (`NXU13`), and clears `lease_expires_at`.
@@ -128,6 +128,10 @@ The migration also does the following:
 
 - `drop function public.record_run_step(uuid, jsonb, jsonb)` and
   `public.finish_run(uuid, text, text)`.
+- `create_run(p_user_id, p_intent_id, p_kind, p_input)` replaces the user-callable version and
+  is granted to `service_role` only. It checks `route` (`edit`, `fast`, `reasoning`) and `text`
+  (1 to 1000 characters) with `NXU22`, and refuses with `NXU14` (409) while the user has 3 runs
+  working, so one account can't fill `RUN_MAX_ACTIVE`.
 - `create_run` and `delete_intent` count a run as working for 15 minutes instead of 6.
 - `cancel_run` is unchanged. A claimed run stays `queued` until its first step, so Stop cancels
   it at once and the worker's first `run_record_step` returns `cancelled`.
@@ -154,8 +158,8 @@ The migration also does the following:
 - `store.ts`: `RUN_STALE_MS` becomes 15 minutes. It is still applied when reading, as a backstop
   in case the cron is down.
 - Orchestrator:
-  - `startIntent` and `startAsk` create the run with the user's client, as before, then
-    `scheduleRun(() => workRun(deps.worker, run.id))`.
+  - `startIntent` and `startAsk` queue the run with the worker's client for `deps.userId` (the
+    user `verifyRequest` returned), then `scheduleRun(() => workRun(deps.worker, run.id))`.
   - The session opened for perception is no longer handed to the run. The worker reopens one,
     which mock mode resolves to the same fixture.
 - `getAdminClient`'s missing-key message no longer says "account deletion".
@@ -163,7 +167,8 @@ The migration also does the following:
 **Cron: `apps/api/src/app/api/cron/runs/route.ts`.**
 
 - `GET` checks `Authorization: Bearer <CRON_SECRET>` with a timing-safe compare. A wrong or
-  missing header gets 401. An unset `CRON_SECRET` gets 503 and is logged under `[cron]`.
+  missing header gets 401. An unset `CRON_SECRET`, or one under 32 characters, gets 503 and is
+  logged under `[cron]`.
 - It then calls `sweepRuns` and answers `{ reaped, claimed }`. The claimed runs execute in
   `after()` (`maxDuration = 300`).
 - `apps/api/vercel.json` schedules it `* * * * *`. That needs a Pro plan: Hobby runs crons once
@@ -221,7 +226,8 @@ The migration also does the following:
   - The cron leaves a fresh orphan alone, then claims and finishes it after 10 seconds.
   - A claimed run whose lease lapsed is reaped, its dead lease gets `NXU13`, and the retry
     succeeds on attempt 2.
-  - A user calling `claim_runs` gets `42501`, and `record_run_step` no longer exists.
+  - A user calling `create_run` or `claim_runs` gets `42501`, and `record_run_step` no longer
+    exists.
 - **Manual, still to do:**
   - In Expo, open a plan and start an ask: the plan updates live.
   - Kill the API mid-run: the cron retries the run or fails it.

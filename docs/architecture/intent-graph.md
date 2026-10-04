@@ -83,6 +83,7 @@ The mobile side is in [`mobile.md`](./mobile.md).
 | `NXU10`       | Already undone (including two Undos racing on the unique index)           | 409                                         |
 | `NXU11`       | Already exists: a reused id or a second live copy of a link               | 409 "That already exists."                  |
 | `NXU13`       | A run's lease moved on (reaped or claimed again)                          | `RunLeaseLostError`; the worker stops       |
+| `NXU14`       | The user already has 3 runs working                                       | 409                                         |
 | `NXU22`       | Malformed changeset (bad op/origin/source/run, missing or invalid column) | 400                                         |
 | anything else | Unknown                                                                   | 500, logged as `[tag] <fallback> (<code>).` |
 
@@ -205,8 +206,14 @@ as a worker with the service-role client (see "Run queue" below).
   `20261003000000_run_stopping.sql`, `20261004130000_run_queue.sql`): a run is `queued`, `running`, `stopping`,
   `awaiting_approval` (unused in slice 1), `succeeded`, `failed` or `cancelled`.
   `ACTIVE_RUN_STATUSES` / `isActiveRunStatus` (`packages/types/src/runs.ts`) are the first three.
-  - `create_run` refuses while another run on the intent is queued, running or stopping (NXU12,
-    409), so a stopped run's last commit can never land under a newer run.
+  - `create_run(user_id, intent_id, kind, input)` is executable by `service_role` only: the API
+    queues each run with the admin client, for the user `verifyRequest` returned, so a client
+    can't queue a run that skips the API's validation and perception. It checks the input too
+    (`route` is `edit`, `fast` or `reasoning`; `text` is 1 to 1000 characters; otherwise
+    `NXU22`). It refuses while another run on the intent is queued, running or stopping (NXU12,
+    409), so a stopped run's last commit can never land under a newer run, and while the user
+    has 3 runs working across their plans (NXU14, 409 "Nexui is already working on a few of your
+    plans. Try again in a minute."), so one account can't fill `RUN_MAX_ACTIVE`.
   - `run_record_step` appends each step's calls to `runs.progress`
     (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries would take
     `progress` past 100 is not recorded, so it holds at most 100 entries. It also appends the
@@ -226,7 +233,7 @@ as a worker with the service-role client (see "Run queue" below).
   - **Run queue** (`20261004130000_run_queue.sql`, `src/lib/runs/worker.ts`): the `runs` table is
     the queue. `runs.attempts`, `lease_id` and `lease_expires_at` record a claim. The worker
     functions are `security definer` and executable by `service_role` only; every write names the
-    run and its lease, and a lease that isn't the run's raises `NXU13`.
+    run and its lease, and a lease that is null, lapsed or not the run's raises `NXU13`.
     - `claim_runs(run_id, limit, lease_seconds, max_active)` leases `queued` runs with
       `for update skip locked`, skipping runs past the deadline and claiming nothing once
       `max_active` runs hold a live lease. With a run id it claims that run (the fast path);
@@ -240,13 +247,14 @@ expected_activity_at)` do the run's writes. The last has no intent or actor para
       deadline or one with 2 attempts becomes `failed`; anything else goes back to `queued`
       with its progress cleared (`model_usage` is kept). So a run that committed nothing is
       retried once, and one that committed keeps its steps and fails.
-    - The route creates the run with the user's client, then `after()` calls `workRun`, which
+    - The route queues the run with `create_run`, then `after()` calls `workRun`, which
       claims it, opens an AI session from the run's kind and input, and runs `executeRun` with the
       admin client and the lease. `RUN_LEASE_SECONDS` is 330. On `NXU13` the executor stops
-      without finishing the run.
+      without finishing the run. A claimed row that doesn't parse is finished `failed` on its
+      own, so it can't hold back the rest of a batch.
     - `GET /api/cron/runs` (`apps/api/vercel.json`, every minute) checks
       `Authorization: Bearer <CRON_SECRET>` (`verify-cron.ts`: 401 on a mismatch, 503 and a
-      `[cron]` log when unset), then `sweepRuns` reaps, claims up to `RUN_SWEEP_LIMIT` (10) runs
+      `[cron]` log when unset or under 32 characters), then `sweepRuns` reaps, claims up to `RUN_SWEEP_LIMIT` (10) runs
       and executes them in `after()`. `RUN_MAX_ACTIVE` (default 100) caps live leases.
   - Home shows "Drafting" on intents with a working run.
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
@@ -338,7 +346,8 @@ In the web preview a live browser color-scheme change only applies after a reloa
   `psql`) against a scratch database. Creates two throwaway users, exercises create, change,
   undo, redo and cross-user isolation through the RPCs, and rolls everything back in one
   transaction — nothing it does persists.
-- `supabase/tests/runs-smoke.sql`: the worker functions (as `service_role`), `cancel_run`,
+- `supabase/tests/runs-smoke.sql`: `create_run` refused to users, its input checks and the 3-run
+  cap; the worker functions (as `service_role`), `cancel_run`,
   `discard_intent` and `delete_intent`, as two throwaway users, rolled back: Stop on a running run
   (stopping, its last step kept, `NXU12` meanwhile, then cancelled, or failed with its error), a
   queued run cancelled at once, lease loss (`NXU13`), reap and retry, reap to failed, and the

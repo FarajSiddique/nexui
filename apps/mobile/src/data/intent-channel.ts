@@ -44,15 +44,36 @@ interface OpenChannel {
 export function createIntentChannels(realtime: IntentRealtime): IntentChannels {
   const open = new Map<string, OpenChannel>();
   const leaving = new Map<string, Promise<unknown>>();
+  // Channels this module removed. A removal that doesn't end `ok` leaves the channel in the
+  // client, which then hands it back for the topic, already subscribed.
+  const retired = new WeakSet<BroadcastChannel>();
 
-  const join = (intentId: string): OpenChannel => {
-    const entry: OpenChannel = {
-      channel: realtime.channel(`intent:${intentId}`, { config: { private: true } }),
-      watchers: new Set(),
-      subscribed: false,
-    };
+  const retire = (intentId: string, channel: BroadcastChannel): void => {
+    retired.add(channel);
 
-    entry.channel
+    const removal = realtime.removeChannel(channel).catch(() => undefined);
+
+    leaving.set(intentId, removal);
+    void removal.then(() => {
+      if (leaving.get(intentId) === removal) {
+        leaving.delete(intentId);
+      }
+    });
+  };
+
+  // Null when Realtime handed back a channel that never finished leaving: it is removed again.
+  const join = (intentId: string): OpenChannel | null => {
+    const channel = realtime.channel(`intent:${intentId}`, { config: { private: true } });
+
+    if (retired.has(channel)) {
+      retire(intentId, channel);
+
+      return null;
+    }
+
+    const entry: OpenChannel = { channel, watchers: new Set(), subscribed: false };
+
+    channel
       .on('broadcast', { event: 'changed' }, () => {
         for (const watcher of entry.watchers) {
           watcher.onChange();
@@ -72,8 +93,27 @@ export function createIntentChannels(realtime: IntentRealtime): IntentChannels {
     return entry;
   };
 
-  const add = (intentId: string, watcher: IntentWatcher): void => {
+  // Adds the watcher once no removal of the intent's channel is in flight.
+  const start = (intentId: string, watcher: IntentWatcher, released: () => boolean): void => {
+    const pending = open.has(intentId) ? undefined : leaving.get(intentId);
+
+    if (pending) {
+      void pending.then(() => {
+        if (!released()) {
+          start(intentId, watcher, released);
+        }
+      });
+
+      return;
+    }
+
     const entry = open.get(intentId) ?? join(intentId);
+
+    if (!entry) {
+      start(intentId, watcher, released);
+
+      return;
+    }
 
     entry.watchers.add(watcher);
 
@@ -82,7 +122,7 @@ export function createIntentChannels(realtime: IntentRealtime): IntentChannels {
     }
   };
 
-  const remove = (intentId: string, watcher: IntentWatcher): void => {
+  const stop = (intentId: string, watcher: IntentWatcher): void => {
     const entry = open.get(intentId);
 
     if (!entry?.watchers.delete(watcher) || entry.watchers.size > 0) {
@@ -90,36 +130,19 @@ export function createIntentChannels(realtime: IntentRealtime): IntentChannels {
     }
 
     open.delete(intentId);
-
-    const removal = realtime.removeChannel(entry.channel).catch(() => undefined);
-
-    leaving.set(intentId, removal);
-    void removal.then(() => {
-      if (leaving.get(intentId) === removal) {
-        leaving.delete(intentId);
-      }
-    });
+    retire(intentId, entry.channel);
   };
 
   return {
     watch(intentId, watcher) {
       let released = false;
-      const pending = open.has(intentId) ? undefined : leaving.get(intentId);
 
-      if (pending) {
-        void pending.then(() => {
-          if (!released) {
-            add(intentId, watcher);
-          }
-        });
-      } else {
-        add(intentId, watcher);
-      }
+      start(intentId, watcher, () => released);
 
       return () => {
         if (!released) {
           released = true;
-          remove(intentId, watcher);
+          stop(intentId, watcher);
         }
       };
     },

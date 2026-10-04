@@ -51,7 +51,12 @@ export async function POST(request: Request, { params }: AskRouteContext): Promi
 
   try {
     const started = await startAsk(
-      { db: getUserClient(user.accessToken), openSession: sessionOpener(), worker: runWorker() },
+      {
+        db: getUserClient(user.accessToken),
+        userId: user.userId,
+        openSession: sessionOpener(),
+        worker: runWorker(),
+      },
       id,
       parsed.data.text,
     );

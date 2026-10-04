@@ -8,7 +8,7 @@ import { LEASE_ID, runRow } from './support/graph.mjs';
 import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
 const url = 'http://localhost/api/cron/runs';
-const SECRET = 'cron-secret-test';
+const SECRET = 'cron-secret-test-0123456789abcdef';
 
 // `null` leaves CRON_SECRET unset.
 function useCronSecret(t, value = SECRET) {
@@ -58,8 +58,16 @@ test('without a configured secret the sweep refuses and says so in the log', asy
   assert.equal(response.status, 503);
   assert.deepEqual(logged.mock.calls[0].arguments, [
     '[cron]',
-    'CRON_SECRET is required for scheduled jobs.',
+    'CRON_SECRET (32 characters or more) is required for scheduled jobs.',
   ]);
+});
+
+test('a short secret counts as unset, even when the header matches it', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  mockSupabaseAuth(t);
+  useCronSecret(t, 'short-secret');
+
+  assert.equal((await GET(cron('Bearer short-secret'))).status, 503);
 });
 
 test('the sweep reaps, claims and answers what it did', async (t) => {

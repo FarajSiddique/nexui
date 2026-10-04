@@ -51,14 +51,15 @@ function fakeRealtime() {
     },
     removeChannel(channel) {
       return new Promise((resolve) => {
-        removals.push(() => {
-          channel.removed = true;
-          resolve('ok');
+        removals.push((status) => {
+          // Like realtime-js, only an `ok` leave takes the channel out of the client.
+          channel.removed = status === 'ok';
+          resolve(status);
         });
       });
     },
-    async finishRemoval() {
-      removals.shift()();
+    async finishRemoval(status = 'ok') {
+      removals.shift()(status);
       await new Promise((resolve) => setImmediate(resolve));
     },
     pendingRemovals: () => removals.length,
@@ -188,4 +189,26 @@ test('a watch released while it waited never opens a channel', async () => {
 
   assert.equal(realtime.channels.length, 1);
   assert.equal(realtime.pendingRemovals(), 0);
+});
+
+test('a channel whose removal timed out is removed again, never reused', async () => {
+  const realtime = fakeRealtime();
+  const channels = createIntentChannels(realtime);
+
+  channels.watch(INTENT, watcher())();
+  await realtime.finishRemoval('timed out');
+
+  const again = watcher();
+
+  // Realtime still hands back the old, subscribed channel for the topic.
+  assert.doesNotThrow(() => channels.watch(INTENT, again));
+  assert.equal(realtime.channels.length, 1);
+  assert.equal(realtime.channels[0].listeners.length, 1, 'nothing is added to the old channel');
+  assert.equal(realtime.pendingRemovals(), 1, 'it is removed again');
+
+  await realtime.finishRemoval();
+
+  assert.equal(realtime.channels.length, 2);
+  realtime.channels[1].status('SUBSCRIBED');
+  assert.equal(again.seen.joins, 1);
 });

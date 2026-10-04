@@ -62,7 +62,12 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const started = await startIntent(
-      { db: getUserClient(user.accessToken), openSession: sessionOpener(), worker: runWorker() },
+      {
+        db: getUserClient(user.accessToken),
+        userId: user.userId,
+        openSession: sessionOpener(),
+        worker: runWorker(),
+      },
       parsed.data.goal,
     );
 

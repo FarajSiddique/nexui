@@ -132,8 +132,7 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
         {
           intentId: step.intentId,
           actor: 'ai',
-          runId: step.runId,
-          lease: step.leaseId,
+          run: { id: step.runId, lease: step.leaseId },
           ops,
           restage: (current) => step.stager.restage(current),
         },

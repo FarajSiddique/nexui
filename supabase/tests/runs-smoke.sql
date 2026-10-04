@@ -8,6 +8,20 @@ insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000000c1', 'runs-a@example.test'),
   ('00000000-0000-4000-8000-0000000000c2', 'runs-b@example.test');
 
+-- The API queues runs with the service role, for the user it verified. This stand-in does the
+-- same for the user named, so the blocks below can stay as that user. It is rolled back with
+-- everything else.
+create function public.smoke_queue_run(p_user_id uuid, p_intent_id uuid, p_kind text, p_input jsonb)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.create_run(p_user_id, p_intent_id, p_kind, p_input);
+$$;
+
+grant execute on function public.smoke_queue_run(uuid, uuid, text, jsonb) to authenticated, service_role;
+
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
@@ -46,19 +60,81 @@ select public.create_intent(
     'source', '{"type":"user"}'::jsonb, 'position', null, 'origin', 'direct'))
 );
 
+-- Users can't queue runs themselves; the API checks the input, and so does create_run. A user
+-- may have 3 runs working at once across their plans.
+do $$
+begin
+  begin
+    perform public.create_run('00000000-0000-4000-8000-0000000000c1',
+      '20000000-0000-4000-8000-000000000001', 'ask',
+      '{"text":"Behind the API''s back","route":"reasoning","perception":"model"}');
+    assert false, 'users can''t call create_run';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  begin
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1',
+      '20000000-0000-4000-8000-000000000001', 'ask',
+      '{"text":"Go faster","route":"turbo","perception":"model"}');
+    assert false, 'an unknown route is refused';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+
+  begin
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1',
+      '20000000-0000-4000-8000-000000000001', 'ask',
+      jsonb_build_object('text', repeat('x', 1001), 'route', 'fast', 'perception', 'model'));
+    assert false, 'text over 1000 characters is refused';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+
+  -- Undone by the exception at its end.
+  begin
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1',
+      '20000000-0000-4000-8000-000000000001', 'ask', '{"text":"One","route":"fast"}');
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1',
+      '20000000-0000-4000-8000-000000000003', 'ask', '{"text":"Two","route":"fast"}');
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1',
+      '20000000-0000-4000-8000-000000000005', 'ask', '{"text":"Three","route":"fast"}');
+    perform public.create_intent('20000000-0000-4000-8000-000000000007', 'Plan Rome in April',
+      'travel', jsonb_build_array(jsonb_build_object('op', 'insert_object',
+        'id', '20000000-0000-4000-8000-000000000008', 'kind', 'trip', 'kindVersion', 1,
+        'title', 'Rome', 'status', null,
+        'data', '{"destinations":["Rome"],"currency":"EUR"}'::jsonb,
+        'source', '{"type":"user"}'::jsonb, 'position', null, 'origin', 'direct')));
+
+    begin
+      perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1',
+        '20000000-0000-4000-8000-000000000007', 'ask', '{"text":"Four","route":"fast"}');
+      assert false, 'a fourth working run is refused';
+    exception when sqlstate 'NXU14' then
+      null;
+    end;
+
+    raise exception 'undo' using errcode = 'P0099';
+  exception when sqlstate 'P0099' then
+    null;
+  end;
+
+  assert not exists (select 1 from public.runs), 'the cap check left nothing behind';
+end $$;
+
 -- The user starts a run. Only the worker may claim, record or finish it.
 do $$
 declare
   made jsonb;
 begin
-  made := public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+  made := public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
     '{"text":"Make it slower","route":"reasoning","perception":"model"}');
   assert made ->> 'status' = 'queued', 'a new run is queued';
   assert (made ->> 'attempts')::int = 0 and made ->> 'lease_id' is null, 'nobody holds it yet';
   perform set_config('smoke.run', made ->> 'id', true);
 
   begin
-    perform public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
       '{"text":"Again","route":"edit","perception":"model"}');
     assert false, 'a second active run is refused';
   exception when sqlstate 'NXU12' then
@@ -170,7 +246,7 @@ begin
   assert made ->> 'finished_at' is null, 'a stopping run has not finished';
 
   begin
-    perform public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
       '{"text":"Too soon","route":"edit","perception":"model"}');
     assert false, 'no new run while one is stopping';
   exception when sqlstate 'NXU12' then
@@ -224,7 +300,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
-select set_config('smoke.run', public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+select set_config('smoke.run', public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Stop this one too","route":"edit","perception":"model"}') ->> 'id', true);
 
 set local role service_role;
@@ -269,7 +345,7 @@ do $$
 declare
   made jsonb;
 begin
-  made := public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+  made := public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
     '{"text":"Never mind","route":"fast","perception":"model"}');
   perform set_config('smoke.run', made ->> 'id', true);
   made := public.cancel_run((made ->> 'id')::uuid);
@@ -291,7 +367,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
-select set_config('smoke.run', public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+select set_config('smoke.run', public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Lose me","route":"fast","perception":"model"}') ->> 'id', true);
 
 set local role service_role;
@@ -361,7 +437,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
-select set_config('smoke.run', public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+select set_config('smoke.run', public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Commit then vanish","route":"fast","perception":"model"}') ->> 'id', true);
 
 set local role service_role;
@@ -404,7 +480,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
-select set_config('smoke.run', public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+select set_config('smoke.run', public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Stop then vanish","route":"fast","perception":"model"}') ->> 'id', true);
 
 set local role service_role;
@@ -439,7 +515,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
-select set_config('smoke.run', public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+select set_config('smoke.run', public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Nobody came","route":"fast","perception":"model"}') ->> 'id', true);
 
 reset role;
@@ -461,7 +537,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
-select set_config('smoke.run', public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+select set_config('smoke.run', public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
   '{"text":"Left behind","route":"fast","perception":"model"}') ->> 'id', true);
 
 reset role;
@@ -529,7 +605,7 @@ begin
   assert foreign_run is null, 'RLS hides the other user''s runs';
 
   begin
-    perform public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+    perform public.smoke_queue_run('00000000-0000-4000-8000-0000000000c2', '20000000-0000-4000-8000-000000000001', 'ask',
       '{"text":"Not mine","route":"fast","perception":"model"}');
     assert false, 'no runs on another user''s intent';
   exception when sqlstate 'NXU04' then
@@ -567,7 +643,7 @@ do $$
 declare
   made jsonb;
 begin
-  made := public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+  made := public.smoke_queue_run('00000000-0000-4000-8000-0000000000c1', '20000000-0000-4000-8000-000000000001', 'ask',
     '{"text":"One more thing","route":"fast","perception":"model"}');
 
   begin

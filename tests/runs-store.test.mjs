@@ -20,7 +20,7 @@ import {
 } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { pgError, postgrest } from './support/graph-api.mjs';
-import { INTENT_ID, LEASE_ID, RUN_ID, runRow } from './support/graph.mjs';
+import { INTENT_ID, LEASE_ID, RUN_ID, runRow, USER_ID } from './support/graph.mjs';
 import { mockSupabaseAuth, signToken } from './support/supabase-auth.mjs';
 
 function client(t, handlers) {
@@ -41,9 +41,14 @@ test('createRun starts a run on the intent', async (t) => {
     },
   });
 
-  const run = await createRun(db, { intentId: INTENT_ID, kind: 'ask', input });
+  const run = await createRun(db, { userId: USER_ID, intentId: INTENT_ID, kind: 'ask', input });
 
-  assert.deepEqual(sent, { p_intent_id: INTENT_ID, p_kind: 'ask', p_input: input });
+  assert.deepEqual(sent, {
+    p_user_id: USER_ID,
+    p_intent_id: INTENT_ID,
+    p_kind: 'ask',
+    p_input: input,
+  });
   assert.equal(run.id, RUN_ID);
   assert.equal(run.status, 'queued');
   assert.deepEqual(run.input, input);
@@ -53,7 +58,7 @@ test('a second active run on one intent is refused', async (t) => {
   const db = client(t, { create_run: () => pgError('NXU12') });
 
   await assert.rejects(
-    createRun(db, { intentId: INTENT_ID, kind: 'ask', input }),
+    createRun(db, { userId: USER_ID, intentId: INTENT_ID, kind: 'ask', input }),
     (error) =>
       error instanceof ChangesetConflictError &&
       error.message === 'Nexui is still working on this plan.',
@@ -213,4 +218,46 @@ test('activeRunIntentIds finds intents with a recent active run', async (t) => {
   assert.deepEqual([...(await activeRunIntentIds(db, now))], [INTENT_ID]);
   assert.equal(asked.searchParams.get('status'), 'in.(queued,running,stopping)');
   assert.equal(asked.searchParams.get('created_at'), 'gte.2026-09-29T11:45:00.000Z');
+});
+
+test('a user with 3 runs working gets a 409 with its own message', async (t) => {
+  const db = client(t, { create_run: () => pgError('NXU14') });
+
+  await assert.rejects(
+    createRun(db, { userId: USER_ID, intentId: INTENT_ID, kind: 'ask', input }),
+    (error) =>
+      error instanceof ChangesetConflictError &&
+      error.message === 'Nexui is already working on a few of your plans. Try again in a minute.',
+  );
+});
+
+test('an unreadable claimed run fails on its own, and the rest of the batch still runs', async (t) => {
+  t.mock.method(console, 'error', () => {});
+
+  let finished;
+  const db = client(t, {
+    claim_runs: () => [
+      runRow({ id: 'c0000000-0000-4000-8000-000000000009', input: {}, lease_id: LEASE_ID }),
+      runRow({ lease_id: LEASE_ID }),
+    ],
+    run_finish: (args) => {
+      finished = args;
+
+      return runRow({ status: 'failed' });
+    },
+  });
+
+  const claimed = await claimRuns(db, {
+    runId: null,
+    limit: 10,
+    leaseSeconds: 330,
+    maxActive: 100,
+  });
+
+  assert.deepEqual(
+    claimed.map((item) => item.run.id),
+    [RUN_ID],
+  );
+  assert.equal(finished.p_run_id, 'c0000000-0000-4000-8000-000000000009');
+  assert.equal(finished.p_status, 'failed');
 });

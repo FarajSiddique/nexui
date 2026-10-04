@@ -23,6 +23,8 @@ export const RUN_STALE_MS = 15 * 60 * 1000;
 
 export const STALE_RUN_ERROR = 'This run stopped unexpectedly.';
 
+const UNREADABLE_RUN_ERROR = "Nexui couldn't finish this.";
+
 /** Tokens one model step used, added to `runs.model_usage`. */
 export interface RunUsage {
   inputTokens: number;
@@ -62,14 +64,16 @@ export function mapRunRow(row: unknown, now: Date = new Date()): RunRecord {
 }
 
 /**
- * Queues a run on one of the caller's intents, for a worker to claim. Throws a 409-mapped error
- * while another run works on the intent.
+ * Queues a run on one of the user's intents, for a worker to claim. `db` is the service-role
+ * client and `userId` the user the API verified. Throws a 409-mapped error while another run
+ * works on the intent, or while the user has 3 runs working.
  */
 export async function createRun(
   db: SupabaseClient,
-  run: { intentId: string; kind: RunKind; input: RunInput },
+  run: { userId: string; intentId: string; kind: RunKind; input: RunInput },
 ): Promise<RunRecord> {
   const { data, error } = await db.rpc('create_run', {
+    p_user_id: run.userId,
     p_intent_id: run.intentId,
     p_kind: run.kind,
     p_input: run.input,
@@ -110,10 +114,26 @@ export async function claimRuns(db: SupabaseClient, options: ClaimOptions): Prom
     throw mapRpcError(error);
   }
 
-  return ((data ?? []) as Row[]).map((row) => ({
-    run: mapRunRow(row),
-    leaseId: String(row.lease_id),
-  }));
+  const claimed: ClaimedRun[] = [];
+
+  // One unreadable row fails on its own, so it can't hold back the rest of the batch.
+  for (const row of (data ?? []) as Row[]) {
+    const leaseId = String(row.lease_id);
+
+    try {
+      claimed.push({ run: mapRunRow(row), leaseId });
+    } catch {
+      console.error('[runs]', 'A claimed run could not be read.');
+
+      try {
+        await finishRun(db, String(row.id), leaseId, 'failed', UNREADABLE_RUN_ERROR);
+      } catch {
+        console.error('[runs]', 'Could not record a failed run.');
+      }
+    }
+  }
+
+  return claimed;
 }
 
 /**
