@@ -70,6 +70,8 @@ Project subagents live in `.claude/agents/`. Reviewers report findings and never
 - `security-reviewer`: for changes to auth, env, logging, or API routes.
 - `docs-keeper`: after a behavior, contract, env, or command change; it edits docs.
 
+Project skills live in `.claude/skills/`. `/update-roadmap` brings the Notion roadmap in line with merged PRs: it applies status and notes changes itself and asks before adding items or changing the plan.
+
 ## Commit & Pull Request Guidelines
 
 Use concise imperative subjects. PRs should explain the change, list validation results, link relevant issues, and include screenshots for UI changes. Keep scope focused.
