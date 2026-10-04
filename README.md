@@ -112,7 +112,8 @@ URL reachable from the device is still required. Restart Expo after changing env
 
 Supabase and Google values are required for sign-in; the `.env.example` files list
 them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` lives only
-in `apps/api/.env.local`, where account deletion and the place media cache use it.
+in `apps/api/.env.local`, where AI runs, account deletion and the place media cache use it.
+`CRON_SECRET`, also API-only, authorizes Vercel's cron call to `GET /api/cron/runs`.
 `WIKIMEDIA_CONTACT` there is an email address or URL Wikimedia can reach us at; the stop
 details lookup sends it in its User-Agent, and leaving it empty turns lookups off.
 
@@ -123,7 +124,7 @@ the `.env.example` files are tracked. Turbo passes the AI settings (AI_PROVIDER,
 AI_GATEWAY_API_KEY and NEXUI_MODEL_*) and WIKIMEDIA_CONTACT only to the API dev task. Do not add Gateway keys to
 Expo configuration or any public environment variable.
 
-`GET /api/health` is public. The intent graph routes and `DELETE /api/account` require
+`GET /api/health` is public, and `GET /api/cron/runs` takes `Bearer <CRON_SECRET>`. The intent graph routes and `DELETE /api/account` require
 `Authorization: Bearer <Supabase access token>` and return 401 without one. They allow
 cross-origin requests for Expo web, and no cookies are involved.
 
@@ -143,6 +144,7 @@ apps/
     src/app/api/intents/       # GET, POST /api/intents; :id and :id/changesets
     src/app/api/events/        # POST /api/events/:id/undo
     src/app/api/changes/       # GET /api/changes
+    src/app/api/cron/runs/     # GET /api/cron/runs (Vercel Cron: reaps and starts AI runs)
     src/app/api/account/       # DELETE /api/account (deletes the signed-in user)
     src/lib/graph/             # applyChangeset, undo, snapshot loading, error mapping
     src/lib/kinds/             # Per-kind derivations (derive.trip)

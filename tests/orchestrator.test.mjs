@@ -4,11 +4,19 @@ import test from 'node:test';
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
 import { ChangesetInvalidError } from '../apps/api/src/lib/graph/errors.ts';
 import { startAsk, startIntent } from '../apps/api/src/lib/orchestrator/orchestrate.ts';
-import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
+import { getAdminClient, getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { captureRuns, failingEvaluationModel } from './support/ai.mjs';
 import { graphDb } from './support/graph-db.mjs';
-import { INTENT_ID, KYOTO_ID, RUN_ID, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import {
+  INTENT_ID,
+  KYOTO_ID,
+  LEASE_ID,
+  RUN_ID,
+  snapshotRow,
+  TRIP_ID,
+  USER_ID,
+} from './support/graph.mjs';
 import { mockSupabaseAuth, signToken } from './support/supabase-auth.mjs';
 
 const tripFixture = {
@@ -52,6 +60,17 @@ const askFixture = {
 };
 const fixtures = [tripFixture, jobFixture, askFixture];
 
+function orchestrator() {
+  const openSession = sessionOpener({ AI_PROVIDER: 'mock' }, fixtures);
+
+  return {
+    db: getUserClient(signToken()),
+    userId: USER_ID,
+    openSession,
+    worker: { db: getAdminClient(), openSession, maxActive: 100 },
+  };
+}
+
 function setup(t, row = null) {
   const fake = graphDb(row);
 
@@ -60,10 +79,7 @@ function setup(t, row = null) {
   return {
     fake,
     tasks: captureRuns(t),
-    deps: {
-      db: getUserClient(signToken()),
-      openSession: sessionOpener({ AI_PROVIDER: 'mock' }, fixtures),
-    },
+    deps: orchestrator(),
   };
 }
 
@@ -75,6 +91,7 @@ test('a trip goal is seeded at once and filled in by a run after the response', 
   assert.equal(started.snapshot.intent.template, 'travel');
   assert.equal(fake.state.created.p_template, 'travel');
   assert.deepEqual(fake.state.createdRun, {
+    p_user_id: USER_ID,
     p_intent_id: started.snapshot.intent.id,
     p_kind: 'create_intent',
     p_input: {
@@ -90,12 +107,18 @@ test('a trip goal is seeded at once and filled in by a run after the response', 
   );
   assert.equal(tasks.length, 1);
 
+  assert.equal(fake.state.claims.length, 0);
+
   await tasks[0]();
 
+  assert.deepEqual(fake.state.claims, [
+    { p_run_id: RUN_ID, p_limit: 1, p_lease_seconds: 330, p_max_active: 100 },
+  ]);
   assert.deepEqual(
     fake.state.snapshot.objects.filter((object) => object.kind === 'place').map((p) => p.title),
     ['Lisbon'],
   );
+  assert.equal(fake.state.applied[0].p_lease_id, LEASE_ID);
   assert.equal(fake.state.finished.p_status, 'succeeded');
 });
 
@@ -107,10 +130,7 @@ test('a trip whose run cannot start is discarded, and the error stands', async (
   mockSupabaseAuth(t, fake.fetch);
 
   const tasks = captureRuns(t);
-  const deps = {
-    db: getUserClient(signToken()),
-    openSession: sessionOpener({ AI_PROVIDER: 'mock' }, fixtures),
-  };
+  const deps = orchestrator();
 
   await assert.rejects(startIntent(deps, 'A test trip to Lisbon'));
   assert.deepEqual(fake.state.discarded, { p_intent_id: fake.state.created.p_intent_id });

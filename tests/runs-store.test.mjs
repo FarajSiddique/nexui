@@ -1,20 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ChangesetConflictError, GraphNotFoundError } from '../apps/api/src/lib/graph/errors.ts';
+import {
+  ChangesetConflictError,
+  GraphNotFoundError,
+  RunLeaseLostError,
+} from '../apps/api/src/lib/graph/errors.ts';
 import {
   activeRunIntentIds,
   cancelRun,
+  claimRuns,
   createRun,
   finishRun,
   getRun,
   mapRunRow,
+  reapRuns,
   recordRunStep,
   STALE_RUN_ERROR,
 } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { pgError, postgrest } from './support/graph-api.mjs';
-import { INTENT_ID, RUN_ID, runRow } from './support/graph.mjs';
+import { INTENT_ID, LEASE_ID, RUN_ID, runRow, USER_ID } from './support/graph.mjs';
 import { mockSupabaseAuth, signToken } from './support/supabase-auth.mjs';
 
 function client(t, handlers) {
@@ -35,9 +41,14 @@ test('createRun starts a run on the intent', async (t) => {
     },
   });
 
-  const run = await createRun(db, { intentId: INTENT_ID, kind: 'ask', input });
+  const run = await createRun(db, { userId: USER_ID, intentId: INTENT_ID, kind: 'ask', input });
 
-  assert.deepEqual(sent, { p_intent_id: INTENT_ID, p_kind: 'ask', p_input: input });
+  assert.deepEqual(sent, {
+    p_user_id: USER_ID,
+    p_intent_id: INTENT_ID,
+    p_kind: 'ask',
+    p_input: input,
+  });
   assert.equal(run.id, RUN_ID);
   assert.equal(run.status, 'queued');
   assert.deepEqual(run.input, input);
@@ -47,7 +58,7 @@ test('a second active run on one intent is refused', async (t) => {
   const db = client(t, { create_run: () => pgError('NXU12') });
 
   await assert.rejects(
-    createRun(db, { intentId: INTENT_ID, kind: 'ask', input }),
+    createRun(db, { userId: USER_ID, intentId: INTENT_ID, kind: 'ask', input }),
     (error) =>
       error instanceof ChangesetConflictError &&
       error.message === 'Nexui is still working on this plan.',
@@ -57,7 +68,7 @@ test('a second active run on one intent is refused', async (t) => {
 test('recordRunStep sends the entries and usage and returns the status', async (t) => {
   const sent = [];
   const db = client(t, {
-    record_run_step: (args) => {
+    run_record_step: (args) => {
       sent.push(args);
 
       return sent.length === 1 ? 'running' : 'cancelled';
@@ -73,18 +84,61 @@ test('recordRunStep sends the entries and usage and returns the status', async (
   };
   const usage = { inputTokens: 10, outputTokens: 2, model: 'anthropic/claude-haiku-4.5' };
 
-  assert.equal(await recordRunStep(db, RUN_ID, [entry], usage), 'running');
-  assert.equal(await recordRunStep(db, RUN_ID, [], null), 'cancelled');
+  assert.equal(await recordRunStep(db, RUN_ID, LEASE_ID, [entry], usage), 'running');
+  assert.equal(await recordRunStep(db, RUN_ID, LEASE_ID, [], null), 'cancelled');
   assert.deepEqual(sent, [
-    { p_run_id: RUN_ID, p_entries: [entry], p_usage: usage },
-    { p_run_id: RUN_ID, p_entries: [], p_usage: {} },
+    { p_run_id: RUN_ID, p_lease_id: LEASE_ID, p_entries: [entry], p_usage: usage },
+    { p_run_id: RUN_ID, p_lease_id: LEASE_ID, p_entries: [], p_usage: {} },
   ]);
+});
+
+test('a write with a lease that moved on throws RunLeaseLostError', async (t) => {
+  const db = client(t, { run_record_step: () => pgError('NXU13') });
+
+  await assert.rejects(
+    recordRunStep(db, RUN_ID, LEASE_ID, [], null),
+    (error) => error instanceof RunLeaseLostError,
+  );
+});
+
+test('claimRuns sends the claim and returns each run with its lease', async (t) => {
+  let sent;
+  const db = client(t, {
+    claim_runs: (args) => {
+      sent = args;
+
+      return [runRow({ lease_id: LEASE_ID, attempts: 1 })];
+    },
+  });
+
+  const claimed = await claimRuns(db, {
+    runId: null,
+    limit: 10,
+    leaseSeconds: 330,
+    maxActive: 100,
+  });
+
+  assert.deepEqual(sent, {
+    p_run_id: null,
+    p_limit: 10,
+    p_lease_seconds: 330,
+    p_max_active: 100,
+  });
+  assert.equal(claimed.length, 1);
+  assert.equal(claimed[0].run.id, RUN_ID);
+  assert.equal(claimed[0].leaseId, LEASE_ID);
+});
+
+test('reapRuns returns how many runs it settled', async (t) => {
+  const db = client(t, { reap_runs: () => 3 });
+
+  assert.equal(await reapRuns(db), 3);
 });
 
 test('finishRun and cancelRun return the run as it now is', async (t) => {
   let finished;
   const db = client(t, {
-    finish_run: (args) => {
+    run_finish: (args) => {
       finished = args;
 
       return runRow({
@@ -96,10 +150,11 @@ test('finishRun and cancelRun return the run as it now is', async (t) => {
     cancel_run: () => runRow({ status: 'cancelled', finished_at: new Date().toISOString() }),
   });
 
-  const failed = await finishRun(db, RUN_ID, 'failed', "Nexui couldn't finish this.");
+  const failed = await finishRun(db, RUN_ID, LEASE_ID, 'failed', "Nexui couldn't finish this.");
 
   assert.deepEqual(finished, {
     p_run_id: RUN_ID,
+    p_lease_id: LEASE_ID,
     p_status: 'failed',
     p_error: "Nexui couldn't finish this.",
   });
@@ -125,10 +180,10 @@ test('getRun reads the caller’s run, or reports it missing', async (t) => {
   );
 });
 
-test('a run left queued, running or stopping for 6 minutes reads as failed', () => {
+test('a run left queued, running or stopping for 15 minutes reads as failed', () => {
   const now = new Date('2026-09-29T12:00:00Z');
-  const old = '2026-09-29T11:53:00Z';
-  const recent = '2026-09-29T11:55:00Z';
+  const old = '2026-09-29T11:44:00Z';
+  const recent = '2026-09-29T11:46:00Z';
 
   assert.deepEqual(
     (({ status, error }) => ({ status, error }))(
@@ -162,5 +217,47 @@ test('activeRunIntentIds finds intents with a recent active run', async (t) => {
 
   assert.deepEqual([...(await activeRunIntentIds(db, now))], [INTENT_ID]);
   assert.equal(asked.searchParams.get('status'), 'in.(queued,running,stopping)');
-  assert.equal(asked.searchParams.get('created_at'), 'gte.2026-09-29T11:54:00.000Z');
+  assert.equal(asked.searchParams.get('created_at'), 'gte.2026-09-29T11:45:00.000Z');
+});
+
+test('a user with 3 runs working gets a 409 with its own message', async (t) => {
+  const db = client(t, { create_run: () => pgError('NXU14') });
+
+  await assert.rejects(
+    createRun(db, { userId: USER_ID, intentId: INTENT_ID, kind: 'ask', input }),
+    (error) =>
+      error instanceof ChangesetConflictError &&
+      error.message === 'Nexui is already working on a few of your plans. Try again in a minute.',
+  );
+});
+
+test('an unreadable claimed run fails on its own, and the rest of the batch still runs', async (t) => {
+  t.mock.method(console, 'error', () => {});
+
+  let finished;
+  const db = client(t, {
+    claim_runs: () => [
+      runRow({ id: 'c0000000-0000-4000-8000-000000000009', input: {}, lease_id: LEASE_ID }),
+      runRow({ lease_id: LEASE_ID }),
+    ],
+    run_finish: (args) => {
+      finished = args;
+
+      return runRow({ status: 'failed' });
+    },
+  });
+
+  const claimed = await claimRuns(db, {
+    runId: null,
+    limit: 10,
+    leaseSeconds: 330,
+    maxActive: 100,
+  });
+
+  assert.deepEqual(
+    claimed.map((item) => item.run.id),
+    [RUN_ID],
+  );
+  assert.equal(finished.p_run_id, 'c0000000-0000-4000-8000-000000000009');
+  assert.equal(finished.p_status, 'failed');
 });
