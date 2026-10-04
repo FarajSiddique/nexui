@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/buttons';
@@ -42,8 +42,7 @@ export default function ComposeSheet(): ReactElement {
   const create = useCreateIntent();
   const ask = useAsk();
   const cancel = useCancelRun();
-  const sheet = useRef<View>(null);
-  const keyboard = useKeyboardOverlap(sheet);
+  const keyboardOverlap = useKeyboardOverlap();
 
   // A plan open underneath keeps its own Realtime channel, so the sheet only listens for a plan
   // it started.
@@ -104,11 +103,10 @@ export default function ComposeSheet(): ReactElement {
   };
 
   return (
-    <View
-      ref={sheet}
-      onLayout={keyboard.onLayout}
-      style={[styles.sheet, { paddingBottom: keyboard.overlap }]}
-    >
+    <View collapsable={false} style={[styles.sheet, { paddingBottom: keyboardOverlap }]}>
+      {/* With the collapsable root, this empty first child stops react-native-screens from
+          resizing the ScrollView under the composer (docs/architecture/mobile.md). */}
+      <View collapsable={false} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
