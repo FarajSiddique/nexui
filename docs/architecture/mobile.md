@@ -142,15 +142,15 @@ Once a run starts, `RunCard` (`apps/mobile/src/components/run-card.tsx`) streams
 elapsed time while active, one line per succeeded capability call (not per step — a step can make
 several calls) as it lands, and Stop, Retry or "See changes" depending on the run's status. After
 Stop, a running run shows **Stopping…** ("Nexui is saving the change it was making, then it
-stops.") with no Stop button until its last step commits, then Stopped. A run that succeeded keeps
-"See changes" as a secondary link. Closing the sheet doesn't stop the run — what it's written stays
-and can be undone from Changes.
+stops.") with no Stop button until its last step commits, then Stopped. A run that succeeded also
+offers "See changes" as a secondary link. Closing the sheet doesn't stop the run — what it's
+written stays and can be undone from Changes.
 
 After an ask about the plan underneath (the sheet was opened with `intentId`), `afterAsk`
 (`apps/mobile/src/lib/run-outcome.ts`, pure and unit-tested) picks the next step once the run has
 succeeded: **See the choice** when its progress has an `ok` `decision.propose` entry, otherwise
 **Back to plan**, which dismisses the sheet. A run that failed or stopped gets neither, only the
-RunCard's own buttons, and a new plan keeps "Open plan". Both buttons sit in the composer above
+RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer above
 the input, outside the scroll view, so they stay in view while the keyboard is up.
 
 **See the choice** sets `use-reveal-store.ts` (`revealOpenBand(intentId)`) and dismisses the sheet.

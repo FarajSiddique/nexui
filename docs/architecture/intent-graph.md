@@ -205,9 +205,7 @@ with the user's token, so RLS applies to everything it writes.
   - A run still queued, running or stopping 6 minutes after it was created (a function instance
     stops after 300 s) reads as failed ("This run stopped unexpectedly."), and stops blocking
     `create_run`.
-
-  Home shows "Drafting" on intents with a working run.
-
+  - Home shows "Drafting" on intents with a working run.
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
   correction; `reasoning` and the create run use `NEXUI_MODEL_REASONING` for up to 8 steps.
@@ -237,10 +235,9 @@ with the user's token, so RLS applies to everything it writes.
     trip's last stop when proposed; dropped when the trip has no stops or the option no place).
     An option with no place may instead name a stop already on the route in `extend` (stored as
     `extendPlaceId`), such as "Extra day in Tokyo"; a ref that names no stop on the route is
-    dropped, and an option can't do both. When the AI proposes during a run, the decision keeps
-    what the user asked as
-    `DecisionData.asked` (the run's request, cut to 300 characters without splitting an emoji),
-    which the card shows as _You asked "…"_.
+    dropped, and an option can't do both. When the AI proposes during a run, the decision stores
+    what the user asked as `DecisionData.asked` (the run's request, cut to 300 characters without
+    splitting an emoji), which the card shows as _You asked "…"_.
   - `decision.resolve` settles a decision in one changeset, so one Undo restores all of it. A
     pick sets `chosenOptionId`; leaving `optionId` out dismisses. On a pick, the days handed out
     are the trip's free days if above 0, else the option's `suggestedDays`, else 1. A chosen place
