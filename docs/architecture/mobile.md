@@ -181,6 +181,16 @@ succeeded: **See the choice** when its progress has an `ok` `decision.propose` e
 RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer above
 the input, outside the scroll view, so they stay in view while the keyboard is up.
 
+The sheet is an iOS form sheet (react-native-screens), which constrains two things. The composer
+clears the keyboard with `useKeyboardOverlap()` (`apps/mobile/src/lib/use-keyboard-overlap.ts`),
+which pads by the window height minus the keyboard's top edge and does not measure the sheet:
+Fabric's `measureInWindow` reads the shadow tree, which puts a form sheet at the top of the window
+wherever iOS draws it, so a measured overlap comes out short and the composer sits behind the
+keyboard. Android and web get 0. The sheet's root `View` is `collapsable={false}` with an empty
+`<View collapsable={false} />` as its first child; RNScreens stretches a ScrollView it finds among
+a form sheet's direct children or down its first-child chain to fill the sheet, which hides the
+body behind the composer. Keep both so the ScrollView stays at the height React lays out.
+
 **See the choice** sets `use-reveal-store.ts` (`revealOpenBand(intentId)`) and dismisses the sheet.
 The workspace screen watches the flag: once it is focused again and its Open band has been laid out
 (it measures the page and the band with `onLayout`, and waits out a 0×0 layout, which is what Expo

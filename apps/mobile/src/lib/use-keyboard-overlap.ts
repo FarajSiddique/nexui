@@ -1,15 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ComponentRef, type RefObject } from 'react';
-import { Keyboard, LayoutAnimation, Platform, View } from 'react-native';
-
-import { keyboardOverlap } from './keyboard-overlap';
-
-// A short ease for the correction measured after the keyboard has settled.
-const KEYBOARD_SETTLE_MS = 120;
-
-interface KeyboardOverlap {
-  onLayout: () => void;
-  overlap: number;
-}
+import { useEffect, useRef, useState } from 'react';
+import { Dimensions, Keyboard, LayoutAnimation, Platform } from 'react-native';
 
 function animateWithKeyboard(duration: number): void {
   if (duration > 0) {
@@ -21,59 +11,43 @@ function animateWithKeyboard(duration: number): void {
 }
 
 /**
- * Bottom padding that keeps a view's content above the iOS keyboard. Pass the view's ref, attach
- * `onLayout` to it and pad it by `overlap`. The view is measured in the window, so this works inside
- * a form sheet, which iOS moves and grows while the keyboard is up. Android and web get 0.
+ * Bottom padding that keeps a view's content above the iOS keyboard, for a view that reaches the
+ * bottom of the screen, like the + form sheet. The keyboard covers such a view by its whole
+ * visible height, so nothing is measured: Fabric's `measureInWindow` reads the shadow tree, which
+ * puts a form sheet at the top of the window wherever iOS draws it, so a measured overlap comes up
+ * short by the sheet's offset. Android and web get 0.
+ *
+ * @example On an 874pt screen with the keyboard's top at 546, the overlap is 328.
  */
-export function useKeyboardOverlap(
-  ref: RefObject<ComponentRef<typeof View> | null>,
-): KeyboardOverlap {
-  const keyboardTop = useRef<number | null>(null);
+export function useKeyboardOverlap(): number {
   const applied = useRef(0);
   const [overlap, setOverlap] = useState(0);
-
-  // Animates only a real change, so a no-op measurement can't leave an animation configured
-  // for some unrelated layout.
-  const apply = useCallback((next: number, duration: number) => {
-    if (next === applied.current) {
-      return;
-    }
-
-    applied.current = next;
-    animateWithKeyboard(duration);
-    setOverlap(next);
-  }, []);
-
-  const measure = useCallback(
-    (duration: number) => {
-      ref.current?.measureInWindow((_x, y, _width, height) => {
-        apply(keyboardOverlap({ y, height }, keyboardTop.current), duration);
-      });
-    },
-    [ref, apply],
-  );
-
-  const onLayout = useCallback(() => {
-    measure(0);
-  }, [measure]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') {
       return;
     }
 
+    // Animates only a real change, so a repeated keyboard frame can't leave an animation
+    // configured for some unrelated layout.
+    const apply = (next: number, duration: number): void => {
+      if (next === applied.current) {
+        return;
+      }
+
+      applied.current = next;
+      animateWithKeyboard(duration);
+      setOverlap(next);
+    };
+
     // keyboardWillChangeFrame also fires on show, so there's no keyboardWillShow listener.
-    // keyboardDidShow measures again once iOS has finished moving and growing the sheet.
     const subscriptions = [
       Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-        keyboardTop.current = event.endCoordinates.screenY;
-        measure(event.duration);
-      }),
-      Keyboard.addListener('keyboardDidShow', () => {
-        measure(KEYBOARD_SETTLE_MS);
+        const windowHeight = Dimensions.get('window').height;
+
+        apply(Math.max(windowHeight - event.endCoordinates.screenY, 0), event.duration);
       }),
       Keyboard.addListener('keyboardWillHide', (event) => {
-        keyboardTop.current = null;
         apply(0, event.duration);
       }),
     ];
@@ -81,7 +55,7 @@ export function useKeyboardOverlap(
     return () => {
       subscriptions.forEach((subscription) => subscription.remove());
     };
-  }, [measure, apply]);
+  }, []);
 
-  return { onLayout, overlap };
+  return overlap;
 }
