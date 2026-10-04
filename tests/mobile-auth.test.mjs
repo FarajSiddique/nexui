@@ -6,19 +6,32 @@ import {
   createAuthActions,
 } from '../apps/mobile/src/features/auth/auth-actions.ts';
 
+function appleCredential(overrides = {}) {
+  return {
+    idToken: 'apple-id-token',
+    nonce: 'raw-nonce',
+    givenName: null,
+    familyName: null,
+    authorizationCode: 'apple-code',
+    ...overrides,
+  };
+}
+
 function setup(t, overrides = {}) {
   const auth = {
     signInWithOtp: t.mock.fn(async () => ({ data: {}, error: null })),
     verifyOtp: t.mock.fn(async () => ({ data: {}, error: null })),
     signInWithIdToken: t.mock.fn(async () => ({ data: {}, error: null })),
     signOut: t.mock.fn(async () => ({ error: null })),
+    updateUser: t.mock.fn(async () => ({ data: {}, error: null })),
     ...overrides,
   };
   const google = {
     getIdToken: t.mock.fn(async () => 'google-id-token'),
     signOut: t.mock.fn(async () => {}),
   };
-  return { auth, google, actions: createAuthActions(auth, google) };
+  const apple = { getCredential: t.mock.fn(async () => appleCredential()) };
+  return { auth, google, apple, actions: createAuthActions(auth, google, apple) };
 }
 
 test('email requests normalize the address and allow account creation', async (t) => {
@@ -124,4 +137,94 @@ test('deleted-account cleanup uses local sign-out only', async (t) => {
   await actions.clearDeletedAccount();
   assert.equal(auth.signOut.mock.callCount(), 1);
   assert.deepEqual(auth.signOut.mock.calls[0].arguments, [{ scope: 'local' }]);
+});
+
+test('Apple cancellation exchanges nothing', async (t) => {
+  const { actions, auth, apple } = setup(t);
+  apple.getCredential.mock.mockImplementation(async () => null);
+  assert.equal(await actions.signInWithApple(), false);
+  assert.equal(auth.signInWithIdToken.mock.callCount(), 0);
+  assert.equal(auth.updateUser.mock.callCount(), 0);
+});
+
+test('Apple sign-in exchanges the ID token with the raw nonce', async (t) => {
+  const { actions, auth } = setup(t);
+  assert.equal(await actions.signInWithApple(), true);
+  assert.deepEqual(auth.signInWithIdToken.mock.calls[0].arguments, [
+    { provider: 'apple', token: 'apple-id-token', nonce: 'raw-nonce' },
+  ]);
+});
+
+test('Apple’s first sign-in saves the name to user metadata', async (t) => {
+  const { actions, auth, apple } = setup(t);
+  apple.getCredential.mock.mockImplementation(async () =>
+    appleCredential({ givenName: 'Ada', familyName: 'Lovelace' }),
+  );
+  assert.equal(await actions.signInWithApple(), true);
+  assert.deepEqual(auth.updateUser.mock.calls[0].arguments, [
+    { data: { full_name: 'Ada Lovelace', given_name: 'Ada', family_name: 'Lovelace' } },
+  ]);
+});
+
+test('a given name alone still sets the full name', async (t) => {
+  const { actions, auth, apple } = setup(t);
+  apple.getCredential.mock.mockImplementation(async () => appleCredential({ givenName: 'Ada' }));
+  await actions.signInWithApple();
+  assert.deepEqual(auth.updateUser.mock.calls[0].arguments, [
+    { data: { full_name: 'Ada', given_name: 'Ada' } },
+  ]);
+});
+
+test('no name, or a blank one, saves nothing', async (t) => {
+  const { actions, auth, apple } = setup(t);
+  await actions.signInWithApple();
+  apple.getCredential.mock.mockImplementation(async () =>
+    appleCredential({ givenName: '  ', familyName: '' }),
+  );
+  await actions.signInWithApple();
+  assert.equal(auth.signInWithIdToken.mock.callCount(), 2);
+  assert.equal(auth.updateUser.mock.callCount(), 0);
+});
+
+test('a failing or throwing name update still signs in', async (t) => {
+  const named = async () => appleCredential({ givenName: 'Ada', familyName: 'Lovelace' });
+  for (const updateUser of [
+    async () => ({ data: {}, error: new Error('metadata failed') }),
+    async () => {
+      throw new Error('offline');
+    },
+  ]) {
+    const { actions, apple } = setup(t, { updateUser });
+    apple.getCredential.mock.mockImplementation(named);
+    assert.equal(await actions.signInWithApple(), true);
+  }
+});
+
+test('Apple exchange errors become the generic message and save no name', async (t) => {
+  const { actions, auth, apple } = setup(t, {
+    signInWithIdToken: async () => ({ error: new Error('provider internals') }),
+  });
+  apple.getCredential.mock.mockImplementation(async () => appleCredential({ givenName: 'Ada' }));
+  await assert.rejects(actions.signInWithApple, { message: 'Apple sign-in failed. Try again.' });
+  assert.equal(auth.updateUser.mock.callCount(), 0);
+});
+
+test('the deletion confirmation returns Apple’s code, or null when cancelled', async (t) => {
+  const { actions, auth, apple } = setup(t);
+  assert.equal(await actions.getAppleDeletionCode(), 'apple-code');
+  apple.getCredential.mock.mockImplementation(async () => null);
+  assert.equal(await actions.getAppleDeletionCode(), null);
+  assert.equal(auth.signInWithIdToken.mock.callCount(), 0);
+});
+
+test('when Apple can’t confirm, deletion goes ahead without a code', async (t) => {
+  const { actions, apple } = setup(t);
+  apple.getCredential.mock.mockImplementation(async () =>
+    appleCredential({ authorizationCode: null }),
+  );
+  assert.equal(await actions.getAppleDeletionCode(), undefined);
+  apple.getCredential.mock.mockImplementation(async () => {
+    throw new AuthActionError('Apple sign-in failed. Try again.');
+  });
+  assert.equal(await actions.getAppleDeletionCode(), undefined);
 });

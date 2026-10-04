@@ -5,7 +5,7 @@
 This pnpm/Turborepo monorepo contains four private workspaces:
 
 - `apps/mobile/src/app/`: Expo Router screens and root layout, routes only. Each area's components, helpers and Zustand stores live in `src/features/<area>/`; shared building blocks in `src/ui/`, palettes and appearance in `src/theme/`, API, Supabase and query code in `src/data/`, shared pure helpers in `src/lib/` (see "Where code lives" in `docs/architecture/mobile.md`).
-- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, templates in `src/lib/templates/`, and the place media lookup and cache in `src/lib/media/` (see `docs/architecture/place-media.md`); Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
+- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, templates in `src/lib/templates/`, the place media lookup and cache in `src/lib/media/` (see `docs/architecture/place-media.md`), account deletion in `src/lib/account/`, and Apple token revocation in `src/lib/apple/`; Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
 - `packages/types/src/`: shared Zod schemas and inferred TypeScript contracts, imported through `@nexui/types`.
 - `packages/config/`: strict TypeScript defaults, shared ESLint rules, and Prettier configuration.
 - `supabase/migrations/`: Postgres schema, RLS and the graph functions (see `docs/architecture/intent-graph.md`; the `place_media` cache and the `place-photos` bucket are in `docs/architecture/place-media.md`).
@@ -73,4 +73,4 @@ Use concise imperative subjects. PRs should explain the change, list validation 
 
 ## Security & Configuration
 
-Copy app-local `.env.example` files; never commit secrets. Both `EXPO_PUBLIC_*` and `NEXT_PUBLIC_*` are public. Physical devices need the computer's LAN IP in `EXPO_PUBLIC_API_URL`. Supabase and Google credentials are required for sign-in (see `docs/specs/auth.md`). Only the publishable key goes in the mobile app; `SUPABASE_SECRET_KEY` stays in the API.
+Copy app-local `.env.example` files; never commit secrets. Both `EXPO_PUBLIC_*` and `NEXT_PUBLIC_*` are public. Physical devices need the computer's LAN IP in `EXPO_PUBLIC_API_URL`. Supabase, Google and Apple credentials are required for sign-in (see `docs/specs/auth.md`). Only the publishable key goes in the mobile app; `SUPABASE_SECRET_KEY` stays in the API.

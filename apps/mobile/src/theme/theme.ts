@@ -31,6 +31,10 @@ const light = {
   skyGlow: 'rgba(255, 228, 92, 0.22)',
   skyDetail: '#FFFFFF', // clouds, or stars in dark
   skyCrater: 'rgba(30, 26, 43, 0.14)',
+  // Sign in with Apple and Google buttons: the colors both brands allow, matched to each other.
+  providerFill: '#FFFFFF',
+  providerLine: '#747775',
+  providerInk: '#000000',
   photoScrim: 'rgba(30, 26, 43, 0.72)', // behind text and buttons drawn on a photo, both schemes
   photoInk: '#FFFFFF', // text on photoScrim
 } as const;
@@ -67,6 +71,9 @@ const dark: Palette = {
   skyGlow: 'rgba(236, 232, 245, 0.06)',
   skyDetail: '#F2EFF8',
   skyCrater: 'rgba(30, 26, 43, 0.14)',
+  providerFill: '#131314',
+  providerLine: '#8E918F',
+  providerInk: '#FFFFFF',
   photoScrim: 'rgba(30, 26, 43, 0.72)',
   photoInk: '#FFFFFF',
 };
