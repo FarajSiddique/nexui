@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
+import { readRows } from '../apps/api/src/lib/media/cache.ts';
 import { mediaPlaces, resolvePlaceMedia } from '../apps/api/src/lib/media/lookup.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { placeMediaKey } from '../packages/types/src/media.ts';
@@ -433,4 +434,18 @@ test('a throttled image download holds back the rest of the request like a throt
     assert.equal(row.status, 'failed');
     assert.equal(row.expires_at, new Date(NOW.getTime() + 3_600_000).toISOString());
   }
+});
+
+test('the cache is read at most 100 keys per query', async (t) => {
+  const upstream = mediaUpstream({ rows: [cacheRow('k 150')] });
+
+  t.mock.method(globalThis, 'fetch', upstream.handler);
+
+  const rows = await readRows(
+    adminDb(),
+    Array.from({ length: 250 }, (_, index) => `k ${index}`),
+  );
+
+  assert.equal(upstream.state.reads, 3);
+  assert.deepEqual([...rows.keys()], ['k 150']);
 });

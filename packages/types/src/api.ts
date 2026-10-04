@@ -7,6 +7,7 @@ import {
   intentSummarySchema,
   templateSchema,
 } from './graph.ts';
+import { storageUrlSchema } from './media.ts';
 import { userOpSchema } from './ops.ts';
 import { capabilityNameSchema, fitsFreeJson, idSchema, timestampSchema } from './primitives.ts';
 import { runRouteSchema } from './runs.ts';
@@ -30,6 +31,8 @@ export const intentListItemSchema = z.object({
   status: intentStatusSchema,
   summary: intentSummarySchema,
   lastActivityAt: timestampSchema,
+  // The 500px photos of the plan's first three stops that have one, from the media cache.
+  photos: z.array(storageUrlSchema).max(3),
 });
 
 export const intentListResponseSchema = z.object({ items: z.array(intentListItemSchema) });

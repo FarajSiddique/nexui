@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   applyOps,
   formatDateRange,
+  placeMediaKey,
   tripFigures,
   tripParts,
   type ChangesetOp,
@@ -317,10 +318,15 @@ function tripSummary(
   }
 
   if (places.length > 0) {
-    summary.strip = places.slice(0, 12).map((place) => ({
-      label: (place.data as PlaceData).name.slice(0, 100),
-      ai: place.source?.type === 'ai' && !place.source.reviewedAt,
-    }));
+    summary.strip = places.slice(0, 12).map((place) => {
+      const data = place.data as PlaceData;
+
+      return {
+        label: data.name.slice(0, 100),
+        ai: place.source?.type === 'ai' && !place.source.reviewedAt,
+        key: placeMediaKey(data),
+      };
+    });
   }
 
   return summary;

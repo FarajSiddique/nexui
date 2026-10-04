@@ -7,9 +7,10 @@ import {
 import { sessionOpener } from '#lib/ai';
 import { graphErrorResponse, listIntents } from '#lib/graph';
 import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
+import { withHomePhotos } from '#lib/media';
 import { startIntent } from '#lib/orchestrator';
 import { runWorker } from '#lib/runs';
-import { getUserClient, verifyRequest } from '#lib/supabase';
+import { getAdminClient, getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET', 'POST'], ['Authorization', 'Content-Type']);
 
@@ -20,7 +21,7 @@ export function OPTIONS(): Response {
   return preflight(headers);
 }
 
-/** Home's cards. */
+/** Home's cards, with their stops' cached photos. */
 export async function GET(request: Request): Promise<Response> {
   const user = await verifyRequest(request, headers);
 
@@ -29,7 +30,9 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const items = await listIntents(getUserClient(user.accessToken));
+    const listed = await listIntents(getUserClient(user.accessToken));
+    // The user's own summaries name the keys; the secret-key client reads the shared cache.
+    const items = await withHomePhotos(getAdminClient(), listed);
 
     return Response.json(intentListResponseSchema.parse({ items }), { headers });
   } catch (error) {

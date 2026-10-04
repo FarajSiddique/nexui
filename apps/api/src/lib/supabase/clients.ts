@@ -42,8 +42,8 @@ export function getAuthClient(env: Env = process.env): SupabaseClient {
 }
 
 // Bypasses row-level security. Only use it for account deletion, the run worker, whose
-// database functions scope every write to the run it holds, and the shared place media cache,
-// after the route has checked the caller owns the plan.
+// database functions scope every write to the run it holds, and the shared place media cache
+// and its photo bucket, after the route has loaded the caller's own plans.
 export function getAdminClient(env: Env = process.env): SupabaseClient {
   const key = env.SUPABASE_SECRET_KEY?.trim();
 
