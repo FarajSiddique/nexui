@@ -11,6 +11,7 @@ These rules add to the root `AGENTS.md` for the Next.js API. Rules marked _(lint
   3. `safeParse` the body with a schema from `@nexui/types`. Respond with 400 and a user-safe message if it fails.
   4. Do the work, then `schema.parse` the response body before sending it.
 - Build responses with `src/lib/http/responses.ts`: `corsHeaders` once per route, `preflight` for `OPTIONS`, and `jsonError` for failures. Send the route's headers on every response.
+- Cron routes (`src/app/api/cron/`) are server to server: they start with `verifyCronRequest(request, headers)` instead of `verifyRequest`, send only `Cache-Control: no-store` (no CORS headers), and take no body.
 - Error bodies are always `{ error: string }`. The message must be safe to show a user, so never include provider errors, stack traces, or IDs.
 
 ## Errors and logging
