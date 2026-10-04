@@ -14,7 +14,7 @@ Work from the change the caller describes, or from `git diff HEAD` plus untracke
 ## Where docs live
 
 - `docs/architecture/*.md`: short guides to how a flow works now (e.g. `authentication.md`: "Follow an operation" flow, ownership, lifecycle).
-- `docs/specs/*.md`: setup and requirements (e.g. `auth.md` for Supabase and Google credentials).
+- `docs/specs/*.md`: setup and requirements (e.g. `auth.md` for Supabase, Google and Apple setup).
 - Root `AGENTS.md`: structure, commands, conventions. `apps/api/AGENTS.md`: API rules.
 - `README.md`, `apps/*/.env.example`: setup steps and env variables with one-line comments.
 

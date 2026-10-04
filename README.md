@@ -4,8 +4,8 @@ Nexui turns what you're trying to accomplish into a persistent object graph, ren
 workspace made of registered primitives. The first slice is travel: describe a trip, and Nexui
 keeps a graph of places, legs and decisions that every edit — yours or Nexui's — changes as one
 undoable changeset. See [Intent graph](docs/architecture/intent-graph.md) for how it works.
-Users sign in with Supabase Auth (emailed 6-digit code or native Google). Setup steps are in
-`docs/specs/auth.md`. For the current auth flow and ownership boundaries, see
+Users sign in with Supabase Auth (emailed 6-digit code, native Google, or Sign in with Apple on
+iOS). Setup steps are in `docs/specs/auth.md`. For the current auth flow and ownership boundaries, see
 [Authentication](docs/architecture/authentication.md).
 
 ## Requirements
@@ -13,7 +13,7 @@ Users sign in with Supabase Auth (emailed 6-digit code or native Google). Setup 
 - Node.js 24 LTS recommended (`nvm use`); minimum 22.13.
 - pnpm 10.34.5: `npm install --global pnpm@10.34.5`.
 - An EAS development build on the iOS Simulator or an Android device. Native Google
-  sign-in doesn't run in Expo Go (see `docs/specs/auth.md` A5). The web preview
+  and Apple sign-in don't run in Expo Go (see "EAS builds" in `docs/specs/auth.md`). The web preview
   supports email-code sign-in only.
 
 ## Start development
