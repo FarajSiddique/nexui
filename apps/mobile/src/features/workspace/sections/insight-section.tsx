@@ -1,13 +1,12 @@
-import type { GraphObject, InsightAction, InsightData } from '@nexui/types';
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import type { WorkspaceAction } from '@/features/workspace/workspace-actions';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { ActorAvatar } from '@/ui/actor-avatar';
-import { Button } from '@/ui/buttons';
+import type { GraphObject, InsightAction, InsightData } from '@nexui/types';
 
+import { fonts, createThemedStyles } from '#theme';
+import { ActorAvatar, Button } from '#ui';
+
+import type { WorkspaceAction } from '../workspace-actions';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 

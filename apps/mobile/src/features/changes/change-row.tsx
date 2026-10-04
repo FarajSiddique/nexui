@@ -1,11 +1,9 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import { formatRelative } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { ActorAvatar } from '@/ui/actor-avatar';
-import { Button } from '@/ui/buttons';
+import { formatRelative } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
+import { ActorAvatar, Button } from '#ui';
 
 import type { ChangeRow } from './change-feed';
 

@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 import { Text } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { fonts, createThemedStyles } from '#theme';
 
 interface FormMessageProps {
   message: string | null;

@@ -4,22 +4,11 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  isDrafting,
-  useDeleteIntent,
-  useIntents,
-  usePlanDeletes,
-  useRecentChanges,
-} from '@/data/queries';
-import { buildChangeRows } from '@/features/changes/change-feed';
-import { ChangeRowView } from '@/features/changes/change-row';
-import { ConnectionBanner } from '@/features/home/connection-banner';
-import { IntentCard } from '@/features/home/intent-card';
-import { SwipeToDelete } from '@/features/home/swipe-to-delete';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { ListEmpty, ListError, RefetchNotice, SkeletonRows } from '@/ui/list-states';
-import { HeaderButton, TabHeader } from '@/ui/tab-header';
+import { isDrafting, useDeleteIntent, useIntents, usePlanDeletes, useRecentChanges } from '#data';
+import { fonts, createThemedStyles } from '#theme';
+import { ListEmpty, ListError, RefetchNotice, SkeletonRows, HeaderButton, TabHeader } from '#ui';
+import { buildChangeRows, ChangeRowView } from '#features/changes';
+import { ConnectionBanner, IntentCard, SwipeToDelete } from '#features/home';
 
 /**
  * Home: every plan as a card, then the latest three changes. The gear opens Account. Swiping a

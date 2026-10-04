@@ -1,6 +1,6 @@
 import type { MapStyleElement } from 'react-native-maps';
 
-import type { Palette } from '@/theme/theme';
+import type { Palette } from '#theme';
 
 /** Android's dark map, drawn with the theme's tokens. iOS follows `userInterfaceStyle`. */
 export function darkMapStyle(colors: Palette): MapStyleElement[] {

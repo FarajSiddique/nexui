@@ -1,9 +1,9 @@
-import type { GraphSnapshot, Section } from '@nexui/types';
 import type { ComponentType, ReactElement } from 'react';
 
-import type { WorkspaceAction } from '@/features/workspace/workspace-actions';
-import type { SectionDataOf, SectionEntry } from '@/features/workspace/workspace-layout';
+import type { GraphSnapshot, Section } from '@nexui/types';
 
+import type { WorkspaceAction } from '../workspace-actions';
+import type { SectionDataOf, SectionEntry } from '../workspace-layout';
 import { AllocationSection } from './allocation-section';
 import { ComparisonSection } from './comparison-section';
 import { DecisionSection } from './decision-section';

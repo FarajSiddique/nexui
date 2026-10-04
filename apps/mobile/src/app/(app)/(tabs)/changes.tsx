@@ -3,19 +3,16 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useChangesFeed, useUndo } from '@/data/queries';
+import { useChangesFeed, useUndo } from '#data';
+import { fonts, createThemedStyles, useColors } from '#theme';
+import { Button, ListEmpty, ListError, RefetchNotice, SkeletonRows, TabHeader } from '#ui';
 import {
   buildChangeRows,
   filterRows,
   groupByDay,
   type ChangeFilter,
-} from '@/features/changes/change-feed';
-import { ChangeRowView } from '@/features/changes/change-row';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
-import { Button } from '@/ui/buttons';
-import { ListEmpty, ListError, RefetchNotice, SkeletonRows } from '@/ui/list-states';
-import { TabHeader } from '@/ui/tab-header';
+  ChangeRowView,
+} from '#features/changes';
 
 const FILTERS: { value: ChangeFilter; label: string }[] = [
   { value: 'all', label: 'All' },

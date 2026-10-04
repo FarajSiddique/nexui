@@ -1,9 +1,8 @@
 import type { ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { useHealth } from '@/data/use-health';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { useHealth } from '#data';
+import { fonts, createThemedStyles } from '#theme';
 
 // Shown under a tab's header only while the server is unreachable; it goes on recovery.
 export function ConnectionBanner(): ReactElement | null {

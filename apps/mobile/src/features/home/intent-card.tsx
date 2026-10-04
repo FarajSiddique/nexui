@@ -1,11 +1,10 @@
-import type { IntentListItem } from '@nexui/types';
 import { Fragment, type ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { AiText } from '@/ui/ai-text';
-import { Pill } from '@/ui/pill';
+import type { IntentListItem } from '@nexui/types';
+
+import { fonts, createThemedStyles } from '#theme';
+import { AiText, Pill } from '#ui';
 
 /**
  * A plan on Home: its goal, badge, summary line and a mini route of its stops. With `onDelete`,

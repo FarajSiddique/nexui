@@ -2,9 +2,7 @@ import type { ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { cubicBezier, useReducedMotion } from 'react-native-reanimated';
 
-import { fonts } from '@/theme/theme';
-import { setAppearance, useAppearanceStore } from '@/theme/use-appearance-store';
-import { createThemedStyles, useScheme } from '@/theme/use-theme';
+import { fonts, setAppearance, useAppearanceStore, createThemedStyles, useScheme } from '#theme';
 
 const TRACK_WIDTH = 116;
 const TRACK_HEIGHT = 52;

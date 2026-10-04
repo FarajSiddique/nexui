@@ -1,16 +1,16 @@
-import type { GraphObject, LegData, PlaceData } from '@nexui/types';
 import type { ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { aiMarkFor } from '@/features/workspace/ai-mark';
-import { rememberDays, useEditMemoryStore } from '@/features/workspace/use-edit-memory-store';
-import { MAX_PLACE_DAYS } from '@/features/workspace/workspace-actions';
-import type { RouteStop, SectionDataOf } from '@/features/workspace/workspace-layout';
-import { formatDays, formatHours, formatMoney, placeName } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { AiText } from '@/ui/ai-text';
+import type { GraphObject, LegData, PlaceData } from '@nexui/types';
 
+import { formatDays, formatHours, formatMoney, placeName } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
+import { AiText } from '#ui';
+
+import { aiMarkFor } from '../ai-mark';
+import { rememberDays, useEditMemoryStore } from '../use-edit-memory-store';
+import { MAX_PLACE_DAYS } from '../workspace-actions';
+import type { RouteStop, SectionDataOf } from '../workspace-layout';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 

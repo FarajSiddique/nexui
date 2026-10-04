@@ -1,11 +1,10 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import type { MetricValue } from '@/features/workspace/workspace-layout';
-import { formatMoney } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { formatMoney } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
 
+import type { MetricValue } from '../workspace-layout';
 import type { SectionProps } from './types';
 
 function metricText(metric: MetricValue): string {

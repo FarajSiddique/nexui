@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "main": "expo-router/entry",
+  "imports": {
+    "#data": "./src/data/index.ts",
+    "#features/*": "./src/features/*/index.ts",
+    "#lib": "./src/lib/index.ts",
+    "#theme": "./src/theme/index.ts",
+    "#ui": "./src/ui/index.ts"
+  },
   "scripts": {
     "dev": "expo start --port 8081",
     "android": "expo start --android",

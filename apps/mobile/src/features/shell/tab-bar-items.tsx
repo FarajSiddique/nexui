@@ -2,8 +2,8 @@ import { router } from 'expo-router';
 import type { ReactElement } from 'react';
 import { Pressable, View, type ColorValue } from 'react-native';
 
-import { useFocusedIntentStore } from '@/features/workspace/use-focused-intent-store';
-import { createThemedStyles } from '@/theme/use-theme';
+import { createThemedStyles } from '#theme';
+import { useFocusedIntentStore } from '#features/workspace';
 
 /** The tab bar's height above the bottom safe area. */
 export const TAB_BAR_HEIGHT = 64;

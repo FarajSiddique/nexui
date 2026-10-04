@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 import { Text, View, type StyleProp, type TextStyle } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { fonts, createThemedStyles } from '#theme';
 
 /** The small yellow "Nexui" tag. */
 export function NexuiTag({ label = 'Nexui' }: { label?: string }): ReactElement {

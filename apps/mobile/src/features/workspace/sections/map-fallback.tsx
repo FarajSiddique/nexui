@@ -1,11 +1,10 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import type { MapPin } from '@/features/workspace/workspace-layout';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { AiText } from '@/ui/ai-text';
+import { fonts, createThemedStyles } from '#theme';
+import { AiText } from '#ui';
 
+import type { MapPin } from '../workspace-layout';
 import { SectionFrame } from './section-frame';
 
 /** The route as an ordered list, where no native map is available (web, Android without a key). */

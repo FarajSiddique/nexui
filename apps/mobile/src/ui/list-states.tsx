@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { fonts, createThemedStyles } from '#theme';
 
 import type { Placement } from './placement';
 

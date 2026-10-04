@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { fonts, createThemedStyles, useColors } from '#theme';
 
 /** A summary badge: attention (accent), ok, or running (with a spinner). */
 export function Pill({

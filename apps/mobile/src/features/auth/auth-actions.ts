@@ -1,5 +1,6 @@
-import { emailCodeRequestSchema, emailCodeVerificationSchema } from '@nexui/types';
 import { isAuthApiError, type SupabaseClient } from '@supabase/supabase-js';
+
+import { emailCodeRequestSchema, emailCodeVerificationSchema } from '@nexui/types';
 
 type AuthClient = Pick<
   SupabaseClient['auth'],

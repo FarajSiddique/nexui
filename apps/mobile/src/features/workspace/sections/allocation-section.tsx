@@ -1,11 +1,10 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import type { SectionDataOf } from '@/features/workspace/workspace-layout';
-import { formatDays } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { formatDays } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
 
+import type { SectionDataOf } from '../workspace-layout';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 
