@@ -55,7 +55,7 @@ test('request 2 asks Commons for the 960px thumbnail and the credit metadata', a
   assert.equal(new Headers(init.headers).get('User-Agent'), `Nexui/1.0 (${CONTACT})`);
   assert.deepEqual(info, {
     thumbUrl:
-      'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Berlin.jpg/960px-Berlin.jpg',
+      'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Berlin.jpg/960px-Berlin.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail',
     thumbWidth: 960,
     thumbHeight: 640,
     pageUrl: 'https://commons.wikimedia.org/wiki/File:Berlin.jpg',

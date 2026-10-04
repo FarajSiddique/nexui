@@ -12,7 +12,8 @@ export const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0
 
 /**
  * A Commons imageinfo answer (formatversion 2) for one file, with a 960px thumbnail, a CC BY-SA
- * licence and Kasa Fue as the author. `overrides` replace fields of its `imageinfo` entry.
+ * licence and Kasa Fue as the author. Like the live API since 2026, the thumbnail is on
+ * thumb.wikimedia.org with a tracking query. `overrides` replace fields of its `imageinfo` entry.
  */
 export function fileInfoBody(file, overrides = {}) {
   return {
@@ -26,7 +27,7 @@ export function fileInfoBody(file, overrides = {}) {
           imagerepository: 'local',
           imageinfo: [
             {
-              thumburl: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${file}/960px-${file}`,
+              thumburl: `https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/${file}/960px-${file}?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail`,
               thumbwidth: 960,
               thumbheight: 640,
               url: `https://upload.wikimedia.org/wikipedia/commons/a/ab/${file}`,
@@ -135,7 +136,7 @@ export function mediaUpstream({
       return commons(url);
     }
 
-    if (url.hostname === 'upload.wikimedia.org') {
+    if (url.hostname === 'thumb.wikimedia.org' || url.hostname === 'upload.wikimedia.org') {
       state.downloads.push({ url, headers: new Headers(init.headers), redirect: init.redirect });
 
       return images(url);

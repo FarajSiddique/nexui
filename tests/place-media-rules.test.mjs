@@ -218,6 +218,13 @@ test('the Artist HTML becomes plain text of at most 120 characters', () => {
     'Jane & John Doe, own work',
   );
   assert.equal(plainText('Caf&#233; &#x263A; &bogus;'), 'Café ☺ &bogus;');
+  // Berlin's lead image, a derivative work: the source file's link goes, list items join.
+  assert.equal(
+    plainText(
+      '<ul><li><a href="//commons.wikimedia.org/wiki/File:Museumsinsel_Berlin_Juli_2021_1_(cropped).jpg" title="File:Museumsinsel Berlin Juli 2021 1 (cropped).jpg">File:Museumsinsel Berlin Juli 2021 1 (cropped).jpg</a>: <a href="//commons.wikimedia.org/wiki/User:Kasa_Fue" title="User:Kasa Fue">Kasa Fue</a></li>\n<li>derivative work: <a href="//commons.wikimedia.org/wiki/User:Georgfotoart" title="User:Georgfotoart">Georgfotoart</a></li></ul>',
+    ),
+    'Kasa Fue; derivative work: Georgfotoart',
+  );
 
   const long = plainText(`<b>${'name '.repeat(40)}</b>`);
 
@@ -262,6 +269,22 @@ test('request 2 gives a photo its two sizes and its credit', () => {
       license: 'Public domain',
       sourceUrl: 'https://commons.wikimedia.org/wiki/File:Berlin.jpg',
     },
+  );
+});
+
+test('a thumbnail on thumb.wikimedia.org is used without its tracking query', () => {
+  const thumb =
+    'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Museumsinsel_%28cropped%29.jpg/960px-Museumsinsel_%28cropped%29.jpg';
+  const source = photoSource(
+    fileInfo({
+      thumbUrl: `${thumb}?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail`,
+    }),
+  );
+
+  assert.equal(source.url, thumb);
+  assert.equal(
+    source.thumbUrl,
+    'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Museumsinsel_%28cropped%29.jpg/500px-Museumsinsel_%28cropped%29.jpg',
   );
 });
 

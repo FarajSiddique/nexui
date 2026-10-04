@@ -282,13 +282,16 @@ function decodeEntity(entity: string, name: string): string {
 
 /**
  * Commons' `Artist` HTML as plain text on one line, at most 120 characters: tags dropped and
- * entities decoded.
+ * entities decoded. A derivative work names its source file in a link; that link goes, and
+ * list items join with semicolons.
  *
  * @example
  * plainText('<a href="//commons.wikimedia.org/wiki/User:Kasa_Fue">Kasa Fue</a>') // 'Kasa Fue'
  */
 export function plainText(html: string): string {
   const text = html
+    .replace(/<a\b[^>]*href="[^"]*\/wiki\/File:[^"]*"[^>]*>.*?<\/a>\s*:?/gis, ' ')
+    .replace(/<\/li>\s*<li\b[^>]*>/gi, '; ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => decodeEntity(entity, name))
     .replace(/\s+/g, ' ')
@@ -321,12 +324,15 @@ export function imageType(bytes: Uint8Array): ImageType | null {
   return null;
 }
 
-// The URL when it's https on that host, else null.
-function httpsOn(value: string, host: string): URL | null {
+// Where Wikimedia serves thumbnails: thumb.wikimedia.org since 2026, upload.wikimedia.org before.
+const THUMB_HOSTS = ['thumb.wikimedia.org', 'upload.wikimedia.org'];
+
+// The URL when it's https on one of those hosts, else null.
+function httpsOn(value: string, hosts: readonly string[]): URL | null {
   try {
     const url = new URL(value);
 
-    return url.protocol === 'https:' && url.hostname === host ? url : null;
+    return url.protocol === 'https:' && hosts.includes(url.hostname) ? url : null;
   } catch {
     return null;
   }
@@ -348,7 +354,7 @@ function licenseLink(value: string | null): string | null {
 /**
  * The photo that request 2 describes, or null when it fails the rules (spec section 2). It needs:
  * - a licence that isn't marked non-free;
- * - a 960px thumbnail on upload.wikimedia.org;
+ * - a 960px thumbnail on Wikimedia's thumbnail host;
  * - a file page on Commons.
  *
  * The 500px URL is the 960px one with the width replaced; both are standard Wikimedia widths.
@@ -359,11 +365,11 @@ function licenseLink(value: string | null): string | null {
  */
 export function photoSource(info: FileInfo): PhotoSource | null {
   const license = clip(info.license ?? '', MAX_LICENSE);
-  const large = httpsOn(info.thumbUrl, 'upload.wikimedia.org');
-  const page = httpsOn(info.pageUrl, 'commons.wikimedia.org');
+  const thumb = httpsOn(info.thumbUrl, THUMB_HOSTS);
+  const page = httpsOn(info.pageUrl, ['commons.wikimedia.org']);
   const height = info.thumbHeight;
 
-  if (info.nonFree || license.length === 0 || !large || !page) {
+  if (info.nonFree || license.length === 0 || !thumb || !page) {
     return null;
   }
 
@@ -371,10 +377,12 @@ export function photoSource(info: FileInfo): PhotoSource | null {
     return null;
   }
 
-  // A narrower original comes back as itself, with no width in its URL.
-  const small = large.href.replace(/\/960px-([^/]+)$/, '/500px-$1');
+  // Without Commons' tracking query. A narrower original comes back as itself, with no width
+  // in its URL.
+  const large = `${thumb.origin}${thumb.pathname}`;
+  const small = large.replace(/\/960px-([^/]+)$/, '/500px-$1');
 
-  if (small === large.href) {
+  if (small === large) {
     return null;
   }
 
@@ -392,7 +400,7 @@ export function photoSource(info: FileInfo): PhotoSource | null {
   const parsed = photoCreditSchema.safeParse(credit);
 
   return parsed.success
-    ? { url: large.href, thumbUrl: small, width: THUMB_WIDTH, height, credit: parsed.data }
+    ? { url: large, thumbUrl: small, width: THUMB_WIDTH, height, credit: parsed.data }
     : null;
 }
 
