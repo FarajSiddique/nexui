@@ -2,7 +2,9 @@ export { AuthActionError } from './auth-actions';
 export { AuthScreen, useAuthStyles } from './auth-screen';
 export {
   clearDeletedAccount,
+  getAppleDeletionCode,
   sendEmailCode,
+  signInWithApple,
   signInWithGoogle,
   signOut,
   verifyEmailCode,
