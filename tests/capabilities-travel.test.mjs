@@ -10,6 +10,7 @@ import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import {
   idSequence,
   KYOTO_ID,
+  kyotoData,
   kyotoRow,
   objectRow,
   RUN_ID,
@@ -99,8 +100,13 @@ const twoPlaces = {
   ],
 };
 
-// The plan-1 trip (Tokyo 3 days, then Kyoto) with this many free days.
-function proposedWithFree(unallocatedDays) {
+// `proposal` with its second option giving the days to `stop`, a stop already on the route.
+function stayLongerIn(stop) {
+  return { ...proposal, options: [proposal.options[0], { ...proposal.options[1], extend: stop }] };
+}
+
+// The plan-1 trip (Tokyo 3 days, then Kyoto 4) with this many free days, and `input` proposed.
+function proposedWithFree(unallocatedDays, input = twoPlaces) {
   const snapshot = mapSnapshotRow(
     snapshotRow(travelWorkspace(TRIP_ID), {
       objects: [
@@ -124,7 +130,7 @@ function proposedWithFree(unallocatedDays) {
     clock,
   });
 
-  s.call('decision.propose', twoPlaces);
+  s.call('decision.propose', input);
   s.takeOps();
 
   return s;
@@ -428,6 +434,70 @@ test('a leg hint from a stop that is no longer last is not used', () => {
 
   assert.equal(leg.title, 'Tokyo → Nara');
   assert.deepEqual(leg.data, { mode: 'other' });
+});
+
+test('an option can give the free days to a stop already on the route', () => {
+  const s = stager('user');
+
+  // o2 is Kyoto, the last stop (see the reorder test).
+  s.call('decision.propose', stayLongerIn('o2'));
+
+  const options = s.takeOps().filter((op) => op.op === 'insert_object' && op.kind === 'option');
+
+  assert.deepEqual(
+    options.map((option) => option.data.extendPlaceId),
+    [undefined, KYOTO_ID],
+  );
+
+  s.call('decision.resolve', { decisionId: 'rural', optionId: 'rural-2' });
+
+  const ops = s.takeOps();
+
+  assert.deepEqual(placeUpdate(ops, KYOTO_ID).patch, { data: { ...kyotoData, days: 5 } });
+  assert.equal(newLeg(ops), undefined);
+  assert.deepEqual(deletedIds(ops), [s.refs.byRef.get('rural-1-place')]);
+});
+
+test('an extended stop gains 1 day when none are free, and none once it leaves the route', () => {
+  for (const free of [null, 0, -2]) {
+    const s = proposedWithFree(free, stayLongerIn(KYOTO_ID));
+
+    s.call('decision.resolve', { decisionId: 'rural', optionId: 'rural-2' });
+    assert.equal(placeUpdate(s.takeOps(), KYOTO_ID).patch.data.days, 5, `${free} free`);
+  }
+
+  const s = proposedWithFree(1, stayLongerIn(KYOTO_ID));
+
+  s.call('relationship.delete', { from: KYOTO_ID, type: 'part_of', to: 'trip' });
+  s.takeOps();
+  s.call('decision.resolve', { decisionId: 'rural', optionId: 'rural-2' });
+
+  const [decision, ...rest] = s.takeOps();
+
+  assert.equal(decision.patch.data.status, 'resolved');
+  assert.equal(placeUpdate(rest, KYOTO_ID), undefined);
+});
+
+test('an option adds a place or extends a stop, not both, and only a stop on the route', () => {
+  const s = stager();
+
+  assert.throws(
+    () =>
+      s.call('decision.propose', {
+        ...proposal,
+        options: [{ ...proposal.options[0], extend: 'o2' }, proposal.options[1]],
+      }),
+    refused(/^"Nara" adds a place or extends a stop, not both\.$/),
+  );
+
+  // o1 is the length decision; "kyoto" names nothing. Neither is a stop, so neither is kept.
+  s.call('decision.propose', stayLongerIn('o1'));
+  s.call('decision.propose', { ...stayLongerIn('kyoto'), ref: 'typo' });
+
+  const options = s.takeOps().filter((op) => op.op === 'insert_object' && op.kind === 'option');
+
+  assert.equal(options.length, 4);
+  assert.ok(options.every((option) => option.data.extendPlaceId === undefined));
 });
 
 test('a pick deletes the candidates nobody chose and keeps the decision as a record', () => {

@@ -96,6 +96,8 @@ export const optionDataSchema = z.strictObject({
   suggestedDays: z.number().int().min(1).max(365).optional(),
   /** How to reach this option's place from `fromPlaceId`, the last stop when it was proposed. */
   leg: legDataSchema.extend({ fromPlaceId: idSchema }).optional(),
+  /** A stop already on the route that gets the days instead, for an option with no place. */
+  extendPlaceId: idSchema.optional(),
 });
 
 export const insightDataSchema = z.strictObject({

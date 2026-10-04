@@ -87,6 +87,9 @@ export const japanAskFreeDays: RunFixture = {
               cons: ['No new place on the route'],
               pros: ['No extra transit', 'Room for a day trip to Nikko or Kamakura'],
               label: 'Extra day in Tokyo',
+              // Added by hand: o4 is Tokyo on the trip that `try-run.mjs goal "Plan two weeks in
+              // Japan in December"` and then `free-day` make (see index.ts).
+              extend: 'o4',
               summary:
                 'Give the day back to Tokyo for a slower pace, a day trip or more neighborhoods.',
             },

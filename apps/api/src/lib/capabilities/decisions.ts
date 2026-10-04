@@ -8,6 +8,7 @@ import {
   type GraphObject,
   type LegData,
   type OptionData,
+  type PlaceData,
   type Section,
   type TripData,
 } from '@nexui/types';
@@ -56,14 +57,25 @@ const optionInput = z.strictObject({
     .optional()
     .describe('The place this option would add to the route'),
   leg: legDataSchema.optional().describe('Getting to that place from the current last stop'),
+  extend: refInput
+    .optional()
+    .describe('Instead of a place: the stop on the route this option gives the days to'),
 });
+
+// The stop on the route that `ref` names, if it names one.
+function stopNamed(ctx: CapabilityContext, ref: string): GraphObject | undefined {
+  const id = ctx.refs.byRef.get(ref) ?? ref;
+
+  return tripPlaces(ctx).find((place) => place.id === id);
+}
 
 const propose = defineCapability({
   name: 'decision.propose',
   description:
     'Put a choice to the user: a question with 2 to 4 options, pinned at the top of the plan. ' +
     'Use it instead of choosing for them. An option that would add a place carries that place, ' +
-    "the days you'd suggest there, and how to get there from the last stop.",
+    "the days you'd suggest there, and how to get there from the last stop. An option that " +
+    'gives the days to a stop already on the route (more time in Kyoto) names it in extend.',
   input: z.strictObject({
     ref: z.string().describe('A new short ref for the decision, such as rural-stop'),
     question: z.string().min(1).max(200),
@@ -116,6 +128,18 @@ const propose = defineCapability({
 
       if (option.fit) {
         data.fit = option.fit;
+      }
+
+      if (option.place && option.extend) {
+        throw new CapabilityError(`"${option.label}" adds a place or extends a stop, not both.`);
+      }
+
+      // A ref that names no stop on the route is dropped, so a recorded proposal replays on any
+      // trip; picking the option then settles the question and leaves the days as they are.
+      const extended = option.extend ? stopNamed(ctx, option.extend) : undefined;
+
+      if (extended) {
+        data.extendPlaceId = extended.id;
       }
 
       // A candidate place is not part of the trip until the user picks it.
@@ -190,7 +214,7 @@ const propose = defineCapability({
   },
 });
 
-// The days a chosen place gets: the trip's free days, else what its option suggested, else 1.
+// The days a pick hands out: the trip's free days, else what its option suggested, else 1.
 function chosenDays(ctx: CapabilityContext, option: OptionData): number {
   const trip = ctx.graph.objects.find((object) => object.id === ctx.anchorId);
   const free = (trip?.data as TripData | undefined)?.derived?.unallocatedDays ?? null;
@@ -281,6 +305,27 @@ function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetO
   return ops;
 }
 
+// Adds `chosenDays` to the stop the chosen option extends, while that stop is still on the route.
+function extendChosenStop(ctx: CapabilityContext, option: GraphObject): ChangesetOp[] {
+  const data = option.data as OptionData;
+  const stop = tripPlaces(ctx).find((place) => place.id === data.extendPlaceId);
+
+  if (!stop) {
+    return [];
+  }
+
+  const place = stop.data as PlaceData;
+
+  return [
+    {
+      op: 'update_object',
+      id: stop.id,
+      patch: { data: { ...place, days: place.days + chosenDays(ctx, data) } },
+      origin: 'direct',
+    },
+  ];
+}
+
 // Deletes the candidate places of a settled decision's options, except the chosen one's and any
 // the user already put on the route. Undo of the changeset restores them.
 function removeCandidates(
@@ -312,7 +357,8 @@ const resolve = defineCapability({
   description:
     'Settle an open decision with one of its options, or dismiss it by leaving optionId out. ' +
     'Choosing an option with a place adds that place to the end of the route with the free ' +
-    'days (or its suggested days), and a leg to it. Candidates nobody chose are removed.',
+    'days (or its suggested days), and a leg to it; one that extends a stop gives it those ' +
+    'days. Candidates nobody chose are removed.',
   input: z.strictObject({ decisionId: refInput, optionId: refInput.optional() }),
   policy: 'internal',
   exposeToModel: true,
@@ -355,7 +401,7 @@ const resolve = defineCapability({
 
       next = { ...data, status: 'resolved', chosenOptionId: option.id };
       label = `Chose ${nameOf(option)}`;
-      placeOps.push(...addChosenPlace(ctx, option));
+      placeOps.push(...addChosenPlace(ctx, option), ...extendChosenStop(ctx, option));
     }
 
     const chosenOptionId = next.status === 'resolved' ? (next.chosenOptionId ?? null) : null;
