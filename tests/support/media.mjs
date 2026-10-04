@@ -7,6 +7,50 @@ import { supabaseEnv } from './supabase-auth.mjs';
 export const CONTACT = 'ops@nexui.test';
 export const NOW = new Date('2026-10-04T12:00:00Z');
 
+/** The first bytes of a JPEG: enough for the lookup to accept it as one. */
+export const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+
+/**
+ * A Commons imageinfo answer (formatversion 2) for one file, with a 960px thumbnail, a CC BY-SA
+ * licence and Kasa Fue as the author. `overrides` replace fields of its `imageinfo` entry.
+ */
+export function fileInfoBody(file, overrides = {}) {
+  return {
+    batchcomplete: true,
+    query: {
+      pages: [
+        {
+          pageid: 1,
+          ns: 6,
+          title: `File:${file}`,
+          imagerepository: 'local',
+          imageinfo: [
+            {
+              thumburl: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${file}/960px-${file}`,
+              thumbwidth: 960,
+              thumbheight: 640,
+              url: `https://upload.wikimedia.org/wikipedia/commons/a/ab/${file}`,
+              descriptionurl: `https://commons.wikimedia.org/wiki/File:${file}`,
+              extmetadata: {
+                Artist: {
+                  value: '<a href="//commons.wikimedia.org/wiki/User:Kasa_Fue">Kasa Fue</a>',
+                  source: 'commons-desc-page',
+                },
+                LicenseShortName: { value: 'CC BY-SA 4.0', source: 'commons-desc-page' },
+                LicenseUrl: {
+                  value: 'https://creativecommons.org/licenses/by-sa/4.0',
+                  source: 'commons-desc-page',
+                },
+              },
+              ...overrides,
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
 /** A Wikipedia search answer (formatversion 2) with these pages, in search order. */
 export function searchBody(pages) {
   return {
