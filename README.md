@@ -112,13 +112,15 @@ URL reachable from the device is still required. Restart Expo after changing env
 
 Supabase and Google values are required for sign-in; the `.env.example` files list
 them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` lives only
-in `apps/api/.env.local`, where account deletion uses it.
+in `apps/api/.env.local`, where account deletion and the place media cache use it.
+`WIKIMEDIA_CONTACT` there is an email address or URL Wikimedia can reach us at; the stop
+details lookup sends it in its User-Agent, and leaving it empty turns lookups off.
 
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.
 Never use either prefix for secrets. Future server credentials belong only in the
 API's environment, without a public prefix. Environment files are ignored by git;
 the `.env.example` files are tracked. Turbo passes the AI settings (AI_PROVIDER,
-AI_GATEWAY_API_KEY and NEXUI_MODEL_*) only to the API dev task. Do not add Gateway keys to
+AI_GATEWAY_API_KEY and NEXUI_MODEL_*) and WIKIMEDIA_CONTACT only to the API dev task. Do not add Gateway keys to
 Expo configuration or any public environment variable.
 
 `GET /api/health` is public. The intent graph routes and `DELETE /api/account` require
