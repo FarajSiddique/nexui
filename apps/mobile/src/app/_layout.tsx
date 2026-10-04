@@ -12,11 +12,11 @@ import { AppState, Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { QueryProvider, queryClient } from '@/lib/query-provider';
-import { startSessionLifecycle } from '@/lib/session-lifecycle';
-import { supabase } from '@/lib/supabase';
-import { useColors, useScheme } from '@/lib/use-theme';
-import { updateSession, useSessionStore } from '@/stores/use-session-store';
+import { QueryProvider, queryClient } from '@/data/query-provider';
+import { supabase } from '@/data/supabase';
+import { startSessionLifecycle } from '@/features/auth/session-lifecycle';
+import { updateSession, useSessionStore } from '@/features/auth/use-session-store';
+import { useColors, useScheme } from '@/theme/use-theme';
 
 // Signing out or deleting the account drops the cache so the next user never sees these items.
 function showSession(session: Session | null): void {

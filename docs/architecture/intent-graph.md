@@ -278,10 +278,10 @@ with the user's token, so RLS applies to everything it writes.
 
 ## Theming
 
-`apps/mobile/src/lib/theme.ts` exports `light` and `dark` palettes with identical keys
+`apps/mobile/src/theme/theme.ts` exports `light` and `dark` palettes with identical keys
 (`TokenName`/`Palette` types), plus the font faces. Components never use a raw color: they read
 one through `useColors()` (for colors passed as props) or `createThemedStyles(factory)` (for a
-`StyleSheet`, cached per scheme) — both in `apps/mobile/src/lib/use-theme.ts`. `useScheme()`
+`StyleSheet`, cached per scheme) — both in `apps/mobile/src/theme/use-theme.ts`. `useScheme()`
 resolves the saved appearance choice (below) against the phone's `useColorScheme()`, treating
 anything but `'dark'` as light; the status bar follows it too. `tests/theme-tokens.test.mjs`
 is the guard: it asserts both palettes declare the same keys, scans `apps/mobile/src` for hex/

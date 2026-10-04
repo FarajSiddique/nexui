@@ -6,6 +6,28 @@ instant, and stays current while a run or another device changes the same intent
 covers the pieces that make that work: the workspace route, the pure layout layer, optimistic
 edits, and Realtime.
 
+## Where code lives
+
+`apps/mobile/src/` is split by what the code is for:
+
+- **`app/`**: Expo Router routes only. Every file here becomes a route, so components and helpers
+  live in the folders below.
+- **`features/<area>/`**: what one area of the app needs: `auth`, `home`, `workspace` (with its
+  `sections/` primitives), `changes`, `compose` (the + sheet), `account`, and `shell` (the tab
+  bar). A Zustand store lives in the feature that owns it, as `use-<name>-store.ts`.
+- **`ui/`**: shared building blocks such as `Button`, `Pill`, the list states and the tab header.
+- **`theme/`**: the palettes and fonts, `useColors`/`createThemedStyles`, and the appearance
+  choice.
+- **`data/`**: the API and Supabase clients, the TanStack Query hooks and keys (`queries.ts`), and
+  Realtime (`use-intent-live.ts`).
+- **`lib/`**: pure helpers that several features share (`format.ts`).
+
+Imports run one way. Routes import from anywhere. Features import `ui`, `theme`, `data` and `lib`,
+and another feature only where a screen needs that area's piece (the + tab button reads
+`workspace`'s focused-intent store). `ui` imports only `theme`; `data`, `theme` and `lib` import
+none of the others. Files in one folder import each other as `./name`; across folders, use the
+`@/` alias, except in the pure files below.
+
 ## The Home stack and the workspace route
 
 `apps/mobile/src/app/(app)/(tabs)/(home)/` is its own `Stack`
@@ -25,16 +47,16 @@ for an `ask`.
 ### Deleting a plan
 
 Swiping a plan card left on Home reveals a red Delete button
-(`apps/mobile/src/components/swipe-to-delete.tsx`, RNGH `ReanimatedSwipeable`). Tapping it deletes
-the plan for good, with no undo. One row is open at a time: opening one closes the other, and
-scrolling closes it. A Drafting plan can't be swiped, and a row that becomes Drafting while open
+(`apps/mobile/src/features/home/swipe-to-delete.tsx`, RNGH `ReanimatedSwipeable`). Tapping it
+deletes the plan for good, with no undo. One row is open at a time: opening one closes the other,
+and scrolling closes it. A Drafting plan can't be swiped, and a row that becomes Drafting while open
 closes. The card offers a VoiceOver/TalkBack "Delete" accessibility action; the swipe button
 itself is `aria-hidden` and out of tab order. Web has no keyboard or screen-reader path to delete.
 
 `useDeleteIntent` (`queries.ts`) calls `DELETE /api/intents/[id]`; a 404 counts as deleted. On
 success it removes the card from the intents cache and the intent query, then refetches intents
 and changes. `usePlanDeletes` reads every delete in the mutation cache through the pure
-`planDeletes` (`apps/mobile/src/lib/plan-deletes.ts`); only each plan's latest attempt counts.
+`planDeletes` (`apps/mobile/src/data/plan-deletes.ts`); only each plan's latest attempt counts.
 Home hides cards whose delete is pending. Failed ones show "Couldn't delete that plan. Tap to try
 again." (or "N plans"), and tapping retries them all.
 
@@ -45,15 +67,16 @@ into a close.
 
 ## The pure display layer
 
-`apps/mobile/src/lib/format.ts`, `ai-mark.ts`, `sections.ts`, `workspace-actions.ts`,
-`map-region.ts`, `change-feed.ts`, `plan-deletes.ts` and `api-request.ts` have no `react-native`
-import and import each other as sibling `.ts` files (not through the `@/` alias), so
-`tests/mobile-*.test.mjs` can run them under plain Node with no RN runtime:
+These files under `apps/mobile/src/` have no `react-native` import and import each other by
+relative `.ts` paths (not through the `@/` alias), so `tests/mobile-*.test.mjs` can run them under
+plain Node with no RN runtime: `lib/format.ts`; `ai-mark.ts`, `workspace-layout.ts`,
+`workspace-actions.ts` and `sections/map-region.ts` in `features/workspace/`;
+`features/changes/change-feed.ts`; and `plan-deletes.ts` and `api-request.ts` in `data/`.
 
 - **`format.ts`**: numbers, money, dates and relative times as display strings; `cardText` reads
   an object's title/subtitle from `KIND_CARDS`.
 - **`ai-mark.ts`**: `aiMarkFor`, the one place that decides what's marked as Nexui's work.
-- **`sections.ts`**: `layoutWorkspace` and `sectionData`, which turn a `WorkspaceDoc` and a
+- **`workspace-layout.ts`**: `layoutWorkspace` and `sectionData`, which turn a `WorkspaceDoc` and a
   `GraphSnapshot` into `WorkspaceBlock[]` — each section's data, evaluated with `evaluateQuery`
   from `@nexui/types`, and the Open band placement.
 - **`workspace-actions.ts`**: `capabilityFor` turns a `WorkspaceAction` into a `CapabilityRequest`
@@ -69,12 +92,12 @@ import and import each other as sibling `.ts` files (not through the `@/` alias)
 
 ## Sections
 
-`SECTION_REGISTRY` (`apps/mobile/src/components/sections/registry.tsx`) maps every `Section['type']`
-to its primitive component; a type with no entry fails typecheck. Every primitive receives
-`{ section, data, snapshot, onAction, busy }` (`SectionProps<T>` in `./types.ts`): it renders and
-reports a `WorkspaceAction` through `onAction`, and never calls the API itself — the workspace
-screen (`intent/[id].tsx`) is the only place a `WorkspaceAction` becomes a capability request or a
-push to `+`.
+`SECTION_REGISTRY` (`apps/mobile/src/features/workspace/sections/registry.tsx`) maps every
+`Section['type']` to its primitive component; a type with no entry fails typecheck. Every primitive
+receives `{ section, data, snapshot, onAction, busy }` (`SectionProps<T>` in `./types.ts`): it
+renders and reports a `WorkspaceAction` through `onAction`, and never calls the API itself — the
+workspace screen (`intent/[id].tsx`) is the only place a `WorkspaceAction` becomes a capability
+request or a push to `+`.
 
 ## The Open band
 
@@ -113,7 +136,7 @@ The route's user-callable capabilities — `trip.setPlaceDays`, `trip.reorderPla
 
 ## Realtime as an invalidation signal
 
-`useIntentLive(intentId)` (`apps/mobile/src/lib/use-intent-live.ts`) keeps an open workspace
+`useIntentLive(intentId)` (`apps/mobile/src/data/use-intent-live.ts`) keeps an open workspace
 current while the server writes to it without the client asking — a run filling it in, or another
 device's edit. It subscribes to INSERT and UPDATE on `objects`, `relationships`, `workspaces`,
 `runs` and `events`, filtered to `intent_id=eq.<id>`, scoped by RLS. It never subscribes to
@@ -166,30 +189,31 @@ enough since visiting the tab is exactly when a stale feed would otherwise show.
 opening `+` acts on that plan instead of starting a new one. `apps/mobile/src/app/(app)/compose.tsx`
 reads `intentId`/`prompt` from its route params (set when a section's `ask` action pushes to `+`
 with a prompt already filled in) and otherwise from nothing, in which case it starts a new intent.
-Once a run starts, `RunCard` (`apps/mobile/src/components/run-card.tsx`) streams it: a spinner and
-elapsed time while active, one line per succeeded capability call (not per step — a step can make
-several calls) as it lands, and Stop, Retry or "See changes" depending on the run's status. After
-Stop, a running run shows **Stopping…** ("Nexui is saving the change it was making, then it
+Once a run starts, `RunCard` (`apps/mobile/src/features/compose/run-card.tsx`) streams it: a spinner
+and elapsed time while active, one line per succeeded capability call (not per step — a step can
+make several calls) as it lands, and Stop, Retry or "See changes" depending on the run's status.
+After Stop, a running run shows **Stopping…** ("Nexui is saving the change it was making, then it
 stops.") with no Stop button until its last step commits, then Stopped. A run that succeeded also
 offers "See changes" as a secondary link. Closing the sheet doesn't stop the run — what it's
 written stays and can be undone from Changes.
 
 After an ask about the plan underneath (the sheet was opened with `intentId`), `afterAsk`
-(`apps/mobile/src/lib/run-outcome.ts`, pure and unit-tested) picks the next step once the run has
-succeeded: **See the choice** when its progress has an `ok` `decision.propose` entry, otherwise
-**Back to plan**, which dismisses the sheet. A run that failed or stopped gets neither, only the
-RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer above
-the input, outside the scroll view, so they stay in view while the keyboard is up.
+(`apps/mobile/src/features/compose/run-outcome.ts`, pure and unit-tested) picks the next step once
+the run has succeeded: **See the choice** when its progress has an `ok` `decision.propose` entry,
+otherwise **Back to plan**, which dismisses the sheet. A run that failed or stopped gets neither,
+only the RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer
+above the input, outside the scroll view, so they stay in view while the keyboard is up.
 
 The sheet is an iOS form sheet (react-native-screens), which constrains two things. The composer
-clears the keyboard with `useKeyboardOverlap()` (`apps/mobile/src/lib/use-keyboard-overlap.ts`),
-which pads by the window height minus the keyboard's top edge and does not measure the sheet:
-Fabric's `measureInWindow` reads the shadow tree, which puts a form sheet at the top of the window
-wherever iOS draws it, so a measured overlap comes out short and the composer sits behind the
-keyboard. Android and web get 0. The sheet's root `View` is `collapsable={false}` with an empty
-`<View collapsable={false} />` as its first child; RNScreens stretches a ScrollView it finds among
-a form sheet's direct children or down its first-child chain to fill the sheet, which hides the
-body behind the composer. Keep both so the ScrollView stays at the height React lays out.
+clears the keyboard with `useKeyboardOverlap()`
+(`apps/mobile/src/features/compose/use-keyboard-overlap.ts`), which pads by the window height minus
+the keyboard's top edge and does not measure the sheet: Fabric's `measureInWindow` reads the shadow
+tree, which puts a form sheet at the top of the window wherever iOS draws it, so a measured overlap
+comes out short and the composer sits behind the keyboard. Android and web get 0. The sheet's root
+`View` is `collapsable={false}` with an empty `<View collapsable={false} />` as its first child;
+RNScreens stretches a ScrollView it finds among a form sheet's direct children or down its
+first-child chain to fill the sheet, which hides the body behind the composer. Keep both so the
+ScrollView stays at the height React lays out.
 
 **See the choice** sets `use-reveal-store.ts` (`revealOpenBand(intentId)`) and dismisses the sheet.
 The workspace screen watches the flag: once it is focused again and its Open band has been laid out
@@ -220,8 +244,8 @@ A failed plan delete shows a similar tappable notice on Home (see "Deleting a pl
 
 ## The map
 
-`MapSection` (`apps/mobile/src/components/sections/map-section.tsx`) uses `react-native-maps`:
-Apple Maps on iOS (no key needed), Google Maps on Android, which needs
+`MapSection` (`apps/mobile/src/features/workspace/sections/map-section.tsx`) uses
+`react-native-maps`: Apple Maps on iOS (no key needed), Google Maps on Android, which needs
 `GOOGLE_MAPS_ANDROID_API_KEY` at build time (`apps/mobile/app.config.ts` passes it to the
 `react-native-maps` config plugin and sets `extra.mapsOnAndroid`). The key is optional — without
 it, Android renders `MapFallback`, the same numbered-list fallback `map-section.web.tsx` always

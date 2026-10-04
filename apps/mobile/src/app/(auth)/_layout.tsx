@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { useColors } from '@/lib/use-theme';
+import { useColors } from '@/theme/use-theme';
 
 // Always open the group on sign-in so verify has a screen to go back to.
 export const unstable_settings = { initialRouteName: 'sign-in' };

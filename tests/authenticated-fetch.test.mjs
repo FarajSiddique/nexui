@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 
-import { fetchWithSession, UnauthorizedError } from '../apps/mobile/src/lib/authenticated-fetch.ts';
+import {
+  fetchWithSession,
+  UnauthorizedError,
+} from '../apps/mobile/src/data/authenticated-fetch.ts';
 
 const mobileRequire = createRequire(new URL('../apps/mobile/package.json', import.meta.url));
 const nativeRequire = createRequire(mobileRequire.resolve('react-native/package.json'));
