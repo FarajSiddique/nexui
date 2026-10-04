@@ -287,7 +287,9 @@ tap can't fire a second retry underneath the first.
 Tapping a stop pushes `apps/mobile/src/app/(app)/place.tsx`, an iOS form sheet (a modal on Android
 and web) registered with the same options as the + sheet. It builds `stopDetails` from the cached
 plan and renders `PlaceSheet` (`features/place/place-sheet.tsx`); its day changes go through the
-same edit path as the route (see "Optimistic edits"). `usePlaceMedia(intentId, placeIds)` fetches
+same edit path as the route (see "Optimistic edits"). Like the + sheet, its root `View` is
+`collapsable={false}` with an empty `<View collapsable={false} />` first child; without them
+react-native-screens resizes the ScrollView and the iOS form sheet shows blank. `usePlaceMedia(intentId, placeIds)` fetches
 `GET /api/intents/:id/media`, refetching every 2 s while any place is pending, up to ten times, and
 the workspace screen calls it for every place in the plan so the sheet usually opens with its
 introduction. The lookup and cache are in

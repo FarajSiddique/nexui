@@ -11,6 +11,8 @@ import {
   type TripData,
 } from '@nexui/types';
 
+import { COUNTRY_NAMES } from './country-names.ts';
+
 /** @example formatDays(1) // '1 day' */
 export function formatDays(days: number): string {
   return `${days} ${Math.abs(days) === 1 ? 'day' : 'days'}`;
@@ -269,33 +271,14 @@ export function ordinalWord(n: number): string {
   return `${n}${suffixes[n % 10] ?? 'th'}`;
 }
 
-let regionNames: Intl.DisplayNames | null | undefined;
-
-// Built once; null where the JS engine has no Intl.DisplayNames.
-function regionNameFormat(): Intl.DisplayNames | null {
-  if (regionNames === undefined) {
-    try {
-      regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
-    } catch {
-      regionNames = null;
-    }
-  }
-
-  return regionNames;
-}
-
 /**
- * A country's English name from its ISO code, or the code itself where the runtime has no
- * name for it.
+ * A country's English name from its ISO code, or the code itself for one the list doesn't
+ * know. The list is bundled because Hermes has no Intl.DisplayNames.
  *
  * @example countryName('DE') // 'Germany'
  */
 export function countryName(code: string): string {
-  try {
-    return regionNameFormat()?.of(code) ?? code;
-  } catch {
-    return code;
-  }
+  return COUNTRY_NAMES[code] ?? code;
 }
 
 const TRAVEL_MODES: Record<LegData['mode'], string> = {

@@ -155,11 +155,12 @@ failed.` with `console.error` when any failed, else with `console.info` outside 
 - `apps/mobile/src/app/(app)/place.tsx` is an iOS form sheet and a modal on Android and web,
   with the + sheet's options. It reads the plan from `useIntent`'s cache, builds
   `stopDetails(snapshot, placeId)` (`features/workspace/stop-details.ts`, pure), and renders
-  `PlaceSheet` (`features/place/place-sheet.tsx`): Done; the name on the Nexui highlighter
-  while unreviewed; "{Type} in {Country}, the {nth} of {n} stops" (`countryName` uses
-  `Intl.DisplayNames`, falling back to the code); Days here with the shared `DayStepper` and
-  Daily cost; Why it's on your route; About {name} ("Looking up {name}…" while pending, hidden
-  with no article) with Read more on Wikipedia; Next stop, which swaps in that stop's details;
+  `PlaceSheet` (`features/place/place-sheet.tsx`): Done (which opens the plan when there's no history to go back to, as after a reload on
+  web); the name on the Nexui highlighter
+  while unreviewed; "{Type} in {Country}, the {nth} of {n} stops" (`countryName` reads the
+  bundled CLDR list in `lib/country-names.ts`, since Hermes has no `Intl.DisplayNames`); Days here with the shared `DayStepper` and
+  Daily cost; Why it's on your route; About {name} ("Looking up {name}…" while pending and the app is still polling, hidden with
+  no article or once the polls run out; `usePlaceAbout`) with Read more on Wikipedia; Next stop, which swaps in that stop's details;
   and Where you'll stay, or Find a stay with Nexui, which closes the sheet and opens + with
   "Find a stay in {name}".
 - Day changes in the sheet go through the same `daysAction`, `capabilityFor`,

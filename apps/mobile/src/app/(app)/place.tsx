@@ -117,7 +117,11 @@ export default function PlaceScreen(): ReactElement {
   };
 
   return (
-    <View style={styles.screen}>
+    <View collapsable={false} style={styles.screen}>
+      {/* As in the + sheet: with the collapsable root, this empty first child stops
+          react-native-screens resizing the ScrollView, which leaves an iOS form sheet blank
+          (docs/architecture/mobile.md). */}
+      <View collapsable={false} />
       <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={styles.content}>
         {edit.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
