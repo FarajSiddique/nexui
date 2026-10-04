@@ -31,6 +31,11 @@ const expected = {
     mapRoute: '#1E1A2B',
     mapPin: '#1E1A2B',
     mapPinInk: '#FFFFFF',
+    skyTrack: '#D6CEF2',
+    skyOrb: '#FFE45C',
+    skyGlow: 'rgba(255, 228, 92, 0.22)',
+    skyDetail: '#FFFFFF',
+    skyCrater: 'rgba(30, 26, 43, 0.14)',
   },
   dark: {
     paper: '#15131B',
@@ -55,6 +60,11 @@ const expected = {
     mapRoute: '#FFE45C',
     mapPin: '#F2EFF8',
     mapPinInk: '#15131B',
+    skyTrack: '#14112A',
+    skyOrb: '#ECE8F5',
+    skyGlow: 'rgba(236, 232, 245, 0.06)',
+    skyDetail: '#F2EFF8',
+    skyCrater: 'rgba(30, 26, 43, 0.14)',
   },
 };
 

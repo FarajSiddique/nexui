@@ -282,10 +282,19 @@ with the user's token, so RLS applies to everything it writes.
 (`TokenName`/`Palette` types), plus the font faces. Components never use a raw color: they read
 one through `useColors()` (for colors passed as props) or `createThemedStyles(factory)` (for a
 `StyleSheet`, cached per scheme) — both in `apps/mobile/src/lib/use-theme.ts`. `useScheme()`
-reads `useColorScheme()` and treats anything but `'dark'` as light. `tests/theme-tokens.test.mjs`
+resolves the saved appearance choice (below) against the phone's `useColorScheme()`, treating
+anything but `'dark'` as light; the status bar follows it too. `tests/theme-tokens.test.mjs`
 is the guard: it asserts both palettes declare the same keys, scans `apps/mobile/src` for hex/
 `rgb(`/`rgba(` literals outside `theme.ts`, and checks AA contrast (≥ 4.5:1) for the token pairs
 text is actually drawn with.
+
+The Account screen's Appearance card picks Light or Dark with a day-and-night sky switch (the
+`sky*` tokens), or "Match my phone" (the default) to follow the phone. The choice is saved on the
+device only, not the account: SecureStore on iOS/Android (`device-appearance.ts`), localStorage
+key `nexui.appearance` in the web preview (`device-appearance.web.ts`). `use-appearance-store.ts`
+holds it and `appearance.ts` has the pure resolution logic. On native, the store also calls
+`Appearance.setColorScheme` at launch and on every change, so keyboards, sheets and alerts match.
+In the web preview a live browser color-scheme change only applies after a reload.
 
 ## Checking it
 

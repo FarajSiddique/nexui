@@ -1,10 +1,16 @@
 import { StyleSheet, useColorScheme } from 'react-native';
 
+import { useAppearanceStore } from '@/stores/use-appearance-store';
+
+import { resolveScheme } from './appearance';
 import { palettes, type Palette, type Scheme } from './theme';
 
-/** The system color scheme; anything but dark counts as light. */
+/** The scheme to draw with: Light or Dark from Account, or the phone's under Match my phone. */
 export function useScheme(): Scheme {
-  return useColorScheme() === 'dark' ? 'dark' : 'light';
+  const system = useColorScheme();
+  const preference = useAppearanceStore((state) => state.preference);
+
+  return resolveScheme(preference, system);
 }
 
 /** The token set for the current scheme, for colors passed as props. */
