@@ -39,6 +39,13 @@ Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s tho
   that no run was ever created on, with its graph (the rows cascade). Anything else, including
   another user's intent or one with a run, is `NXU04`. `startIntent` uses it so a trip whose
   first run can't be created doesn't stay on Home with nothing to fill it in (see "AI runs").
+- `delete_intent(id)` (`20261004000000_delete_intent.sql`): deletes one of the caller's intents
+  with everything under it (objects, relationships, events, workspace and runs cascade). It
+  refuses with `NXU12` while a run on the intent is queued, running or stopping and younger than
+  6 minutes, the same rule as `create_run`, and with `NXU04` when the intent is missing or not
+  the caller's. `DELETE /api/intents/[id]` (`deleteIntent` in `apps/api/src/lib/graph/commit.ts`)
+  calls it and answers 204. A bad id or `NXU04` is a 404, `NXU12` a 409 "Nexui is still working
+  on this plan.", and anything else a logged, safe 500 "Could not delete that plan. Try again.".
 
 `private.apply_ops` is the one place rows actually change. It rejects an op whose `origin` isn't
 `direct` or `derived`, a `source.type` outside `user`/`ai`/`derived`/`external`, more than one op
@@ -286,10 +293,12 @@ text is actually drawn with.
   `psql`) against a scratch database. Creates two throwaway users, exercises create, change,
   undo, redo and cross-user isolation through the RPCs, and rolls everything back in one
   transaction — nothing it does persists.
-- `supabase/tests/runs-smoke.sql`: the run functions and `discard_intent`, as two throwaway users,
-  rolled back: Stop on a running run (stopping, its last step kept, `NXU12` meanwhile, then
-  cancelled, or failed with its error), a queued run cancelled at once, and `discard_intent`
-  refusing an intent with a run or another user's. With the project linked, it also runs as
+- `supabase/tests/runs-smoke.sql`: the run functions, `discard_intent` and `delete_intent`, as two
+  throwaway users, rolled back: Stop on a running run (stopping, its last step kept, `NXU12`
+  meanwhile, then cancelled, or failed with its error), a queued run cancelled at once,
+  `discard_intent` refusing an intent with a run or another user's, and `delete_intent` refusing a
+  plan with an active run (`NXU12`) or another user's (`NXU04`), then removing a plan with its
+  graph, runs and events. With the project linked, it also runs as
   `pnpm exec supabase db query --linked -f supabase/tests/runs-smoke.sql`.
 - `scripts/smoke-intent-graph.mjs [.qa/session.json] [apiUrl]`: a live end-to-end check against
   a running API. Needs a QA session (`node scripts/qa-session.mjs > .qa/session.json`) and the
