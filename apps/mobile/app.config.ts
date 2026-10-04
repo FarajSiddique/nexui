@@ -33,12 +33,24 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: 'nexui',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
+  // The Duet icon, exported from the SVGs in docs/design/app-icons (its README lists each export).
+  icon: './assets/images/icon.png',
   ios: {
     bundleIdentifier: appId,
     usesAppleSignIn: true,
+    icon: {
+      light: './assets/images/icon.png',
+      dark: './assets/images/icon-dark.png',
+      tinted: './assets/images/icon-tinted.png',
+    },
   },
   android: {
     package: appId,
+    adaptiveIcon: {
+      foregroundImage: './assets/images/android-icon-foreground.png',
+      monochromeImage: './assets/images/android-icon-monochrome.png',
+      backgroundColor: '#E8408C',
+    },
   },
   plugins: [
     'expo-router',
@@ -67,6 +79,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     bundler: 'metro',
     output: 'single',
+    favicon: './assets/images/favicon.png',
   },
   extra: {
     router: {},
