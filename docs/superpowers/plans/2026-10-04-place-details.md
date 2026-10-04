@@ -59,7 +59,7 @@
 ```
 packages/types/src/media.ts                          (create) placeMediaKey, normalizePlaceName, contract schemas
 packages/types/src/index.ts                          (modify) export media
-supabase/migrations/20261004120000_place_media.sql   (create) place_media table, RLS, no grants
+supabase/migrations/20261004140000_place_media.sql   (create) place_media table, RLS, no grants
 apps/api/src/lib/media/rules.ts                      (create) pure: match, expiry, freshness, rows, toPlaceMedia
 apps/api/src/lib/media/wikipedia.ts                  (create) request 1 (search), errors, User-Agent
 apps/api/src/lib/media/cache.ts                      (create) readRows, saveRow
@@ -311,7 +311,7 @@ git commit -m "Add the place media key and contract"
 
 **Files:**
 
-- Create: `supabase/migrations/20261004120000_place_media.sql`
+- Create: `supabase/migrations/20261004140000_place_media.sql`
 - Test: `tests/place-media-migration.test.mjs`
 
 **Interfaces:**
@@ -329,7 +329,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const sql = readFileSync('supabase/migrations/20261004120000_place_media.sql', 'utf8');
+const sql = readFileSync('supabase/migrations/20261004140000_place_media.sql', 'utf8');
 
 test('place_media has every column phase 2 needs, with its limits', () => {
   assert.match(sql, /create table public\.place_media \(/);
@@ -361,7 +361,7 @@ Expected: FAIL with `ENOENT`.
 
 - [ ] **Step 3: Write the migration**
 
-`supabase/migrations/20261004120000_place_media.sql`:
+`supabase/migrations/20261004140000_place_media.sql`:
 
 ```sql
 -- The shared cache of what Wikipedia says about each place (docs/architecture/place-media.md).
@@ -395,7 +395,7 @@ Expected: 2 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add supabase/migrations/20261004120000_place_media.sql tests/place-media-migration.test.mjs
+git add supabase/migrations/20261004140000_place_media.sql tests/place-media-migration.test.mjs
 git commit -m "Add the place_media cache table"
 ```
 
