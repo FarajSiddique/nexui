@@ -27,3 +27,20 @@ test('only the secret-key client can reach it', () => {
   assert.doesNotMatch(sql, /create policy/i);
   assert.doesNotMatch(sql, /\bgrant\b/i);
 });
+
+const bucket = readFileSync('supabase/migrations/20261004150000_place_photos_bucket.sql', 'utf8');
+
+test('place-photos is a public bucket of JPEG, PNG and WebP files up to 2 MB', () => {
+  assert.match(
+    bucket,
+    /insert into storage\.buckets \(id, name, public, file_size_limit, allowed_mime_types\)/,
+  );
+  assert.match(bucket, /'place-photos', 'place-photos', true, 2097152,/);
+  assert.match(bucket, /array\['image\/jpeg', 'image\/png', 'image\/webp'\]/);
+  assert.match(bucket, /on conflict \(id\) do update/);
+});
+
+test('no policy lets an app user list, upload or change photos', () => {
+  assert.doesNotMatch(bucket, /create policy/i);
+  assert.doesNotMatch(bucket, /\bgrant\b/i);
+});
