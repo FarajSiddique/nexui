@@ -32,10 +32,11 @@ function cardPhoto(db: SupabaseClient, row: MediaRow | undefined): string[] {
  * Home's cards with their photos (spec section 4): the 500px copies of each plan's first three
  * stops, read from the cache in one go. Nothing is looked up, so Home stays fast. A stop with
  * no cached photo, or a summary from before photos, is simply left out, and expired rows still
- * count, since stored files never move. A failed read is logged, and the cards keep no photos.
+ * count, since stored files never move. `adminClient` gives the secret-key client. When it
+ * can't (no key) or the read fails, that's logged and the cards keep no photos.
  */
 export async function withHomePhotos(
-  db: SupabaseClient,
+  adminClient: () => SupabaseClient,
   items: IntentListItem[],
 ): Promise<IntentListItem[]> {
   const keys = [...new Set(items.flatMap(cardKeys))];
@@ -44,9 +45,11 @@ export async function withHomePhotos(
     return items;
   }
 
+  let db: SupabaseClient;
   let rows: Map<string, MediaRow>;
 
   try {
+    db = adminClient();
     rows = await readRows(db, keys);
   } catch (error) {
     console.error('[media]', logLine(error, 'Could not load Home photos'));

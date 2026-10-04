@@ -26,7 +26,15 @@ export class WikipediaThrottledError extends Error {
 }
 
 /** Any other failed request: an HTTP error, a timeout, a redirect or an answer we can't read. */
-export class WikipediaError extends Error {}
+export class WikipediaError extends Error {
+  /** The HTTP status, when Wikimedia answered with an error. */
+  readonly status: number | undefined;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const searchSchema = z.object({
   error: z.unknown().optional(),
@@ -118,7 +126,7 @@ async function send(url: string, contact: string, init: RequestInit = {}): Promi
   }
 
   if (!response.ok) {
-    throw new WikipediaError(`Wikipedia answered ${response.status}.`);
+    throw new WikipediaError(`Wikipedia answered ${response.status}.`, response.status);
   }
 
   return response;
@@ -236,12 +244,26 @@ export async function fileInfo(file: string, contact: string): Promise<FileInfo 
 }
 
 /**
- * Downloads one size of a photo, without following redirects. Null when it isn't a JPEG, PNG
- * or WebP by its first bytes, or is over 2 MB: such a file never becomes a photo. A throttle,
- * an HTTP error, a redirect or a timeout throws, so the lookup is tried again.
+ * Downloads one size of a photo, without following redirects. Null when Wikimedia refuses it
+ * (a 4xx other than 429), or it isn't a JPEG, PNG or WebP by its first bytes, or is over 2 MB:
+ * such a file never becomes a photo. A throttle, a server error, a redirect or a timeout
+ * throws, so the lookup is tried again.
  */
 export async function downloadImage(url: string, contact: string): Promise<ImageFile | null> {
-  const response = await send(url, contact, { redirect: 'error' });
+  let response: Response;
+
+  try {
+    response = await send(url, contact, { redirect: 'error' });
+  } catch (error) {
+    // A 4xx other than 429 means Wikimedia won't serve this file, such as one deleted or one it
+    // can't render. That's no photo, so the place keeps its introduction instead of failing
+    // every 15 minutes.
+    if (error instanceof WikipediaError && error.status !== undefined && error.status < 500) {
+      return null;
+    }
+
+    throw error;
+  }
 
   if (Number(response.headers.get('Content-Length') ?? 0) > MAX_PHOTO_BYTES) {
     await response.body?.cancel();

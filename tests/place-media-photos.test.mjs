@@ -126,11 +126,22 @@ test('a download that is not a JPEG, PNG or WebP, or is over 2 MB, is no photo',
   }
 });
 
+test('a download Wikimedia refuses for good (404, 403) is no photo, not a failed lookup', async (t) => {
+  stub(
+    t,
+    () => new Response(null, { status: 404 }),
+    () => new Response(null, { status: 403 }),
+  );
+
+  assert.equal(await downloadImage(IMAGE, CONTACT), null);
+  assert.equal(await downloadImage(IMAGE, CONTACT), null);
+});
+
 test('a throttled, failed or redirected download throws, so the lookup is tried again', async (t) => {
   stub(
     t,
     () => new Response(null, { status: 429, headers: { 'Retry-After': '120' } }),
-    () => new Response(null, { status: 404 }),
+    () => new Response(null, { status: 502 }),
     new TypeError('fetch failed: unexpected redirect'),
   );
 

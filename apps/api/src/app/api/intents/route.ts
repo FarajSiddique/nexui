@@ -32,7 +32,7 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const listed = await listIntents(getUserClient(user.accessToken));
     // The user's own summaries name the keys; the secret-key client reads the shared cache.
-    const items = await withHomePhotos(getAdminClient(), listed);
+    const items = await withHomePhotos(getAdminClient, listed);
 
     return Response.json(intentListResponseSchema.parse({ items }), { headers });
   } catch (error) {

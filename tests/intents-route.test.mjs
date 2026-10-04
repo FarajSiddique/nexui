@@ -132,6 +132,22 @@ test('Home fills each card with its first stops’ cached photos and never looks
   );
 });
 
+test('without the secret key Home still lists the plans, without photos', async (t) => {
+  const errors = t.mock.method(console, 'error', () => {});
+
+  mockSupabaseAuth(t, postgrest({ 'table:intents': () => [intentRow], 'table:runs': () => [] }));
+  delete process.env.SUPABASE_SECRET_KEY;
+
+  const response = await GET(authed(url));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).items[0].photos, []);
+  assert.deepEqual(errors.mock.calls[0].arguments, [
+    '[media]',
+    'SUPABASE_SECRET_KEY is required for runs, account deletion and place details.',
+  ]);
+});
+
 test('a failed photo read still lists the plans, without photos', async (t) => {
   const errors = t.mock.method(console, 'error', () => {});
 

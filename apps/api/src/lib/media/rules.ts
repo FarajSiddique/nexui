@@ -100,6 +100,9 @@ const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
 const MAX_EXTRACT = 600;
 const MAX_AUTHOR = 120;
+// `Artist` HTML longer than this isn't read: crafted markup makes the tag regexes slow, and an
+// editor controls it. A real credit is far shorter.
+const MAX_ARTIST_HTML = 4_000;
 const MAX_LICENSE = 60;
 const THUMB_WIDTH = 960;
 
@@ -373,6 +376,10 @@ export function photoSource(info: FileInfo): PhotoSource | null {
     return null;
   }
 
+  if ((info.artist?.length ?? 0) > MAX_ARTIST_HTML) {
+    return null;
+  }
+
   if (info.thumbWidth !== THUMB_WIDTH || !Number.isInteger(height) || height <= 0) {
     return null;
   }
@@ -444,9 +451,24 @@ export function lookupRow(
   };
 }
 
-/** The row a failed lookup writes; it's tried again after 15 minutes or the Retry-After wait. */
-export function failedRow(key: string, now: Date, retryAfter = 0): MediaRow {
-  return emptyRow(key, 'failed', expiresAt('failed', now, retryAfter));
+/**
+ * The row a failed lookup writes; it's tried again after 15 minutes or the Retry-After wait.
+ * A refresh of a `found` row keeps what that row had, so a throttle at refresh time doesn't
+ * take an introduction or photo away. Only its version and expiry change.
+ */
+export function failedRow(
+  key: string,
+  now: Date,
+  retryAfter = 0,
+  previous: MediaRow | null = null,
+): MediaRow {
+  const expires = expiresAt('failed', now, retryAfter);
+
+  if (previous?.status === 'found') {
+    return { ...previous, lookupVersion: LOOKUP_VERSION, expiresAt: expires.toISOString() };
+  }
+
+  return emptyRow(key, 'failed', expires);
 }
 
 /**

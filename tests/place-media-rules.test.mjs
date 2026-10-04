@@ -288,6 +288,13 @@ test('a thumbnail on thumb.wikimedia.org is used without its tracking query', ()
   );
 });
 
+test('an Artist too long to read safely means no photo, and returns at once', () => {
+  // Crafted HTML that makes the tag regexes slow: about 8 KB here took seconds.
+  const crafted = '<a href="/wiki/File:"'.repeat(400);
+
+  assert.equal(photoSource(fileInfo({ artist: crafted })), null);
+});
+
 test('no licence, a non-free file, a small original or a link off Wikimedia means no photo', () => {
   for (const overrides of [
     { license: null },
@@ -334,4 +341,19 @@ test('a found row with a stored photo answers with our URLs; anything else has n
   assert.equal(toPlaceMedia({ ...row, status: 'none' }, bucketUrl).photo, null);
   assert.equal(toPlaceMedia({ ...row, credit: null }, bucketUrl).photo, null);
   assert.equal(lookupRow('k', null, NOW).photo, null);
+});
+
+test('a failed refresh keeps a found row and only waits before trying again', () => {
+  const found = { ...lookupRow('k', north('Hallstatt', town, 1), NOW), lookupVersion: 1 };
+  const kept = failedRow('k', NOW, 3_600_000, found);
+
+  assert.deepEqual(kept, {
+    ...found,
+    lookupVersion: LOOKUP_VERSION,
+    expiresAt: new Date(NOW.getTime() + 3_600_000).toISOString(),
+  });
+  assert.equal(isFresh(kept, NOW), true);
+  assert.equal(isFresh(kept, new Date(NOW.getTime() + 3_600_001)), false);
+  assert.equal(failedRow('k', NOW, 0, { ...found, status: 'none' }).status, 'failed');
+  assert.equal(failedRow('k', NOW).status, 'failed');
 });

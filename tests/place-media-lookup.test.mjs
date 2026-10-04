@@ -436,6 +436,36 @@ test('a throttled image download holds back the rest of the request like a throt
   }
 });
 
+test('a throttled refresh keeps what a found row already had, started or held back', async (t) => {
+  const places = Array.from({ length: 6 }, (_, index) => spot(index + 1));
+  const old = (place) =>
+    cacheRow(place.key, {
+      lookup_version: 1,
+      page_title: place.name,
+      page_url: `https://en.wikipedia.org/wiki/${place.name.replace(' ', '_')}`,
+      extract: `${place.name} is a place.`,
+    });
+  const [first, , , , , last] = places;
+  const upstream = mediaUpstream({
+    rows: [old(first), old(last)],
+    wikipedia: () => new Response(null, { status: 429, headers: { 'Retry-After': '3600' } }),
+  });
+  const { deps } = setup(t, upstream);
+
+  const answers = await resolvePlaceMedia(deps, places);
+  const saved = (place) => upstream.state.saved.find((row) => row.key === place.key);
+
+  for (const place of [first, last]) {
+    assert.equal(saved(place).status, 'found');
+    assert.equal(saved(place).page_title, place.name);
+    assert.equal(saved(place).lookup_version, 2);
+    assert.equal(saved(place).expires_at, new Date(NOW.getTime() + 3_600_000).toISOString());
+    assert.equal(answers[place.id].about.title, place.name);
+  }
+
+  assert.equal(saved(places[1]).status, 'failed', 'a place with nothing cached is still failed');
+});
+
 test('the cache is read at most 100 keys per query', async (t) => {
   const upstream = mediaUpstream({ rows: [cacheRow('k 150')] });
 

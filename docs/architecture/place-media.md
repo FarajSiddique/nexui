@@ -37,7 +37,7 @@ The same place in any plan shares one key, so Wikipedia is asked about Berlin on
 
 - `searchArticles(name, contact)` is request 1: one Action API call on `en.wikipedia.org` (`generator=search`, `gsrlimit=5`, `prop=pageimages|coordinates|extracts`, `exintro`, `explaintext`, `exsentences=3`). Articles without coordinates are dropped. The page-image API returns only freely licensed lead images.
 - `fileInfo(file, contact)` is request 2: `prop=imageinfo` for the lead image on `commons.wikimedia.org`, with `iiurlwidth=960` and the `Artist`, `LicenseShortName`, `LicenseUrl` and `NonFree` metadata. A file that isn't on Commons, such as one stored only on English Wikipedia, comes back null and gets no photo.
-- `downloadImage(url, contact)` fetches one size without following redirects. It returns null for anything that isn't a JPEG, PNG or WebP by its first bytes, or is over 2 MB.
+- `downloadImage(url, contact)` fetches one size without following redirects. It returns null when Wikimedia refuses the file (a 4xx other than 429), or for anything that isn't a JPEG, PNG or WebP by its first bytes, or is over 2 MB.
 
 Errors:
 
@@ -54,7 +54,7 @@ Errors:
   - Its file page must be on `commons.wikimedia.org`.
   - The tracking query Commons adds to thumbnail URLs is dropped.
   - The 500px URL is the 960px one with the width replaced; both are standard Wikimedia widths. An original narrower than 960px has no 960px thumbnail, so it gets no photo.
-  - The author is `plainText(Artist)`: tags dropped, entities decoded, at most 120 characters. A derivative work's link to its source file is dropped, and list items join with "; ". A missing `Artist` gives an empty author.
+  - The author is `plainText(Artist)`: tags dropped, entities decoded, at most 120 characters. A derivative work's link to its source file is dropped, and list items join with "; ". A missing `Artist` gives an empty author. `Artist` HTML over 4,000 characters means no photo: it isn't parsed, since crafted markup can make the tag regexes slow.
 - The file also holds `imageType` (format from the bytes), the expiry rules, `isFresh`, the row builders and `toPlaceMedia`, which maps a row to what the app sees.
 
 **`storage.ts`** holds the copy:
@@ -93,6 +93,7 @@ Rows and photos:
 
 - `found` means an article matched. Its `photo` is null when there's no lead image or the image fails a rule. Phase 1 wrote version 1 rows with no photos, and those are looked up again on their next view.
 - A `failed` row expires after 15 minutes or the `Retry-After` wait, whichever is later, capped at a day.
+- A refresh that fails keeps a `found` row's content and only moves its version and expiry, so a throttle at refresh time doesn't take an introduction or photo away.
 
 Access: RLS is on with no policies, and `anon` and `authenticated` have no grants. Only the API's secret-key client (`getAdminClient`) reads or writes the table, after the route has loaded the plan as the user. A write never sends `pinned`, so an operator's pin survives.
 
@@ -193,7 +194,8 @@ Two cases add no photos:
 
 - **Throttles:** a 429 or 503 from Wikipedia, Commons or a thumbnail download caches the place as `failed` until `Retry-After` (at least 15 minutes) and stops the request starting new lookups.
 - **Other errors:** HTTP errors, redirects, timeouts and failed uploads cache `failed` for 15 minutes. A photo URL never points at a missing file.
-- **Rejected content:** a file that isn't an image we accept, or is over 2 MB, keeps the row `found` with no photo.
+- **Failed refreshes:** when the cached row was `found`, a failed lookup or a throttle hold-back keeps its introduction and photo and only waits before trying again. The log still counts it as failed.
+- **Rejected content:** a file Wikimedia refuses (404, 403), one that isn't an image we accept, or one over 2 MB keeps the row `found` with its introduction and no photo.
 - **Cache failures:**
   - A failed cache write is logged with its code (`[media] Could not cache a lookup (42501).`), and the lookup's answer is still sent.
   - A failed cache read on the media route is a 500, `Could not load place details. Try again.`
