@@ -3,6 +3,7 @@ import { useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppearanceCard } from '@/components/appearance-card';
 import { FormError, PrimaryButton, TextButton } from '@/components/auth-screen';
 import { deleteAccount } from '@/lib/api';
 import { clearDeletedAccount, signOut } from '@/lib/auth';
@@ -82,6 +83,8 @@ export default function AccountScreen(): ReactElement {
               {status}
             </Text>
           </View>
+          <Text style={styles.label}>Appearance</Text>
+          <AppearanceCard />
 
           <PrimaryButton
             label="Sign out"
