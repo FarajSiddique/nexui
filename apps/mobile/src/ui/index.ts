@@ -4,4 +4,5 @@ export { Button } from './buttons';
 export { FormError, FormNotice } from './form-messages';
 export { ListEmpty, ListError, RefetchNotice, SkeletonRows } from './list-states';
 export { Pill } from './pill';
+export { PlacePhoto } from './place-photo';
 export { HeaderButton, TabHeader } from './tab-header';

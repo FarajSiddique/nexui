@@ -36,6 +36,8 @@ const expected = {
     skyGlow: 'rgba(255, 228, 92, 0.22)',
     skyDetail: '#FFFFFF',
     skyCrater: 'rgba(30, 26, 43, 0.14)',
+    photoScrim: 'rgba(30, 26, 43, 0.72)',
+    photoInk: '#FFFFFF',
   },
   dark: {
     paper: '#15131B',
@@ -65,6 +67,8 @@ const expected = {
     skyGlow: 'rgba(236, 232, 245, 0.06)',
     skyDetail: '#F2EFF8',
     skyCrater: 'rgba(30, 26, 43, 0.14)',
+    photoScrim: 'rgba(30, 26, 43, 0.72)',
+    photoInk: '#FFFFFF',
   },
 };
 
@@ -120,6 +124,7 @@ const textPairs = [
   ['card', 'danger'],
   ['ink', 'line'],
   ['card', 'userMark'],
+  ['photoInk', 'photoScrim'],
 ];
 
 for (const scheme of ['light', 'dark']) {

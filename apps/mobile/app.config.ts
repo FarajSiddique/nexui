@@ -42,6 +42,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-font',
+    'expo-image',
     'expo-secure-store',
     [
       'react-native-maps',

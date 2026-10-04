@@ -31,6 +31,8 @@ const light = {
   skyGlow: 'rgba(255, 228, 92, 0.22)',
   skyDetail: '#FFFFFF', // clouds, or stars in dark
   skyCrater: 'rgba(30, 26, 43, 0.14)',
+  photoScrim: 'rgba(30, 26, 43, 0.72)', // behind text and buttons drawn on a photo, both schemes
+  photoInk: '#FFFFFF', // text on photoScrim
 } as const;
 
 export type TokenName = keyof typeof light;
@@ -65,6 +67,8 @@ const dark: Palette = {
   skyGlow: 'rgba(236, 232, 245, 0.06)',
   skyDetail: '#F2EFF8',
   skyCrater: 'rgba(30, 26, 43, 0.14)',
+  photoScrim: 'rgba(30, 26, 43, 0.72)',
+  photoInk: '#FFFFFF',
 };
 
 export const palettes: Record<Scheme, Palette> = { light, dark };

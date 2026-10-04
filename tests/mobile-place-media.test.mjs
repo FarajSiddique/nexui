@@ -11,6 +11,8 @@ import {
   mediaPollInterval,
   mediaStaleTime,
   placeAbout,
+  placePhoto,
+  placePhotos,
 } from '../apps/mobile/src/data/place-media.ts';
 import {
   KYOTO_ID,
@@ -83,4 +85,33 @@ test('About shows the introduction, a placeholder while looking, then nothing', 
 test('an answer with a pending lookup is stale at once, so opening the plan again asks again', () => {
   assert.equal(mediaStaleTime({ places: { [TOKYO_ID]: { status: 'pending' } } }), 0);
   assert.equal(mediaStaleTime({ places: { [TOKYO_ID]: ready } }), 5 * 60_000);
+});
+
+test('a photo slot shows the photo, pending while it may still come, or nothing', () => {
+  const photo = {
+    url: 'https://x.supabase.co/storage/v1/object/public/place-photos/a/b-960.jpg',
+    thumbUrl: 'https://x.supabase.co/storage/v1/object/public/place-photos/a/b-500.jpg',
+    width: 960,
+    height: 640,
+    credit: {
+      author: 'Kasa Fue',
+      license: 'CC BY-SA 4.0',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tokyo.jpg',
+    },
+  };
+  const media = {
+    places: { [TOKYO_ID]: { ...ready, photo }, [KYOTO_ID]: { status: 'pending' } },
+  };
+  const asking = { loading: false, answers: 1 };
+
+  assert.equal(placePhoto(media, TOKYO_ID, asking), photo);
+  assert.equal(placePhoto(media, KYOTO_ID, asking), 'pending');
+  assert.equal(placePhoto(media, KYOTO_ID, { loading: false, answers: MEDIA_POLLS + 1 }), null);
+  assert.equal(placePhoto({ places: { [TOKYO_ID]: ready } }, TOKYO_ID, asking), null);
+  assert.equal(placePhoto(undefined, TOKYO_ID, { loading: true, answers: 0 }), 'pending');
+  assert.equal(placePhoto(undefined, TOKYO_ID, { loading: false, answers: 0 }), null);
+  assert.deepEqual(placePhotos(media, [TOKYO_ID, KYOTO_ID], asking), {
+    [TOKYO_ID]: photo,
+    [KYOTO_ID]: 'pending',
+  });
 });

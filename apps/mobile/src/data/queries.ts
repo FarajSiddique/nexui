@@ -43,7 +43,15 @@ import {
   undoEvent,
 } from './api';
 import { ApiError } from './api-request';
-import { mediaKeyIds, mediaPollInterval, mediaStaleTime, placeAbout } from './place-media';
+import {
+  mediaKeyIds,
+  mediaPollInterval,
+  mediaStaleTime,
+  placeAbout,
+  placePhotos,
+  type MediaQueryState,
+  type PhotoState,
+} from './place-media';
 import { planDeletes, type DeleteAttempt, type PlanDeletes } from './plan-deletes';
 
 export const queryKeys = {
@@ -144,6 +152,22 @@ export function usePlaceMedia(
   });
 }
 
+// One intent's media and how far its query has got, for `placeAbout` and `placePhotos`.
+function useMediaAnswers(
+  intentId: string,
+  placeIds: readonly string[],
+): { media: IntentMedia | undefined; query: MediaQueryState } {
+  const client = useQueryClient();
+  const media = usePlaceMedia(intentId, placeIds);
+  const answers =
+    client.getQueryState(queryKeys.media(intentId, mediaKeyIds(placeIds)))?.dataUpdateCount ?? 0;
+
+  return {
+    media: media.data,
+    query: { loading: media.isPending || media.isPlaceholderData, answers },
+  };
+}
+
 /**
  * What a stop sheet's About shows for one place (`placeAbout`), from the same query as
  * `usePlaceMedia`. A lookup still pending once the polls have run out shows nothing.
@@ -153,15 +177,22 @@ export function usePlaceAbout(
   placeIds: readonly string[],
   placeId: string,
 ): PlaceAbout | 'pending' | null {
-  const client = useQueryClient();
-  const media = usePlaceMedia(intentId, placeIds);
-  const answers =
-    client.getQueryState(queryKeys.media(intentId, mediaKeyIds(placeIds)))?.dataUpdateCount ?? 0;
+  const { media, query } = useMediaAnswers(intentId, placeIds);
 
-  return placeAbout(media.data, placeId, {
-    loading: media.isPending || media.isPlaceholderData,
-    answers,
-  });
+  return placeAbout(media, placeId, query);
+}
+
+/**
+ * Every place's photo slot by id (`placePhotos`), from the same query as `usePlaceMedia`, so
+ * calling it also starts the plan's lookups.
+ */
+export function usePlacePhotos(
+  intentId: string,
+  placeIds: readonly string[],
+): Readonly<Record<string, PhotoState>> {
+  const { media, query } = useMediaAnswers(intentId, placeIds);
+
+  return placePhotos(media, placeIds, query);
 }
 
 /** A run's status and progress. Realtime refetches it; the poll covers a dropped socket. */

@@ -7,6 +7,7 @@ import {
   type GraphObject,
   type LegData,
   type Money,
+  type PhotoCredit,
   type PlaceData,
   type TripData,
 } from '@nexui/types';
@@ -314,4 +315,17 @@ export function legFigures(leg: LegData): string {
   }
 
   return parts.join(', ');
+}
+
+/**
+ * A photo's credit line, as the stop sheet shows it under the photo.
+ *
+ * @example
+ * photoCredit({ author: 'Kasa Fue', license: 'CC BY-SA 4.0' })
+ * // 'Photo: Kasa Fue, CC BY-SA 4.0, via Wikimedia Commons'
+ */
+export function photoCredit(credit: Pick<PhotoCredit, 'author' | 'license'>): string {
+  const who = [credit.author, credit.license].filter(Boolean).join(', ');
+
+  return `Photo: ${who}, via Wikimedia Commons`;
 }
