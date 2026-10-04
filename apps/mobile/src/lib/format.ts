@@ -5,6 +5,7 @@ import {
   readField,
   type FieldFormat,
   type GraphObject,
+  type LegData,
   type Money,
   type PlaceData,
   type TripData,
@@ -225,4 +226,109 @@ export function cardText(object: GraphObject): { title: string; subtitle: string
     title: typeof title === 'string' && title.length > 0 ? title : (object.title ?? object.kind),
     subtitle,
   };
+}
+
+/** @example capitalize('city') // 'City' */
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const ORDINAL_WORDS = [
+  'first',
+  'second',
+  'third',
+  'fourth',
+  'fifth',
+  'sixth',
+  'seventh',
+  'eighth',
+  'ninth',
+  'tenth',
+];
+
+/**
+ * @example
+ * ordinalWord(2) // 'second'
+ * ordinalWord(12) // '12th'
+ */
+export function ordinalWord(n: number): string {
+  const word = ORDINAL_WORDS[n - 1];
+
+  if (word) {
+    return word;
+  }
+
+  const lastTwo = n % 100;
+
+  if (lastTwo >= 11 && lastTwo <= 13) {
+    return `${n}th`;
+  }
+
+  const suffixes: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
+
+  return `${n}${suffixes[n % 10] ?? 'th'}`;
+}
+
+let regionNames: Intl.DisplayNames | null | undefined;
+
+// Built once; null where the JS engine has no Intl.DisplayNames.
+function regionNameFormat(): Intl.DisplayNames | null {
+  if (regionNames === undefined) {
+    try {
+      regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    } catch {
+      regionNames = null;
+    }
+  }
+
+  return regionNames;
+}
+
+/**
+ * A country's English name from its ISO code, or the code itself where the runtime has no
+ * name for it.
+ *
+ * @example countryName('DE') // 'Germany'
+ */
+export function countryName(code: string): string {
+  try {
+    return regionNameFormat()?.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+const TRAVEL_MODES: Record<LegData['mode'], string> = {
+  flight: 'Flight',
+  train: 'Train',
+  bus: 'Bus',
+  car: 'Drive',
+  ferry: 'Ferry',
+  other: 'Travel',
+};
+
+/** @example travelTo('train', 'Prague') // 'Train to Prague' */
+export function travelTo(mode: LegData['mode'], name: string): string {
+  return `${TRAVEL_MODES[mode]} to ${name}`;
+}
+
+/**
+ * A leg's time and cost, either of which may be missing.
+ *
+ * @example
+ * legFigures({ mode: 'train', estHours: 4.25, estCost: { amount: 40, currency: 'USD' } })
+ * // '4h 15m, ≈ $40'
+ */
+export function legFigures(leg: LegData): string {
+  const parts: string[] = [];
+
+  if (leg.estHours !== undefined) {
+    parts.push(formatHours(leg.estHours));
+  }
+
+  if (leg.estCost) {
+    parts.push(`≈ ${formatMoney(leg.estCost)}`);
+  }
+
+  return parts.join(', ');
 }

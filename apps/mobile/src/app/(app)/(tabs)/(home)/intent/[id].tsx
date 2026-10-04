@@ -96,6 +96,12 @@ export default function WorkspaceScreen(): ReactElement {
   });
 
   const handleAction = (action: WorkspaceAction): void => {
+    if (action.type === 'openPlace') {
+      router.push({ pathname: '/place', params: { intentId: id, placeId: action.placeId } });
+
+      return;
+    }
+
     if (action.type === 'ask') {
       router.push({
         pathname: '/compose',
