@@ -4,7 +4,7 @@ import { emailCodeRequestSchema, emailCodeVerificationSchema } from '@nexui/type
 
 type AuthClient = Pick<
   SupabaseClient['auth'],
-  'signInWithOtp' | 'verifyOtp' | 'signInWithIdToken' | 'signOut'
+  'signInWithOtp' | 'verifyOtp' | 'signInWithIdToken' | 'signOut' | 'updateUser'
 >;
 
 export interface GoogleAuth {
@@ -12,10 +12,25 @@ export interface GoogleAuth {
   signOut(): Promise<void>;
 }
 
+/** What Apple's sheet returns. `nonce` is the raw nonce; the sheet was given its SHA-256 hash. */
+export interface AppleCredential {
+  idToken: string;
+  nonce: string;
+  givenName: string | null;
+  familyName: string | null;
+  authorizationCode: string | null;
+}
+
+export interface AppleAuth {
+  getCredential(): Promise<AppleCredential | null>;
+}
+
 export interface AuthActions {
   sendEmailCode(email: string): Promise<string>;
   verifyEmailCode(email: string, code: string): Promise<void>;
   signInWithGoogle(): Promise<boolean>;
+  signInWithApple(): Promise<boolean>;
+  getAppleDeletionCode(): Promise<string | null>;
   signOut(): Promise<void>;
   clearDeletedAccount(): Promise<void>;
 }
@@ -37,8 +52,44 @@ function authMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-/** Binds auth operations to Supabase and the native Google adapter. */
-export function createAuthActions(auth: AuthClient, google: GoogleAuth): AuthActions {
+/**
+ * Apple's name parts as user metadata, or null when Apple sent none (it only sends a name on the
+ * first authorization).
+ *
+ * @example
+ * appleNameMetadata('Ada', null) // { full_name: 'Ada', given_name: 'Ada' }
+ */
+function appleNameMetadata(
+  givenName: string | null,
+  familyName: string | null,
+): Record<string, string> | null {
+  const given = givenName?.trim() ?? '';
+  const family = familyName?.trim() ?? '';
+  const fullName = [given, family].filter(Boolean).join(' ');
+
+  if (!fullName) {
+    return null;
+  }
+
+  const data: Record<string, string> = { full_name: fullName };
+
+  if (given) {
+    data.given_name = given;
+  }
+
+  if (family) {
+    data.family_name = family;
+  }
+
+  return data;
+}
+
+/** Binds auth operations to Supabase and the native Google and Apple adapters. */
+export function createAuthActions(
+  auth: AuthClient,
+  google: GoogleAuth,
+  apple: AppleAuth,
+): AuthActions {
   async function sendEmailCode(email: string): Promise<string> {
     const parsed = emailCodeRequestSchema.safeParse({ email });
 
@@ -93,6 +144,63 @@ export function createAuthActions(auth: AuthClient, google: GoogleAuth): AuthAct
     }
   }
 
+  /** Returns false when Apple's sheet was cancelled. Saves the name best-effort. */
+  async function signInWithApple(): Promise<boolean> {
+    const credential = await apple.getCredential();
+
+    if (credential === null) {
+      return false;
+    }
+
+    try {
+      const { error } = await auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.idToken,
+        nonce: credential.nonce,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      throw new AuthActionError(authMessage(error, 'Apple sign-in failed. Try again.'));
+    }
+
+    await saveAppleName(credential);
+
+    return true;
+  }
+
+  // The name is a nicety and sign-in has already succeeded, so a failure here is ignored.
+  async function saveAppleName({ givenName, familyName }: AppleCredential): Promise<void> {
+    const data = appleNameMetadata(givenName, familyName);
+
+    if (data === null) {
+      return;
+    }
+
+    try {
+      await auth.updateUser({ data });
+    } catch {
+      // Best-effort, like a returned error.
+    }
+  }
+
+  /** Asks Apple to confirm an Apple account's deletion. Null when the sheet was cancelled. */
+  async function getAppleDeletionCode(): Promise<string | null> {
+    const credential = await apple.getCredential();
+
+    if (credential === null) {
+      return null;
+    }
+
+    if (!credential.authorizationCode) {
+      throw new AuthActionError('Apple did not confirm. Try again.');
+    }
+
+    return credential.authorizationCode;
+  }
+
   /** Tries local scope after a failed sign-out; offline refresh can still make both fail. */
   async function signOut(): Promise<void> {
     await google.signOut();
@@ -117,5 +225,13 @@ export function createAuthActions(auth: AuthClient, google: GoogleAuth): AuthAct
     }
   }
 
-  return { sendEmailCode, verifyEmailCode, signInWithGoogle, signOut, clearDeletedAccount };
+  return {
+    sendEmailCode,
+    verifyEmailCode,
+    signInWithGoogle,
+    signInWithApple,
+    getAppleDeletionCode,
+    signOut,
+    clearDeletedAccount,
+  };
 }
