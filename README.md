@@ -112,10 +112,10 @@ URL reachable from the device is still required. Restart Expo after changing env
 
 Supabase and Google values are required for sign-in; the `.env.example` files list
 them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` lives only
-in `apps/api/.env.local`, where AI runs, account deletion and the place media cache use it.
+in `apps/api/.env.local`, where AI runs, account deletion and the place media cache and photo bucket use it.
 `CRON_SECRET`, also API-only, authorizes Vercel's cron call to `GET /api/cron/runs`.
 `WIKIMEDIA_CONTACT` there is an email address or URL Wikimedia can reach us at; the stop
-details lookup sends it in its User-Agent, and leaving it empty turns lookups off.
+details and photo lookup sends it in its User-Agent, and leaving it empty turns lookups off.
 
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.
 Never use either prefix for secrets. Future server credentials belong only in the

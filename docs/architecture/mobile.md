@@ -16,12 +16,13 @@ edits, and Realtime.
   `sections/` primitives), `changes`, `compose` (the + sheet), `account`, `place` (a stop's details sheet), and
   `shell` (the tab bar). A Zustand store lives in the feature that owns it, as `use-<name>-store.ts`.
 - **`ui/`**: shared building blocks such as `Button` (its `ink` variant is a screen's main
-  action, like Sign out), `Pill`, the list states including `RefetchNotice`, `FormError` and
-  `FormNotice`, and the tab header.
-- **`theme/`**: the palettes and fonts, `useColors`/`createThemedStyles`, and the appearance
+  action, like Sign out), `PlacePhoto` (a place's photo on `expo-image`), `Pill`, the list states
+  including `RefetchNotice`, `FormError` and `FormNotice`, and the tab header.
+- **`theme/`**: the palettes and fonts (the `photoScrim` and `photoInk` tokens, the same in both
+  themes, are for text and buttons drawn on a photo), `useColors`/`createThemedStyles`, and the appearance
   choice.
 - **`data/`**: the API and Supabase clients, the TanStack Query hooks and keys (`queries.ts`, with
-  `usePlaceMedia`), and Realtime (`use-intent-live.ts`).
+  `usePlaceMedia`, `usePlacePhotos` and the `PhotoState` type), and Realtime (`use-intent-live.ts`).
 - **`lib/`**: pure helpers that several features share (`format.ts`).
 
 Imports run one way. Routes import from anywhere. Features import `ui`, `theme`, `data` and `lib`,
@@ -109,7 +110,7 @@ into a close.
 These files under `apps/mobile/src/` have no `react-native` import, so `tests/mobile-*.test.mjs`
 can run them under plain Node with no RN runtime: `lib/format.ts`; `ai-mark.ts`,
 `workspace-layout.ts`, `workspace-actions.ts`, `stop-details.ts` and `sections/map-region.ts` in
-`features/workspace/`; `features/changes/change-feed.ts`; and `plan-deletes.ts`,
+`features/workspace/`; `features/changes/change-feed.ts`; `features/home/photo-band.ts`; and `plan-deletes.ts`,
 `api-request.ts`, `intent-channel.ts` and `place-media.ts` in `data/`.
 
 They import siblings by relative `.ts` paths. The only barrel they may import is `#lib`, whose
@@ -129,7 +130,8 @@ React Native and breaks the tests.
   builds the `ChangesetOp[]` a `setDays` or `move` shows at once.
 - **`stop-details.ts`**: `stopDetails(snapshot, placeId)`, what the stop's sheet shows.
 - **`place-media.ts`**: `mediaPlaceIds`, `mediaKeyIds` and `mediaPollInterval` for
-  `usePlaceMedia`.
+  `usePlaceMedia`, and `placeAbout` and `placePhotos` for what each place shows (`PhotoState`).
+- **`photo-band.ts`**: `photoBand`, the photos and "+N" of a Home card's band.
 - **`map-region.ts`**: `fitRegion`, the map's camera for a set of points.
 - **`change-feed.ts`**: `buildChangeRows`, `filterRows` and `groupByDay` for the Changes feed and
   Home's "What changed".
@@ -142,10 +144,13 @@ React Native and breaks the tests.
 
 `SECTION_REGISTRY` (`apps/mobile/src/features/workspace/sections/registry.tsx`) maps every
 `Section['type']` to its primitive component; a type with no entry fails typecheck. Every primitive
-receives `{ section, data, snapshot, onAction, busy }` (`SectionProps<T>` in `./types.ts`): it
+receives `{ section, data, snapshot, photos, onAction, busy }` (`SectionProps<T>` in `./types.ts`): it
 renders and reports a `WorkspaceAction` through `onAction`, and never calls the API itself — the
 workspace screen (`intent/[id].tsx`) is the only place a `WorkspaceAction` becomes a capability
 request or a push to `+` or `/place`.
+
+`photos` is each place's `PhotoState` by id, which the workspace screen passes from
+`usePlacePhotos`.
 
 A route row is one button per stop (`openPlace`), with the ↑↓ and the day stepper on a line below.
 `DayStepper` lives in `features/workspace/day-stepper.tsx`, shared with the place sheet.
@@ -293,8 +298,8 @@ same edit path as the route (see "Optimistic edits"). Like the + sheet, its root
 `collapsable={false}` with an empty `<View collapsable={false} />` first child; without them
 react-native-screens resizes the ScrollView and the iOS form sheet shows blank. `usePlaceMedia(intentId, placeIds)` fetches
 `GET /api/intents/:id/media`, refetching every 2 s while any place is pending, up to ten times, and
-the workspace screen calls it for every place in the plan so the sheet usually opens with its
-introduction. The lookup and cache are in
+the workspace screen calls it, through `usePlacePhotos`, for every place in the plan so the sheet
+usually opens with its introduction and photo. The lookup and cache are in
 [`docs/architecture/place-media.md`](./place-media.md).
 
 ## Error display
@@ -323,6 +328,9 @@ route line in stop order.
 Changing anything under `ios`/`android`/`plugins` in `app.config.ts`, or the maps key, needs a new
 native dev client, not just a JS reload: `pnpm --filter @nexui/mobile exec expo run:ios` (or
 `run:android`).
+
+`expo-image`, which `PlacePhoto` uses, is a native module with a config plugin in `app.config.ts`,
+so photos need a new dev client and a new EAS preview build.
 
 ## iOS scene life cycle
 
