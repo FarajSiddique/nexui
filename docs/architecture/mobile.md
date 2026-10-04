@@ -15,7 +15,9 @@ edits, and Realtime.
 - **`features/<area>/`**: what one area of the app needs: `auth`, `home`, `workspace` (with its
   `sections/` primitives), `changes`, `compose` (the + sheet), `account`, and `shell` (the tab
   bar). A Zustand store lives in the feature that owns it, as `use-<name>-store.ts`.
-- **`ui/`**: shared building blocks such as `Button`, `Pill`, the list states and the tab header.
+- **`ui/`**: shared building blocks such as `Button` (its `ink` variant is a screen's main
+  action, like Sign out), `Pill`, the list states including `RefetchNotice`, `FormError` and
+  `FormNotice`, and the tab header.
 - **`theme/`**: the palettes and fonts, `useColors`/`createThemedStyles`, and the appearance
   choice.
 - **`data/`**: the API and Supabase clients, the TanStack Query hooks and keys (`queries.ts`), and
@@ -216,10 +218,11 @@ first-child chain to fill the sheet, which hides the body behind the composer. K
 ScrollView stays at the height React lays out.
 
 **See the choice** sets `use-reveal-store.ts` (`revealOpenBand(intentId)`) and dismisses the sheet.
-The workspace screen watches the flag: once it is focused again and its Open band has been laid out
-(it measures the page and the band with `onLayout`, and waits out a 0×0 layout, which is what Expo
-web reports for a screen hidden under the sheet), it scrolls the band into view and clears the
-flag. If the loaded plan has nothing open, it just clears it. The decision card shows _You asked
+The workspace screen watches the flag through `useRevealOpenBand`
+(`apps/mobile/src/features/workspace/use-reveal-open-band.ts`): once it is focused again and its
+Open band has been laid out (it measures the page and the band with `onLayout`, and waits out a
+0×0 layout, which is what Expo web reports for a screen hidden under the sheet), it scrolls the
+band into view and clears the flag. If the loaded plan has nothing open, it just clears it. The decision card shows _You asked
 "…"_ above its question from `DecisionData.asked`, cut to two lines; a decision the user or a
 derivation made has none.
 
@@ -234,11 +237,11 @@ tap can't fire a second retry underneath the first.
 
 Home and the workspace show a full `ListError` (with retry) only when nothing has loaded yet
 (`isLoadingError`, or a 404 as "This plan no longer exists."). Once something has loaded, a
-failed refetch (`isRefetchError`) shows a small inline notice — a 44 pt `Pressable` reading
-"Couldn't refresh your plans/this plan. Showing what was last loaded. Tap to try again." — over
-the stale data instead of replacing it; tapping it calls `refetch()` again. The Changes tab shows
-the equivalent notice as plain (non-interactive) text, since its feed already refetches on its own
-whenever the tab regains focus.
+failed refetch (`isRefetchError`) shows `RefetchNotice` (`apps/mobile/src/ui/list-states.tsx`)
+over the stale data instead of replacing it: a 44 pt button reading "Couldn't refresh your
+plans/this plan. Showing what was last loaded. Tap to try again." that calls `refetch()` again.
+The Changes tab passes no `onRetry`, so its notice is plain (non-interactive) text without "Tap to
+try again.", since its feed already refetches on its own whenever the tab regains focus.
 
 A failed plan delete shows a similar tappable notice on Home (see "Deleting a plan").
 
