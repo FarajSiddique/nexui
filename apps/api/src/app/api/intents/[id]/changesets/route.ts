@@ -1,11 +1,8 @@
 import { changesetRequestSchema, commitResponseSchema, fromUserOps, idSchema } from '@nexui/types';
 
-import { commitChangeset } from '../../../../../lib/graph/commit.ts';
-import { graphErrorResponse } from '../../../../../lib/graph/respond.ts';
-import { readJsonBody } from '../../../../../lib/http/json-body.ts';
-import { corsHeaders, jsonError, preflight } from '../../../../../lib/http/responses.ts';
-import { getUserClient } from '../../../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../../../lib/supabase/verify-request.ts';
+import { commitChangeset, graphErrorResponse } from '#lib/graph';
+import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['POST'], ['Authorization', 'Content-Type']);
 

@@ -114,7 +114,7 @@ route.ts → fromUserOps → prepareChangeset → apply_changeset (RPC) → { ev
      ops include `set_workspace` or `delete_object` it checks the workspace doc still names only
      live objects, so deleting the trip (the anchor) or a decision the doc shows is a 400.
   3. The validated ops are staged in memory (`applyOps`), and `deriveForTemplate`
-     (`apps/api/src/lib/templates/index.ts`) runs the intent's template derivation — `derive.trip`
+     (`apps/api/src/lib/templates/derive.ts`) runs the intent's template derivation — `derive.trip`
      for `template: 'travel'` — over the staged result, producing more ops with `origin:
 'derived'`.
   4. `coalesceOps` merges the direct and derived ops down to one op per row (a row can only

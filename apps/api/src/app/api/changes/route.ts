@@ -1,10 +1,8 @@
 import { changesQuerySchema, changesResponseSchema } from '@nexui/types';
 
-import { graphErrorResponse } from '../../../lib/graph/respond.ts';
-import { listChanges } from '../../../lib/graph/lists.ts';
-import { corsHeaders, jsonError, preflight } from '../../../lib/http/responses.ts';
-import { getUserClient } from '../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../lib/supabase/verify-request.ts';
+import { graphErrorResponse, listChanges } from '#lib/graph';
+import { corsHeaders, jsonError, preflight } from '#lib/http';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET'], ['Authorization']);
 

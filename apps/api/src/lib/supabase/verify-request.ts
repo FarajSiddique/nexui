@@ -1,6 +1,7 @@
 import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 
-import { jsonError } from '../http/responses.ts';
+import { jsonError } from '#lib/http';
+
 import { getAuthClient, SupabaseConfigurationError } from './clients.ts';
 
 export interface AuthUser {

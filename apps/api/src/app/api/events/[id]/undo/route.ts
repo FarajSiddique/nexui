@@ -1,10 +1,8 @@
 import { commitResponseSchema, idSchema } from '@nexui/types';
 
-import { revertEvent } from '../../../../../lib/graph/commit.ts';
-import { graphErrorResponse } from '../../../../../lib/graph/respond.ts';
-import { corsHeaders, jsonError, preflight } from '../../../../../lib/http/responses.ts';
-import { getUserClient } from '../../../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../../../lib/supabase/verify-request.ts';
+import { revertEvent, graphErrorResponse } from '#lib/graph';
+import { corsHeaders, jsonError, preflight } from '#lib/http';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['POST'], ['Authorization']);
 

@@ -4,9 +4,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { CapabilityRequest, ChangesetOp, GraphSnapshot } from '@nexui/types';
 
-import { commitChangeset, type CommitResult } from '../graph/commit.ts';
-import { ChangesetInvalidError } from '../graph/errors.ts';
-import { loadSnapshot } from '../graph/snapshot.ts';
+import {
+  commitChangeset,
+  type CommitResult,
+  ChangesetInvalidError,
+  loadSnapshot,
+} from '#lib/graph';
+
 import { findCapability } from './registry.ts';
 import { createStager } from './stage.ts';
 import { CapabilityError, type Capability } from './types.ts';

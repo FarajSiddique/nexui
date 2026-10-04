@@ -6,8 +6,8 @@ import {
   type ToolSet,
 } from 'ai';
 
-import type { GatewayOptions } from '../ai/config.ts';
-import type { RunUsage } from '../runs/store.ts';
+import type { GatewayOptions } from '#lib/ai';
+import type { RunUsage } from '#lib/runs';
 
 /** `single`: one forced tool step plus one correction (edit, fast). `loop`: plan with tools. */
 export type ModelMode = 'single' | 'loop';

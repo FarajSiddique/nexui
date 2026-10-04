@@ -1,6 +1,7 @@
-import { AiConfigurationError } from '../ai/config.ts';
-import { jsonError } from '../http/responses.ts';
-import { SupabaseConfigurationError } from '../supabase/clients.ts';
+import { AiConfigurationError } from '#lib/ai';
+import { jsonError } from '#lib/http';
+import { SupabaseConfigurationError } from '#lib/supabase';
+
 import { ChangesetConflictError, ChangesetInvalidError, GraphNotFoundError } from './errors.ts';
 
 // Only a short code such as a SQLSTATE or `PGRST202` is logged, never an error's message.

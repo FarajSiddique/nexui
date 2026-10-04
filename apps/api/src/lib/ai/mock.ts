@@ -3,7 +3,8 @@ import { Experimental_EvaluationMockModelV4, MockLanguageModelV4 } from 'ai/test
 
 import type { RunKind } from '@nexui/types';
 
-import { toolNameFor } from '../cognition/tools.ts';
+import { toolNameFor } from '#lib/cognition';
+
 import type { RunFixture } from './fixtures/types.ts';
 
 /** The first fixture for `kind` whose phrases all appear in `text`, ignoring case. */

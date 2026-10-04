@@ -12,7 +12,7 @@ import {
   type RunStatus,
 } from '@nexui/types';
 
-import { GraphNotFoundError, mapRpcError } from '../graph/errors.ts';
+import { GraphNotFoundError, mapRpcError } from '#lib/graph';
 
 /** A queued, running or stopping run older than this has stopped: its function instance ended. */
 export const RUN_STALE_MS = 6 * 60 * 1000;

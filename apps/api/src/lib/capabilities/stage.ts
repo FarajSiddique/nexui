@@ -9,8 +9,8 @@ import {
   type RunProgressEntry,
 } from '@nexui/types';
 
-import { ChangesetInvalidError } from '../graph/errors.ts';
-import { validateOps } from '../graph/prepare.ts';
+import { ChangesetInvalidError, validateOps } from '#lib/graph';
+
 import { buildRefTable, claimRefs, type RefTable } from './refs.ts';
 import {
   CapabilityError,

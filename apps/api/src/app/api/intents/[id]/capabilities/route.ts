@@ -1,11 +1,9 @@
 import { capabilityRequestSchema, commitResponseSchema, idSchema } from '@nexui/types';
 
-import { invokeCapability } from '../../../../../lib/capabilities/invoke.ts';
-import { graphErrorResponse } from '../../../../../lib/graph/respond.ts';
-import { readJsonBody } from '../../../../../lib/http/json-body.ts';
-import { corsHeaders, jsonError, preflight } from '../../../../../lib/http/responses.ts';
-import { getUserClient } from '../../../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../../../lib/supabase/verify-request.ts';
+import { invokeCapability } from '#lib/capabilities';
+import { graphErrorResponse } from '#lib/graph';
+import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['POST'], ['Authorization', 'Content-Type']);
 

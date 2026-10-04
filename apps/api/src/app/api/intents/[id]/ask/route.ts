@@ -1,12 +1,10 @@
 import { askRequestSchema, askResponseSchema, idSchema } from '@nexui/types';
 
-import { sessionOpener } from '../../../../../lib/ai/session.ts';
-import { graphErrorResponse } from '../../../../../lib/graph/respond.ts';
-import { readJsonBody } from '../../../../../lib/http/json-body.ts';
-import { corsHeaders, jsonError, preflight } from '../../../../../lib/http/responses.ts';
-import { startAsk } from '../../../../../lib/orchestrator/orchestrate.ts';
-import { getUserClient } from '../../../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../../../lib/supabase/verify-request.ts';
+import { sessionOpener } from '#lib/ai';
+import { graphErrorResponse } from '#lib/graph';
+import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
+import { startAsk } from '#lib/orchestrator';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['POST'], ['Authorization', 'Content-Type']);
 

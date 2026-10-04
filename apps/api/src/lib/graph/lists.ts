@@ -2,7 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChangesQuery, ChangesResponse, IntentListItem, IntentSummary } from '@nexui/types';
 
-import { activeRunIntentIds } from '../runs/store.ts';
+import { activeRunIntentIds } from '#lib/runs';
+
 import { mapRpcError } from './errors.ts';
 import { mapChangeRow, mapIntentListRow } from './mappers.ts';
 

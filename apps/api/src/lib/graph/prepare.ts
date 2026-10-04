@@ -7,7 +7,8 @@ import {
   type GraphSnapshot,
 } from '@nexui/types';
 
-import { deriveForTemplate } from '../templates/index.ts';
+import { deriveForTemplate } from '#lib/templates';
+
 import { ChangesetInvalidError } from './errors.ts';
 
 /** A user's edit to something Nexui wrote clears its highlighter (spec section D). */
