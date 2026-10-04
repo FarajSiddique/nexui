@@ -12,7 +12,7 @@ import {
   queryKeys,
   useIntent,
   useIntents,
-  usePlaceMedia,
+  usePlacePhotos,
   useUndo,
   useWorkspaceEdit,
   useIntentLive,
@@ -92,8 +92,9 @@ export default function WorkspaceScreen(): ReactElement {
   );
   const placeIds = useMemo(() => (snapshot ? mediaPlaceIds(snapshot) : []), [snapshot]);
 
-  // Looks the plan's places up as soon as it's open, so a stop's sheet opens with its details.
-  usePlaceMedia(id, placeIds);
+  // Looks the plan's places up as soon as it's open, so stops show their photos and a stop's
+  // sheet opens with its details.
+  const photos = usePlacePhotos(id, placeIds);
 
   const hasOpenBand = blocks.some((block) => block.kind === 'open');
   const band = useRevealOpenBand(scroll, {
@@ -185,6 +186,7 @@ export default function WorkspaceScreen(): ReactElement {
                   snapshot={data}
                   onAction={handleAction}
                   busy={edit.isPending}
+                  photos={photos}
                 />
               ))}
             </View>
@@ -195,6 +197,7 @@ export default function WorkspaceScreen(): ReactElement {
               snapshot={data}
               onAction={handleAction}
               busy={edit.isPending}
+              photos={photos}
             />
           ),
         )}
