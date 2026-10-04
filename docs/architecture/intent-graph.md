@@ -17,8 +17,8 @@ model; this doc cites the code that implements it.
 ## Tables and writers
 
 Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are
-in `20260929000000_runs.sql`, redefined by `20260930000000_run_cutoff.sql` and
-`20261003000000_run_stopping.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
+in `20260929000000_runs.sql`, redefined by `20260930000000_run_cutoff.sql`,
+`20261003000000_run_stopping.sql` and `20261004130000_run_queue.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
 `workspaces`, and `runs` (one per AI request; see "AI runs"). Every table is owner-scoped by RLS.
 Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s those and only `grant`s
 `select` to `authenticated`. All writes go through `security definer` functions:
@@ -42,7 +42,7 @@ Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s tho
 - `delete_intent(id)` (`20261004000000_delete_intent.sql`): deletes one of the caller's intents
   with everything under it (objects, relationships, events, workspace and runs cascade). It
   refuses with `NXU12` while a run on the intent is queued, running or stopping and younger than
-  6 minutes, the same rule as `create_run`, and with `NXU04` when the intent is missing or not
+  15 minutes, the same rule as `create_run`, and with `NXU04` when the intent is missing or not
   the caller's. `DELETE /api/intents/[id]` (`deleteIntent` in `apps/api/src/lib/graph/commit.ts`)
   calls it and answers 204. A bad id or `NXU04` is a 404, `NXU12` a 409 "Nexui is still working
   on this plan.", and anything else a logged, safe 500 "Could not delete that plan. Try again.".
@@ -61,7 +61,16 @@ duplicate live relationship). Read the migration for the exact checks.
 
 The functions are still callable with the caller's own token, so a client that skips the API can
 write unvalidated `data` or mislabel the actor of its own changes — accepted for slice 1 (spec
-section C), because AI runs write with the user's token too.
+section C). AI runs don't use the caller's token: the worker functions below are executable by
+`service_role` only, and each takes the user and intent from the run row.
+
+**Live updates.** `20261004120000_intent_broadcast.sql` adds triggers that send a Realtime
+Broadcast message on the private topic `intent:<id>` (`realtime.send`, event `changed`, payload
+`{ table }`): one per `events` insert, so one per changeset or Undo however many rows it touched,
+and one per `runs` insert or update. A select policy on `realtime.messages` lets only the intent's
+owner join the topic, and no insert policy lets a client send on it. The five graph tables are not
+in the `supabase_realtime` publication. A failed send is a warning and never rolls back a write.
+The mobile side is in [`mobile.md`](./mobile.md).
 
 **Error codes and HTTP mapping** (`apps/api/src/lib/graph/errors.ts#mapRpcError`, used by
 `apps/api/src/lib/graph/respond.ts#graphErrorResponse`):
@@ -73,6 +82,7 @@ section C), because AI runs write with the user's token too.
 | `NXU09`       | A row changed since, or Undo/Redo would leave a link dangling             | 409                                         |
 | `NXU10`       | Already undone (including two Undos racing on the unique index)           | 409                                         |
 | `NXU11`       | Already exists: a reused id or a second live copy of a link               | 409 "That already exists."                  |
+| `NXU13`       | A run's lease moved on (reaped or claimed again)                          | `RunLeaseLostError`; the worker stops       |
 | `NXU22`       | Malformed changeset (bad op/origin/source/run, missing or invalid column) | 400                                         |
 | anything else | Unknown                                                                   | 500, logged as `[tag] <fallback> (<code>).` |
 
@@ -181,7 +191,7 @@ length becomes known or unknown.
 
 `POST /api/intents` and `POST /api/intents/[id]/ask` perceive, then start a run
 (`src/lib/orchestrator/orchestrate.ts`). The route answers at once; `after()` executes the run
-with the user's token, so RLS applies to everything it writes.
+as a worker with the service-role client (see "Run queue" below).
 
 - **Perception** (`src/lib/perception`): Jev (`NEXUI_MODEL_PERCEPTION`, `typesafe-ai/jev`)
   answers one choice question within 5 seconds. A goal is `travel` or `none`; an ask is `edit`,
@@ -192,12 +202,12 @@ with the user's token, so RLS applies to everything it writes.
   logged under `[intents]` with only its error code, and the original error is still the one
   rethrown.
 - **Runs** (`src/lib/runs`, `20260929000000_runs.sql`, `20260930000000_run_cutoff.sql`,
-  `20261003000000_run_stopping.sql`): a run is `queued`, `running`, `stopping`,
+  `20261003000000_run_stopping.sql`, `20261004130000_run_queue.sql`): a run is `queued`, `running`, `stopping`,
   `awaiting_approval` (unused in slice 1), `succeeded`, `failed` or `cancelled`.
   `ACTIVE_RUN_STATUSES` / `isActiveRunStatus` (`packages/types/src/runs.ts`) are the first three.
   - `create_run` refuses while another run on the intent is queued, running or stopping (NXU12,
     409), so a stopped run's last commit can never land under a newer run.
-  - `record_run_step` appends each step's calls to `runs.progress`
+  - `run_record_step` appends each step's calls to `runs.progress`
     (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries would take
     `progress` past 100 is not recorded, so it holds at most 100 entries. It also appends the
     step's tokens to `runs.model_usage`, and returns the status. A stopping run keeps that last
@@ -207,11 +217,37 @@ with the user's token, so RLS applies to everything it writes.
     `stopping`, the executor commits and records that step, then finishes the run `cancelled`.
     A queued or awaiting-approval run is cancelled at once. A run that already finished, or is
     already stopping, comes back unchanged.
-  - `finish_run` turns a stopping run into `cancelled`, or `failed` with the error if its last
-    step failed, and never changes a finished run.
-  - A run still queued, running or stopping 6 minutes after it was created (a function instance
-    stops after 300 s) reads as failed ("This run stopped unexpectedly."), and stops blocking
-    `create_run`.
+  - `run_finish` turns a stopping run into `cancelled`, or `failed` with the error if its last
+    step failed, and never changes a finished run. A queued run whose lease hasn't started a step
+    is cancelled at once by `cancel_run`.
+  - A run still queued, running or stopping 15 minutes after it was created reads as failed
+    ("This run stopped unexpectedly."), and stops blocking `create_run`. The reaper settles it
+    sooner; the read-time cutoff (`RUN_STALE_MS`) is the backstop if the cron is down.
+  - **Run queue** (`20261004130000_run_queue.sql`, `src/lib/runs/worker.ts`): the `runs` table is
+    the queue. `runs.attempts`, `lease_id` and `lease_expires_at` record a claim. The worker
+    functions are `security definer` and executable by `service_role` only; every write names the
+    run and its lease, and a lease that isn't the run's raises `NXU13`.
+    - `claim_runs(run_id, limit, lease_seconds, max_active)` leases `queued` runs with
+      `for update skip locked`, skipping runs past the deadline and claiming nothing once
+      `max_active` runs hold a live lease. With a run id it claims that run (the fast path);
+      without one it takes the oldest unclaimed runs created over 10 seconds ago.
+    - `run_record_step`, `run_finish` and `run_apply_changeset(run_id, lease_id, ops,
+expected_activity_at)` do the run's writes. The last has no intent or actor parameter: it
+      applies the ops as actor `ai` for the run's own user and intent. `record_run_step` and
+      `finish_run` no longer exist.
+    - `reap_runs()` handles each active run whose lease lapsed or that is past the deadline: a
+      `stopping` run becomes `cancelled`; a run with a committed changeset, a run past the
+      deadline or one with 2 attempts becomes `failed`; anything else goes back to `queued`
+      with its progress cleared (`model_usage` is kept). So a run that committed nothing is
+      retried once, and one that committed keeps its steps and fails.
+    - The route creates the run with the user's client, then `after()` calls `workRun`, which
+      claims it, opens an AI session from the run's kind and input, and runs `executeRun` with the
+      admin client and the lease. `RUN_LEASE_SECONDS` is 330. On `NXU13` the executor stops
+      without finishing the run.
+    - `GET /api/cron/runs` (`apps/api/vercel.json`, every minute) checks
+      `Authorization: Bearer <CRON_SECRET>` (`verify-cron.ts`: 401 on a mismatch, 503 and a
+      `[cron]` log when unset), then `sweepRuns` reaps, claims up to `RUN_SWEEP_LIMIT` (10) runs
+      and executes them in `after()`. `RUN_MAX_ACTIVE` (default 100) caps live leases.
   - Home shows "Drafting" on intents with a working run.
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
@@ -302,13 +338,19 @@ In the web preview a live browser color-scheme change only applies after a reloa
   `psql`) against a scratch database. Creates two throwaway users, exercises create, change,
   undo, redo and cross-user isolation through the RPCs, and rolls everything back in one
   transaction — nothing it does persists.
-- `supabase/tests/runs-smoke.sql`: the run functions, `discard_intent` and `delete_intent`, as two
-  throwaway users, rolled back: Stop on a running run (stopping, its last step kept, `NXU12`
-  meanwhile, then cancelled, or failed with its error), a queued run cancelled at once,
+- `supabase/tests/runs-smoke.sql`: the worker functions (as `service_role`), `cancel_run`,
+  `discard_intent` and `delete_intent`, as two throwaway users, rolled back: Stop on a running run
+  (stopping, its last step kept, `NXU12` meanwhile, then cancelled, or failed with its error), a
+  queued run cancelled at once, lease loss (`NXU13`), reap and retry, reap to failed, and the
+  concurrency cap,
   `discard_intent` refusing an intent with a run or another user's, and `delete_intent` refusing a
   plan with an active run (`NXU12`) or another user's (`NXU04`), then removing a plan with its
   graph, runs and events. With the project linked, it also runs as
   `pnpm exec supabase db query --linked -f supabase/tests/runs-smoke.sql`.
+- `supabase/tests/broadcast-smoke.sql`: a changeset and each run write send one message on the
+  intent's topic, the owner can join it and another user can't. Rolled back.
+  Both SQL smoke tests run against a local `supabase start` with
+  `psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f <file>`.
 - `scripts/smoke-intent-graph.mjs [.qa/session.json] [apiUrl]`: a live end-to-end check against
   a running API. Needs a QA session (`node scripts/qa-session.mjs > .qa/session.json`) and the
   API running (`pnpm dev:api`). It needs AI_PROVIDER=mock and waits for each run. After an ask

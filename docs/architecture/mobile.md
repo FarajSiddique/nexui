@@ -110,8 +110,8 @@ into a close.
 These files under `apps/mobile/src/` have no `react-native` import, so `tests/mobile-*.test.mjs`
 can run them under plain Node with no RN runtime: `lib/format.ts`; `ai-mark.ts`,
 `workspace-layout.ts`, `workspace-actions.ts` and `sections/map-region.ts` in
-`features/workspace/`; `features/changes/change-feed.ts`; and `plan-deletes.ts` and
-`api-request.ts` in `data/`.
+`features/workspace/`; `features/changes/change-feed.ts`; and `plan-deletes.ts`,
+`api-request.ts` and `intent-channel.ts` in `data/`.
 
 They import siblings by relative `.ts` paths. The only barrel they may import is `#lib`, whose
 `index.ts` also uses `.ts` paths so Node can load it. Any other barrel, such as `#data`, pulls in
@@ -182,27 +182,30 @@ The route's user-callable capabilities — `trip.setPlaceDays`, `trip.reorderPla
 
 `useIntentLive(intentId)` (`apps/mobile/src/data/use-intent-live.ts`) keeps an open workspace
 current while the server writes to it without the client asking — a run filling it in, or another
-device's edit. It subscribes to INSERT and UPDATE on `objects`, `relationships`, `workspaces`,
-`runs` and `events`, filtered to `intent_id=eq.<id>`, scoped by RLS. It never subscribes to
-DELETE, because Realtime delivers DELETE events to every subscriber without RLS or filters, so
-every user's plan delete would reach every open channel. Rows under a plan are only hard-deleted
-with the whole plan or by an Undo, which also inserts an `events` row. A burst of row changes
-collapses into one refetch per 300 ms: the run, intents and changes lists always refetch, but the
-intent snapshot itself waits (re-arming only its own retry, not the lists') while the user's own
-edit is still in flight, so a refetch can't briefly undo an optimistic change. Each mount opens a
-channel with a unique topic (`intent-<id>-<random>`), because `supabase.channel` returns an
-existing channel for a topic already in use, which would throw on a second `.on(...)` for a
-remount of the same intent.
+device's edit. The database broadcasts a `changed` message on the private topic `intent:<id>` for
+each changeset and each run write, and only the intent's owner may join it (see
+[`intent-graph.md`](./intent-graph.md)). The hook treats the message as a signal only and
+refetches. A burst of messages collapses into one refetch per 300 ms: the run, intents and
+changes lists always refetch, but the intent snapshot itself waits (re-arming only its own retry,
+not the lists') while the user's own edit is still in flight, so a refetch can't briefly undo an
+optimistic change.
 
-`subscribe` takes a status callback: on every `SUBSCRIBED` — including a rejoin after
-`CHANNEL_ERROR` or `TIMED_OUT`, or the socket dropping and reconnecting — it runs the same
-catch-up (lists plus the intent key), since `postgres_changes` gives no other sign that events
-were missed while disconnected.
+`createIntentChannels` (`apps/mobile/src/data/intent-channel.ts`) owns the channels. It takes the
+Realtime client (`channel`, `removeChannel`), so it is tested without Supabase. `watch(intentId,
+{ onChange, onSubscribed })` returns a release function. There is one private channel per intent,
+shared by its watchers, because `supabase.channel` returns the existing channel for a topic and a
+private topic can't carry a random suffix. The last release removes the channel; a watch that
+arrives while the removal is in flight waits for it and opens a fresh one.
+
+`onSubscribed` runs on every `SUBSCRIBED` — including a rejoin after `CHANNEL_ERROR` or
+`TIMED_OUT`, or the socket dropping and reconnecting — and at once for a watcher joining an
+already-subscribed channel. The hook runs the same catch-up there (lists plus the intent key),
+since Broadcast doesn't replay messages missed while disconnected.
 
 Three polls cover what Realtime and a rejoin don't:
 
 - `useIntents` (Home's cards) polls every 4 s while any intent's summary badge reads `running`,
-  since `intents` isn't a table `useIntentLive` watches. When that goes from some plan Drafting to
+  since a change to `intents` alone sends no message. When that goes from some plan Drafting to
   none, it invalidates `changes` once more, to catch a run's last change even if it landed just
   before this poll saw the plan settle.
 - `useIntent(id, { poll })` polls every 4 s while its workspace screen passes `poll: true` (set
@@ -212,14 +215,13 @@ Three polls cover what Realtime and a rejoin don't:
   an optimistic change. The workspace screen also invalidates the intent key and `changes` once,
   directly, the moment `drafting` flips from true to false.
 - `useRecentChanges` (Home's "What changed") polls on the same 4 s cadence as `useIntents`, reading
-  its cached data to decide whether any plan is Drafting, since a run's changes aren't on Realtime
+  its cached data to decide whether any plan is Drafting, since no channel is open for a run's changes
   when no workspace is open for it.
 
 `useRun` polls every 3 s while its run is active (`queued`, `running` or `stopping`, through
 `isRunActive`), as a fallback for a dropped socket, unrelated to the polls above.
 
-There is one Realtime channel per intent. The workspace stays mounted under the + sheet with its
-own channel, so the sheet calls `useIntentLive(params.intentId ? null : target)`: it subscribes
+The workspace stays mounted under the + sheet with its own watcher, so the sheet calls `useIntentLive(params.intentId ? null : target)`: it subscribes
 only for a plan it started itself, not for the plan open underneath.
 
 The Changes tab (`apps/mobile/src/app/(app)/(tabs)/changes.tsx`) doesn't poll — the feed
