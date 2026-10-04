@@ -1,6 +1,5 @@
-import { corsHeaders, jsonError, preflight } from '../../../lib/http/responses.ts';
-import { getAdminClient, SupabaseConfigurationError } from '../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../lib/supabase/verify-request.ts';
+import { corsHeaders, jsonError, preflight } from '#lib/http';
+import { getAdminClient, SupabaseConfigurationError, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['DELETE'], ['Authorization']);
 

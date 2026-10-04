@@ -4,14 +4,11 @@ import {
   intentListResponseSchema,
 } from '@nexui/types';
 
-import { sessionOpener } from '../../../lib/ai/session.ts';
-import { graphErrorResponse } from '../../../lib/graph/respond.ts';
-import { listIntents } from '../../../lib/graph/lists.ts';
-import { readJsonBody } from '../../../lib/http/json-body.ts';
-import { corsHeaders, jsonError, preflight } from '../../../lib/http/responses.ts';
-import { startIntent } from '../../../lib/orchestrator/orchestrate.ts';
-import { getUserClient } from '../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../lib/supabase/verify-request.ts';
+import { sessionOpener } from '#lib/ai';
+import { graphErrorResponse, listIntents } from '#lib/graph';
+import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
+import { startIntent } from '#lib/orchestrator';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET', 'POST'], ['Authorization', 'Content-Type']);
 

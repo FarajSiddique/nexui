@@ -4,27 +4,35 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { RunProgressEntry, RunRecord, RunRoute } from '@nexui/types';
 
-import { CAPABILITIES } from '../capabilities/registry.ts';
-import { createStager, type Stager } from '../capabilities/stage.ts';
-import { CapabilityError, type Capability } from '../capabilities/types.ts';
-import { instructionsFor, promptFor } from '../cognition/prompts.ts';
 import {
+  CAPABILITIES,
+  createStager,
+  type Stager,
+  CapabilityError,
+  type Capability,
+} from '#lib/capabilities';
+import {
+  instructionsFor,
+  promptFor,
   runModel,
   type ModelMode,
   type StepDecision,
   type StepReport,
-} from '../cognition/run-model.ts';
-import { capabilityForTool, toModelTools } from '../cognition/tools.ts';
-import { commitChangeset, NothingToCommitError } from '../graph/commit.ts';
+  capabilityForTool,
+  toModelTools,
+} from '#lib/cognition';
 import {
+  commitChangeset,
+  NothingToCommitError,
   ChangesetConflictError,
   ChangesetInvalidError,
   GraphNotFoundError,
-} from '../graph/errors.ts';
-import { logLine } from '../graph/respond.ts';
-import { loadSnapshot } from '../graph/snapshot.ts';
+  logLine,
+  loadSnapshot,
+} from '#lib/graph';
+import type { AiSession, ModelTier } from '#lib/ai';
+
 import { finishRun, recordRunStep } from './store.ts';
-import type { AiSession, ModelTier } from '../ai/session.ts';
 
 export interface RunJob {
   db: SupabaseClient;

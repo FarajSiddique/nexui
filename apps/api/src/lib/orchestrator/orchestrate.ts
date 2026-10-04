@@ -2,15 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { GraphSnapshot, RunRecord, RunRoute } from '@nexui/types';
 
-import { createIntent, discardIntent } from '../graph/commit.ts';
-import { ChangesetInvalidError } from '../graph/errors.ts';
-import { logLine } from '../graph/respond.ts';
-import { loadSnapshot } from '../graph/snapshot.ts';
-import { chooseTemplate, routeAsk } from '../perception/perceive.ts';
-import { executeRun } from '../runs/execute.ts';
-import { scheduleRun } from '../runs/schedule.ts';
-import { createRun } from '../runs/store.ts';
-import type { OpenSession } from '../ai/session.ts';
+import {
+  createIntent,
+  discardIntent,
+  ChangesetInvalidError,
+  logLine,
+  loadSnapshot,
+} from '#lib/graph';
+import { chooseTemplate, routeAsk } from '#lib/perception';
+import { executeRun, scheduleRun, createRun } from '#lib/runs';
+import type { OpenSession } from '#lib/ai';
 
 export interface Orchestrator {
   /** The user's client: every read and write is theirs, under RLS. */

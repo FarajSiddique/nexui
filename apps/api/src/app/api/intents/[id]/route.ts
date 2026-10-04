@@ -1,11 +1,8 @@
 import { graphSnapshotSchema, idSchema } from '@nexui/types';
 
-import { deleteIntent } from '../../../../lib/graph/commit.ts';
-import { graphErrorResponse } from '../../../../lib/graph/respond.ts';
-import { loadSnapshot } from '../../../../lib/graph/snapshot.ts';
-import { corsHeaders, jsonError, preflight } from '../../../../lib/http/responses.ts';
-import { getUserClient } from '../../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../../lib/supabase/verify-request.ts';
+import { deleteIntent, graphErrorResponse, loadSnapshot } from '#lib/graph';
+import { corsHeaders, jsonError, preflight } from '#lib/http';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET', 'DELETE'], ['Authorization']);
 

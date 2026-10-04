@@ -2,7 +2,7 @@ import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
 
 import type { RunRoute } from '@nexui/types';
 
-import type { GatewayOptions } from '../ai/config.ts';
+import type { GatewayOptions } from '#lib/ai';
 
 export type TemplateChoice = 'travel' | 'none';
 

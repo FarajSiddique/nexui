@@ -6,8 +6,7 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "incremental": true,
-    "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./src/*"] }
+    "plugins": [{ "name": "next" }]
   },
   "include": [
     "next-env.d.ts",

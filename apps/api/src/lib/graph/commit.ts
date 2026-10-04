@@ -4,7 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Actor, ChangesetOp, EventRecord, GraphSnapshot } from '@nexui/types';
 
-import { seedTravelOps } from '../templates/travel.ts';
+import { seedTravelOps } from '#lib/templates';
+
 import { GraphNotFoundError, mapRpcError } from './errors.ts';
 import { mapEventRow } from './mappers.ts';
 import { prepareChangeset } from './prepare.ts';

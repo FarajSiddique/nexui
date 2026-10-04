@@ -1,6 +1,6 @@
 import type { GraphObject, GraphSnapshot, RunKind, RunRoute } from '@nexui/types';
 
-import { compareObjects, refOf, type RefTable } from '../capabilities/refs.ts';
+import { compareObjects, refOf, type RefTable } from '#lib/capabilities';
 
 const BASE = [
   'You are Nexui’s trip planner. You change the plan only by calling tools. Your text replies ' +

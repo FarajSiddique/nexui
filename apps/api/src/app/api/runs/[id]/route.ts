@@ -1,10 +1,9 @@
 import { idSchema, runRecordSchema } from '@nexui/types';
 
-import { graphErrorResponse } from '../../../../lib/graph/respond.ts';
-import { corsHeaders, jsonError, preflight } from '../../../../lib/http/responses.ts';
-import { getRun } from '../../../../lib/runs/store.ts';
-import { getUserClient } from '../../../../lib/supabase/clients.ts';
-import { verifyRequest } from '../../../../lib/supabase/verify-request.ts';
+import { graphErrorResponse } from '#lib/graph';
+import { corsHeaders, jsonError, preflight } from '#lib/http';
+import { getRun } from '#lib/runs';
+import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET'], ['Authorization']);
 
