@@ -7,6 +7,7 @@ import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { legDataSchema, placeDataSchema, stayDataSchema } from '../packages/types/src/index.ts';
 import {
   idSequence,
   KYOTO_ID,
@@ -283,6 +284,18 @@ test('an intent without a workspace has nothing to stage', () => {
     () => stager({ snapshot: { ...snapshot, workspace: null } }),
     refused(/^Nexui can only change trips so far\.$/),
   );
+});
+
+test('the help text states the same limits as the kind schemas', () => {
+  const create = GRAPH_CAPABILITIES.find((candidate) => candidate.name === 'object.create');
+  const dataHelp = create.input.shape.data.description;
+  const days = placeDataSchema.shape.days;
+  const hours = legDataSchema.shape.estHours.unwrap();
+  const nights = stayDataSchema.shape.nights;
+
+  assert.match(dataHelp, new RegExp(`days \\(whole days, ${days.minValue} to ${days.maxValue}\\)`));
+  assert.match(dataHelp, new RegExp(`estHours\\? \\(${hours.minValue} to ${hours.maxValue}\\)`));
+  assert.match(dataHelp, new RegExp(`nights \\(${nights.minValue} to ${nights.maxValue}\\)`));
 });
 
 test('the help text gives every money field the {amount, currency} shape', () => {

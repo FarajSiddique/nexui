@@ -14,6 +14,19 @@ export function toolNameFor(capability: string): string {
 }
 
 /**
+ * The capability a model tool name stands for, or null for a name no capability has.
+ *
+ * @example
+ * capabilityForTool('trip_setPlaceDays', CAPABILITIES) // 'trip.setPlaceDays'
+ */
+export function capabilityForTool(
+  toolName: string,
+  capabilities: readonly Capability[],
+): string | null {
+  return capabilities.find((capability) => toolNameFor(capability.name) === toolName)?.name ?? null;
+}
+
+/**
  * The model's tools: each capability it may use, staged through `stager`. A refused call throws,
  * and the AI SDK hands the model the message as a tool error to correct.
  */

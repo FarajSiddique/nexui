@@ -10,6 +10,8 @@ export type CapabilityActor = 'ai' | 'user';
 export interface CapabilityContext {
   actor: CapabilityActor;
   runId: string | null;
+  /** What the user asked the run, for a call the AI made; null for a button press. */
+  request: string | null;
   /** The intent as it will be after the calls staged so far. */
   graph: GraphSnapshot;
   /** The workspace anchor: the trip. */

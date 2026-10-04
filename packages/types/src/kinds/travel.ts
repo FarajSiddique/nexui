@@ -78,6 +78,8 @@ export const decisionDataSchema = z.strictObject({
   chosenOptionId: idSchema.optional(),
   tradeoff: z.string().max(400).optional(),
   derivedKey: z.string().max(60).optional(),
+  /** What the user asked the run that proposed this, shown as "You asked …". */
+  asked: z.string().max(300).optional(),
 });
 
 export const optionDataSchema = z.strictObject({
@@ -90,6 +92,12 @@ export const optionDataSchema = z.strictObject({
     .record(z.string().max(40), z.number())
     .refine((metrics) => Object.keys(metrics).length <= 12, 'At most 12 metrics.'),
   fit: z.string().max(120).optional(),
+  /** Days the proposer suggests for this option's place when the trip has none free. */
+  suggestedDays: z.number().int().min(1).max(365).optional(),
+  /** How to reach this option's place from `fromPlaceId`, the last stop when it was proposed. */
+  leg: legDataSchema.extend({ fromPlaceId: idSchema }).optional(),
+  /** A stop already on the route that gets the days instead, for an option with no place. */
+  extendPlaceId: idSchema.optional(),
 });
 
 export const insightDataSchema = z.strictObject({

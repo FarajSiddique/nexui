@@ -33,7 +33,7 @@ export function ComparisonTable({
   const styles = useStyles();
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
       <View>
         <View style={styles.row}>
           <View style={styles.labelCell} />
@@ -81,6 +81,9 @@ export function ComparisonTable({
 }
 
 const useStyles = createThemedStyles((colors) => ({
+  // Fills the parent's width whatever its alignItems. A centered parent would size the scroller
+  // to its content and clip it on both sides instead of scrolling.
+  scroll: { alignSelf: 'stretch' },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
   line: { borderTopWidth: 1, borderTopColor: colors.line },
   labelCell: { width: 84, paddingVertical: 8, paddingRight: 8 },

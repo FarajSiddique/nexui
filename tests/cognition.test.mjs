@@ -5,7 +5,11 @@ import { CAPABILITIES } from '../apps/api/src/lib/capabilities/registry.ts';
 import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
 import { instructionsFor, promptFor } from '../apps/api/src/lib/cognition/prompts.ts';
 import { runModel } from '../apps/api/src/lib/cognition/run-model.ts';
-import { toModelTools, toolNameFor } from '../apps/api/src/lib/cognition/tools.ts';
+import {
+  capabilityForTool,
+  toModelTools,
+  toolNameFor,
+} from '../apps/api/src/lib/cognition/tools.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { scriptedModel, textStep, toolStep } from './support/ai.mjs';
@@ -160,6 +164,42 @@ test('two failing steps in a row end the run as invalid', async () => {
   assert.equal(await run(model, tools, 'single', async () => 'continue'), 'invalid');
 });
 
+test('a call whose input breaks the tool schema is reported as refused', async () => {
+  const { tools } = setup();
+  const reports = [];
+  const model = scriptedModel([toolStep([invalidDays]), toolStep([shortenTokyo])]);
+
+  await run(model, tools, 'single', async (report) => {
+    reports.push(report.refused);
+
+    return 'continue';
+  });
+
+  assert.deepEqual(reports, [
+    [{ toolName: 'trip_setPlaceDays', input: { placeId: 'o2', days: -1 } }],
+    [],
+  ]);
+});
+
+test('a tool name maps back to its capability', () => {
+  assert.equal(capabilityForTool('trip_setPlaceDays', CAPABILITIES), 'trip.setPlaceDays');
+  assert.equal(capabilityForTool('trip_teleport', CAPABILITIES), null);
+});
+
+test('the stager records a refused call with the schema’s reason', () => {
+  const { stager } = setup();
+
+  stager.recordRefused('trip.setPlaceDays', { placeId: 'o2', days: -1 });
+
+  const [entry] = stager.takeEntries();
+
+  assert.equal(entry.capability, 'trip.setPlaceDays');
+  assert.equal(entry.ok, false);
+  assert.deepEqual(entry.input, { placeId: 'o2', days: -1 });
+  assert.match(entry.error, /^days: /);
+  assert.equal(stager.takeOps().length, 0);
+});
+
 test('a forced step that answers in text changes nothing and finishes', async () => {
   const { tools } = setup();
 
@@ -167,6 +207,13 @@ test('a forced step that answers in text changes nothing and finishes', async ()
     await run(scriptedModel([textStep()]), tools, 'single', async () => 'continue'),
     'finished',
   );
+});
+
+test('a forced step that fails and then answers in text is invalid', async () => {
+  const { tools } = setup();
+  const model = scriptedModel([toolStep([invalidDays]), textStep()]);
+
+  assert.equal(await run(model, tools, 'single', async () => 'continue'), 'invalid');
 });
 
 test('a stop from onStep ends the loop after that step', async () => {

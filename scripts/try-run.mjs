@@ -10,80 +10,11 @@
  * NEXUI_SESSION and NEXUI_API override .qa/session.json and http://localhost:3000.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
+import { printPlan, printRun, qaApi, readSession } from './lib/qa-api.mjs';
 
 const [command, ...args] = process.argv.slice(2);
-const api = process.env.NEXUI_API ?? 'http://localhost:3000';
-const { session } = JSON.parse(
-  readFileSync(process.env.NEXUI_SESSION ?? '.qa/session.json', 'utf8'),
-);
-const headers = {
-  Authorization: `Bearer ${session.access_token}`,
-  'Content-Type': 'application/json',
-};
-
-async function call(method, path, body) {
-  const response = await fetch(`${api}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const json = await response.json();
-
-  if (!response.ok) {
-    throw new Error(`${method} ${path} → ${response.status} ${JSON.stringify(json)}`);
-  }
-
-  return json;
-}
-
-async function waitForRun(runId) {
-  for (let attempt = 0; attempt < 300; attempt += 1) {
-    const run = await call('GET', `/api/runs/${runId}`);
-
-    if (run.status !== 'queued' && run.status !== 'running') {
-      return run;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-  }
-
-  throw new Error(`run ${runId} did not finish in 5 minutes`);
-}
-
-function printRun(run) {
-  console.log(`run ${run.id}: ${run.status}${run.error ? ` (${run.error})` : ''}`);
-
-  for (const entry of run.progress) {
-    console.log(`  step ${entry.step} ${entry.ok ? 'ok ' : 'err'} ${entry.error ?? entry.label}`);
-  }
-
-  const usage = run.modelUsage;
-
-  console.log(
-    `  ${usage.inputTokens ?? 0} in / ${usage.outputTokens ?? 0} out (${usage.model ?? '-'})`,
-  );
-}
-
-async function printPlan(intentId) {
-  const snapshot = await call('GET', `/api/intents/${intentId}`);
-  const { line, badge } = snapshot.intent.summary;
-
-  console.log(`intent ${intentId}: "${line}" ${badge?.text ?? ''}`);
-
-  for (const object of snapshot.objects.filter((o) =>
-    ['place', 'leg', 'decision'].includes(o.kind),
-  )) {
-    const detail =
-      object.kind === 'place'
-        ? ` ${object.data.days}d @ ${object.data.lat},${object.data.lng}`
-        : '';
-
-    console.log(`  ${object.kind} ${object.title}${detail}`);
-  }
-
-  return snapshot;
-}
+const { call, waitForRun } = qaApi(readSession());
 
 // Gives a trip without dates a length equal to its days so far, then takes a day from its
 // first stop, which leaves one unallocated day and the "Ask Nexui for ideas" insight.
@@ -120,7 +51,7 @@ async function freeDay(intentId) {
     patch: { data: { ...places[0].data, days: places[0].data.days - 1 } },
   });
   await call('POST', `/api/intents/${intentId}/changesets`, { ops });
-  await printPlan(intentId);
+  await printPlan(call, intentId);
 }
 
 switch (command) {
@@ -133,7 +64,7 @@ switch (command) {
       printRun(await waitForRun(runId));
     }
 
-    await printPlan(snapshot.intent.id);
+    await printPlan(call, snapshot.intent.id);
     break;
   }
 
@@ -142,7 +73,7 @@ switch (command) {
 
     console.log(`routed to ${route}`);
     printRun(await waitForRun(runId));
-    await printPlan(args[0]);
+    await printPlan(call, args[0]);
     break;
   }
 

@@ -99,15 +99,17 @@ export function editObject(state, id, changes) {
 
 /**
  * A stateful PostgREST stand-in for one user and one intent. Commits apply their ops to the
- * in-memory intent, and the run functions keep one run, so a whole run can execute against it.
+ * in-memory intent, and the run functions keep one run with the SQL's statuses, including
+ * `stopping`, so a whole run can execute against it.
  * `onApply(state, n)` runs after the nth commit and `onLoad(state, n)` before the nth snapshot
  * read, to simulate a cancel or an edit from elsewhere. `failApplyOnce` fails the first
  * `apply_changeset` call with that SQLSTATE (e.g. `'NXU08'`) instead of applying it, so a test can
  * exercise `commitChangeset`'s single automatic retry; every later call applies as normal.
+ * `failCreateRun` makes `create_run` fail with that SQLSTATE.
  */
 export function graphDb(
   initialRow = null,
-  { run = runRow(), onApply, onLoad, failApplyOnce } = {},
+  { run = runRow(), onApply, onLoad, failApplyOnce, failCreateRun } = {},
 ) {
   const now = () => new Date().toISOString();
   const state = {
@@ -119,10 +121,11 @@ export function graphDb(
     loads: 0,
     created: null,
     createdRun: null,
+    discarded: null,
     finished: null,
   };
   let pendingFailure = failApplyOnce ?? null;
-  const active = () => state.run.status === 'queued' || state.run.status === 'running';
+  const active = () => ['queued', 'running', 'stopping'].includes(state.run.status);
 
   const fetch = postgrest({
     get_intent_snapshot: () => {
@@ -188,6 +191,10 @@ export function graphDb(
       };
     },
     create_run: (args) => {
+      if (failCreateRun) {
+        return pgError(failCreateRun, 500);
+      }
+
       state.createdRun = args;
       state.run = {
         ...state.run,
@@ -199,13 +206,19 @@ export function graphDb(
 
       return state.run;
     },
+    discard_intent: (args) => {
+      state.discarded = args;
+      state.snapshot = null;
+
+      return null;
+    },
     record_run_step: (args) => {
       state.steps.push(args);
 
       if (active()) {
         state.run = {
           ...state.run,
-          status: 'running',
+          status: state.run.status === 'stopping' ? 'stopping' : 'running',
           progress: [...state.run.progress, ...args.p_entries],
         };
       }
@@ -215,14 +228,20 @@ export function graphDb(
     finish_run: (args) => {
       state.finished = args;
 
-      if (active()) {
+      if (state.run.status === 'stopping') {
+        const status = args.p_status === 'failed' ? 'failed' : 'cancelled';
+
+        state.run = { ...state.run, status, error: status === 'failed' ? args.p_error : null };
+      } else if (active()) {
         state.run = { ...state.run, status: args.p_status, error: args.p_error };
       }
 
       return state.run;
     },
     cancel_run: () => {
-      if (active()) {
+      if (state.run.status === 'running') {
+        state.run = { ...state.run, status: 'stopping' };
+      } else if (state.run.status === 'queued' || state.run.status === 'awaiting_approval') {
         state.run = { ...state.run, status: 'cancelled' };
       }
 

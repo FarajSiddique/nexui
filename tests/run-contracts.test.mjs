@@ -5,6 +5,7 @@ import {
   askRequestSchema,
   capabilityRequestSchema,
   createIntentResponseSchema,
+  isActiveRunStatus,
   runProgressEntrySchema,
   runRecordSchema,
 } from '../packages/types/src/index.ts';
@@ -119,4 +120,14 @@ test('creating an intent may start no run', () => {
   };
 
   assert.equal(createIntentResponseSchema.parse({ snapshot, runId: null }).runId, null);
+});
+
+test('a stopping run is still active; finished ones are not', () => {
+  for (const status of ['queued', 'running', 'stopping']) {
+    assert.equal(isActiveRunStatus(status), true, status);
+  }
+
+  for (const status of ['awaiting_approval', 'succeeded', 'failed', 'cancelled', undefined]) {
+    assert.equal(isActiveRunStatus(status), false, String(status));
+  }
 });

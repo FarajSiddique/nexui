@@ -14,7 +14,7 @@ import {
   type StepDecision,
   type StepReport,
 } from '../cognition/run-model.ts';
-import { toModelTools } from '../cognition/tools.ts';
+import { capabilityForTool, toModelTools } from '../cognition/tools.ts';
 import { commitChangeset, NothingToCommitError } from '../graph/commit.ts';
 import {
   ChangesetConflictError,
@@ -82,6 +82,7 @@ interface StepContext {
   stager: Stager;
   clock: () => Date;
   newId: () => string;
+  capabilities: readonly Capability[];
 }
 
 // Flips each entry `restage` dropped to ok:false, so progress shows why nothing committed for it.
@@ -100,6 +101,14 @@ function markSkipped(entries: RunProgressEntry[], indexes: readonly number[]): v
 // meanwhile, the step is replayed over their changes first. A commit error is recorded first and
 // then thrown, which fails the run with its steps so far kept.
 async function commitStep(step: StepContext, report: StepReport): Promise<StepDecision> {
+  for (const call of report.refused) {
+    const name = capabilityForTool(call.toolName, step.capabilities);
+
+    if (name) {
+      step.stager.recordRefused(name, call.input);
+    }
+  }
+
   const ops = step.stager.takeOps();
   const entries = step.stager.takeEntries().map((entry) => ({ ...entry, step: report.step }));
   let failure: { error: unknown } | null = null;
@@ -142,8 +151,9 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
 
 /**
  * Runs one AI request to the end (spec section F). Each model step's calls commit as one
- * changeset, so Undo in Changes reverts a step; a cancel stops the run after its current step;
- * a failure keeps the committed steps. Never throws: the outcome is written to the run.
+ * changeset, so Undo in Changes reverts a step; Stop lets the current step commit, then the
+ * run ends cancelled; a failure keeps the committed steps. Never throws: the outcome is
+ * written to the run.
  */
 export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void> {
   const { db, run, session } = job;
@@ -168,11 +178,12 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       snapshot,
       actor: 'ai',
       runId: run.id,
+      request: run.input.text,
       newId,
       clock,
     });
     const route = ROUTES[run.input.route];
-    const step: StepContext = { db, intentId, runId: run.id, stager, clock, newId };
+    const step: StepContext = { db, intentId, runId: run.id, stager, clock, newId, capabilities };
     const outcome = await runModel({
       model: session.languageModel(route.tier),
       providerOptions: session.providerOptions(route.tier),
@@ -186,6 +197,8 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
 
     if (outcome === 'invalid') {
       await finishRun(db, run.id, 'failed', INVALID_RUN_ERROR);
+    } else if (outcome === 'stopped') {
+      await finishRun(db, run.id, 'cancelled', null);
     } else {
       await finishRun(db, run.id, 'succeeded', null);
     }

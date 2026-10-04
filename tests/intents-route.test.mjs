@@ -72,7 +72,7 @@ test('Home shows "Drafting" while a run works on an intent', async (t) => {
 
   assert.deepEqual(item.summary.badge, { text: 'Drafting', tone: 'running' });
   assert.deepEqual(item.summary.strip, intentRow.summary.strip);
-  assert.equal(asked.searchParams.get('status'), 'in.(queued,running)');
+  assert.equal(asked.searchParams.get('status'), 'in.(queued,running,stopping)');
   assert.match(asked.searchParams.get('created_at'), /^gte\./);
 });
 

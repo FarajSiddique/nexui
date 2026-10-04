@@ -54,6 +54,7 @@ function decisionRows(fields: FieldSpec[], options: DecisionOption[]): Compariso
  * A question Nexui put to the user: the question on the highlighter, the tradeoff, and the
  * options compared column by column, each with Choose. "Keep the day free" settles it with no
  * option. A decision the trip settles by itself (its length) points to + instead.
+ * A proposal shows what the user asked above its question.
  */
 export function DecisionSection({
   section,
@@ -82,6 +83,11 @@ export function DecisionSection({
   return (
     <SectionFrame accent>
       {mark.highlight ? <NexuiTag label={proposedBy} /> : null}
+      {details.asked ? (
+        <Text numberOfLines={2} style={styles.asked}>
+          <Text style={styles.askedLabel}>You asked </Text>&quot;{details.asked}&quot;
+        </Text>
+      ) : null}
       <AiText
         text={details.question}
         highlight={mark.highlight}
@@ -144,6 +150,8 @@ export function DecisionSection({
 
 const useStyles = createThemedStyles((colors) => ({
   question: { fontFamily: fonts.heading, fontSize: 19, lineHeight: 25, color: colors.ink },
+  asked: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
+  askedLabel: { fontFamily: fonts.bodyBold, color: colors.muted },
   tradeoff: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   tradeoffLabel: { fontFamily: fonts.bodyBold, color: colors.ink },
   detail: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },

@@ -135,18 +135,27 @@ test('each model step commits one changeset as the run, and the run succeeds', a
   assert.deepEqual(state.finished, { p_run_id: RUN_ID, p_status: 'succeeded', p_error: null });
 });
 
-test('a cancel stops the run after the step that sees it', async (t) => {
+test('Stop lets the current step commit and record, then the run ends cancelled', async (t) => {
   const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'), {
     onApply: (state) => {
-      state.run = { ...state.run, status: 'cancelled' };
+      state.run = { ...state.run, status: 'stopping' };
     },
   });
   const run = createRun();
 
   await executeRun({ db, run, session: mockSession(run, [createFixture]) }, deps());
 
-  assert.equal(fake.state.applied.length, 1);
-  assert.equal(fake.state.run.status, 'cancelled');
+  const { state } = fake;
+
+  assert.equal(state.applied.length, 1);
+  // The start marker, then the step Stop let finish, with its three calls.
+  assert.deepEqual(
+    state.steps.map((step) => step.p_entries.length),
+    [0, 3],
+  );
+  assert.equal(state.run.progress.length, 3);
+  assert.deepEqual(state.finished, { p_run_id: RUN_ID, p_status: 'cancelled', p_error: null });
+  assert.equal(state.run.status, 'cancelled');
 });
 
 test('a run cancelled before it starts does nothing', async (t) => {
@@ -175,6 +184,39 @@ test('two invalid steps in a row fail the run and write nothing', async (t) => {
     p_status: 'failed',
     p_error: INVALID_RUN_ERROR,
   });
+});
+
+test('an edit that fails and then gives up in text fails the run as invalid', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)));
+  const run = askRun('edit');
+  const fixture = askFixture('edit', [[setDays('o2', 400)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  assert.equal(fake.state.applied.length, 0);
+  assert.deepEqual(fake.state.finished, {
+    p_run_id: RUN_ID,
+    p_status: 'failed',
+    p_error: INVALID_RUN_ERROR,
+  });
+});
+
+test('a call refused for its schema still shows in progress, and the run goes on', async (t) => {
+  const { fake, db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)));
+  const run = askRun('edit');
+  const fixture = askFixture('edit', [[setDays('o2', 400)], [setDays('o2', 3)]]);
+
+  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+
+  const refused = entriesOf(fake.state).filter((entry) => !entry.ok);
+
+  assert.deepEqual(
+    refused.map((entry) => [entry.step, entry.capability, entry.input]),
+    [[0, 'trip.setPlaceDays', { placeId: 'o2', days: 400 }]],
+  );
+  assert.match(refused[0].error, /^days: /);
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(fake.state.finished.p_status, 'succeeded');
 });
 
 test('a stop the user deletes mid-run is skipped by the step, and progress says so', async (t) => {

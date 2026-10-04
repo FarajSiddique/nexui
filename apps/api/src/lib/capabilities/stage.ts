@@ -24,6 +24,8 @@ export interface StagerOptions {
   snapshot: GraphSnapshot;
   actor: CapabilityActor;
   runId: string | null;
+  /** The run's request, handed to capabilities (a proposal shows it as "You asked …"). */
+  request?: string;
   newId: () => string;
   clock?: () => Date;
 }
@@ -40,6 +42,11 @@ export interface Stager {
   graph(): GraphSnapshot;
   /** Runs one capability. Throws `CapabilityError` with a message safe for the model and user. */
   call(name: string, input: unknown): Record<string, unknown>;
+  /**
+   * Records a call the model SDK refused before it ran (its input broke the tool's schema), so
+   * the run's progress shows it with the schema's reason. Stages nothing.
+   */
+  recordRefused(name: string, input: unknown): void;
   /** The ops staged since the last take, to commit as one changeset. */
   takeOps(): ChangesetOp[];
   /** The calls made since the last take, for the run's progress. */
@@ -280,6 +287,7 @@ export function createStager(options: StagerOptions): Stager {
     const result = capability.execute(parsed.data, {
       actor: options.actor,
       runId: options.runId,
+      request: options.request ?? null,
       graph: staged,
       anchorId,
       refs,
@@ -342,6 +350,25 @@ export function createStager(options: StagerOptions): Stager {
 
         throw new CapabilityError(message ?? UNEXPECTED);
       }
+    },
+    recordRefused(name, input) {
+      const capability = options.capabilities.find((candidate) => candidate.name === name);
+      const parsed = capability?.input.safeParse(input);
+      let error = "That action isn't available.";
+
+      if (capability) {
+        error =
+          parsed && !parsed.success ? describeIssue(parsed.error) : 'That input is not valid.';
+      }
+
+      entries.push({
+        capability: name,
+        label: `Could not run ${name}`,
+        ok: false,
+        ms: 0,
+        input: entryInput(input),
+        error,
+      });
     },
     takeOps() {
       const taken = pending;

@@ -120,8 +120,12 @@ Three polls cover what Realtime and a rejoin don't:
   its cached data to decide whether any plan is Drafting, since a run's changes aren't on Realtime
   when no workspace is open for it.
 
-`useRun` polls every 3 s while its run is `queued` or `running`, as a fallback for a dropped
-socket, unrelated to the polls above.
+`useRun` polls every 3 s while its run is active (`queued`, `running` or `stopping`, through
+`isRunActive`), as a fallback for a dropped socket, unrelated to the polls above.
+
+There is one Realtime channel per intent. The workspace stays mounted under the + sheet with its
+own channel, so the sheet calls `useIntentLive(params.intentId ? null : target)`: it subscribes
+only for a plan it started itself, not for the plan open underneath.
 
 The Changes tab (`apps/mobile/src/app/(app)/(tabs)/changes.tsx`) doesn't poll — the feed
 (`useChangesFeed`) instead refetches whenever the tab regains focus (`useFocusEffect`), which is
@@ -136,8 +140,26 @@ reads `intentId`/`prompt` from its route params (set when a section's `ask` acti
 with a prompt already filled in) and otherwise from nothing, in which case it starts a new intent.
 Once a run starts, `RunCard` (`apps/mobile/src/components/run-card.tsx`) streams it: a spinner and
 elapsed time while active, one line per succeeded capability call (not per step — a step can make
-several calls) as it lands, and Stop, Retry or "See changes" depending on the run's status.
-Closing the sheet doesn't stop the run — what it's written stays and can be undone from Changes.
+several calls) as it lands, and Stop, Retry or "See changes" depending on the run's status. After
+Stop, a running run shows **Stopping…** ("Nexui is saving the change it was making, then it
+stops.") with no Stop button until its last step commits, then Stopped. A run that succeeded also
+offers "See changes" as a secondary link. Closing the sheet doesn't stop the run — what it's
+written stays and can be undone from Changes.
+
+After an ask about the plan underneath (the sheet was opened with `intentId`), `afterAsk`
+(`apps/mobile/src/lib/run-outcome.ts`, pure and unit-tested) picks the next step once the run has
+succeeded: **See the choice** when its progress has an `ok` `decision.propose` entry, otherwise
+**Back to plan**, which dismisses the sheet. A run that failed or stopped gets neither, only the
+RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer above
+the input, outside the scroll view, so they stay in view while the keyboard is up.
+
+**See the choice** sets `use-reveal-store.ts` (`revealOpenBand(intentId)`) and dismisses the sheet.
+The workspace screen watches the flag: once it is focused again and its Open band has been laid out
+(it measures the page and the band with `onLayout`, and waits out a 0×0 layout, which is what Expo
+web reports for a screen hidden under the sheet), it scrolls the band into view and clears the
+flag. If the loaded plan has nothing open, it just clears it. The decision card shows _You asked
+"…"_ above its question from `DecisionData.asked`, cut to two lines; a decision the user or a
+derivation made has none.
 
 "Try again" after a failed run calls `onRetry`, which re-sends the same text through `send()`. For
 an ask, or for a new plan whose run failed after the intent was already created, `target` is

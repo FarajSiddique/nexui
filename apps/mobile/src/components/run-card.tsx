@@ -11,6 +11,7 @@ import { createThemedStyles, useColors } from '@/lib/use-theme';
 const TITLES: Record<RunRecord['status'], string> = {
   queued: 'Starting…',
   running: 'Working on it',
+  stopping: 'Stopping…',
   awaiting_approval: 'Waiting for you',
   succeeded: 'Done',
   failed: 'Stopped partway — Undo or retry',
@@ -71,12 +72,18 @@ export function RunCard({
 
   const renderFooter = (): ReactElement => {
     if (active) {
+      const isStopping = run.status === 'stopping';
+
       return (
         <View style={styles.footer}>
           <Text style={styles.note}>
-            Each change is saved to the plan as it arrives. Closing this sheet doesn&apos;t stop it.
+            {isStopping
+              ? 'Nexui is saving the change it was making, then it stops.'
+              : "Each change is saved to the plan as it arrives. Closing this sheet doesn't stop it."}
           </Text>
-          <Button label="Stop" busy={stopping} onPress={() => onStop(run.id)} />
+          {isStopping ? null : (
+            <Button label="Stop" busy={stopping} onPress={() => onStop(run.id)} />
+          )}
         </View>
       );
     }
@@ -105,9 +112,12 @@ export function RunCard({
     }
 
     return (
-      <Text style={styles.note}>
-        {lines.length === 1 ? '1 change' : `${lines.length} changes`} saved to the plan.
-      </Text>
+      <View style={styles.footer}>
+        <Text style={styles.note}>
+          {lines.length === 1 ? '1 change' : `${lines.length} changes`} saved to the plan.
+        </Text>
+        <Button label="See changes" variant="text" onPress={onSeeChanges} />
+      </View>
     );
   };
 

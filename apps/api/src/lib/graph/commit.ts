@@ -137,6 +137,15 @@ export async function createIntent(
   return loadSnapshot(db, intentId);
 }
 
+/** Deletes an intent no run has started on, such as a trip whose run could not be created. */
+export async function discardIntent(db: SupabaseClient, intentId: string): Promise<void> {
+  const { error } = await db.rpc('discard_intent', { p_intent_id: intentId });
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+}
+
 /** Undo (or Redo, on an Undo event): restores each row's earlier values. */
 export async function revertEvent(db: SupabaseClient, eventId: string): Promise<CommitResult> {
   const { data, error } = await db.rpc('revert_event', { p_event_id: eventId });
