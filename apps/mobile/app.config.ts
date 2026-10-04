@@ -1,6 +1,6 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-// Permanent store identifiers (see docs/specs/auth.md A1). Don't change after release.
+// Permanent store identifiers (see "Identifiers" in docs/specs/auth.md). Don't change after release.
 const appId = 'ai.faraj.nexui';
 
 // Reversed iOS OAuth client ID. Local builds read it from .env; EAS builds need it as an EAS
@@ -35,6 +35,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: appId,
+    usesAppleSignIn: true,
   },
   android: {
     package: appId,
@@ -43,6 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-font',
     'expo-secure-store',
+    'expo-apple-authentication',
     [
       'react-native-maps',
       googleMapsAndroidKey ? { androidGoogleMapsApiKey: googleMapsAndroidKey } : {},

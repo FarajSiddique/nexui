@@ -1,13 +1,17 @@
-import { corsHeaders, jsonError, preflight } from '#lib/http';
-import { getAdminClient, SupabaseConfigurationError, verifyRequest } from '#lib/supabase';
+import { deleteAccountRequestSchema, deleteAccountResponseSchema } from '@nexui/types';
 
-const headers = corsHeaders(['DELETE'], ['Authorization']);
+import { deleteAccount } from '#lib/account';
+import { corsHeaders, jsonError, preflight } from '#lib/http';
+import { SupabaseConfigurationError, verifyRequest } from '#lib/supabase';
+
+const headers = corsHeaders(['DELETE'], ['Authorization', 'Content-Type']);
 
 export function OPTIONS(): Response {
   return preflight(headers);
 }
 
-// Permanently deletes the signed-in user's account (required by App Store rules).
+// Permanently deletes the signed-in user's account (required by App Store rules). An Apple user
+// on iOS sends Apple's authorization code so Nexui's Apple access is revoked too.
 export async function DELETE(request: Request): Promise<Response> {
   const user = await verifyRequest(request, headers);
 
@@ -15,14 +19,24 @@ export async function DELETE(request: Request): Promise<Response> {
     return user;
   }
 
+  let body: unknown;
+
   try {
-    const { error } = await getAdminClient().auth.admin.deleteUser(user.userId);
+    body = await request.json();
+  } catch {
+    return jsonError('Invalid JSON', 400, headers);
+  }
 
-    if (error) {
-      throw error;
-    }
+  const parsed = deleteAccountRequestSchema.safeParse(body);
 
-    return new Response(null, { status: 204, headers });
+  if (!parsed.success) {
+    return jsonError('Invalid request.', 400, headers);
+  }
+
+  try {
+    const result = await deleteAccount(user.userId, parsed.data.appleAuthorizationCode);
+
+    return Response.json(deleteAccountResponseSchema.parse(result), { headers });
   } catch (error) {
     console.error(
       '[account]',

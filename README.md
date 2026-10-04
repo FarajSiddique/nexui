@@ -4,8 +4,8 @@ Nexui turns what you're trying to accomplish into a persistent object graph, ren
 workspace made of registered primitives. The first slice is travel: describe a trip, and Nexui
 keeps a graph of places, legs and decisions that every edit — yours or Nexui's — changes as one
 undoable changeset. See [Intent graph](docs/architecture/intent-graph.md) for how it works.
-Users sign in with Supabase Auth (emailed 6-digit code or native Google). Setup steps are in
-`docs/specs/auth.md`. For the current auth flow and ownership boundaries, see
+Users sign in with Supabase Auth (emailed 6-digit code, native Google, or Sign in with Apple on
+iOS). Setup steps are in `docs/specs/auth.md`. For the current auth flow and ownership boundaries, see
 [Authentication](docs/architecture/authentication.md).
 
 ## Requirements
@@ -13,7 +13,7 @@ Users sign in with Supabase Auth (emailed 6-digit code or native Google). Setup 
 - Node.js 24 LTS recommended (`nvm use`); minimum 22.13.
 - pnpm 10.34.5: `npm install --global pnpm@10.34.5`.
 - An EAS development build on the iOS Simulator or an Android device. Native Google
-  sign-in doesn't run in Expo Go (see `docs/specs/auth.md` A5). The web preview
+  and Apple sign-in don't run in Expo Go (see "EAS builds" in `docs/specs/auth.md`). The web preview
   supports email-code sign-in only.
 
 ## Start development
@@ -110,9 +110,10 @@ computer's firewall. The API binds to `0.0.0.0` for LAN access. `localhost` on a
 phone refers to the phone itself. Expo tunneling does not tunnel the API; an API
 URL reachable from the device is still required. Restart Expo after changing env.
 
-Supabase and Google values are required for sign-in; the `.env.example` files list
-them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` lives only
+Supabase, Google and Apple values are required for sign-in; the `.env.example` files
+list them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` lives only
 in `apps/api/.env.local`, where AI runs, account deletion and the place media cache use it.
+The `APPLE_*` values live there too; account deletion uses them to revoke Apple access.
 `CRON_SECRET`, also API-only, authorizes Vercel's cron call to `GET /api/cron/runs`.
 `WIKIMEDIA_CONTACT` there is an email address or URL Wikimedia can reach us at; the stop
 details lookup sends it in its User-Agent, and leaving it empty turns lookups off.
@@ -145,7 +146,9 @@ apps/
     src/app/api/events/        # POST /api/events/:id/undo
     src/app/api/changes/       # GET /api/changes
     src/app/api/cron/runs/     # GET /api/cron/runs (Vercel Cron: reaps and starts AI runs)
-    src/app/api/account/       # DELETE /api/account (deletes the signed-in user)
+    src/app/api/account/       # DELETE /api/account (deletes the signed-in user, revokes Apple access)
+    src/lib/account/           # deleteAccount: delete the user, then revoke Apple access
+    src/lib/apple/             # Apple client secret and token revocation
     src/lib/graph/             # applyChangeset, undo, snapshot loading, error mapping
     src/lib/kinds/             # Per-kind derivations (derive.trip)
     src/lib/templates/         # Per-template seed ops and derivation dispatch

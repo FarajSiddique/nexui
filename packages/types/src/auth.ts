@@ -28,3 +28,19 @@ export const authErrorSchema = z.object({
 });
 
 export type AuthError = z.infer<typeof authErrorSchema>;
+
+// DELETE /api/account. An Apple user on iOS confirms with Apple first, and the API uses that
+// code to revoke Nexui's Apple access once the account is deleted.
+export const deleteAccountRequestSchema = z.object({
+  appleAuthorizationCode: z.string().min(1).max(1024).optional(),
+});
+
+export type DeleteAccountRequest = z.infer<typeof deleteAccountRequestSchema>;
+
+// True when the account signed in with Apple and Nexui couldn't revoke that access, so the user
+// removes Nexui under Sign in with Apple themselves.
+export const deleteAccountResponseSchema = z.object({
+  appleAccessRemains: z.boolean(),
+});
+
+export type DeleteAccountResponse = z.infer<typeof deleteAccountResponseSchema>;

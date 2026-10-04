@@ -1,13 +1,20 @@
 import { router } from 'expo-router';
 import { useState, type ReactElement } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteAccount, useHealth } from '#data';
 import { fonts, createThemedStyles, useColors } from '#theme';
 import { Button, FormError } from '#ui';
 import { AppearanceCard } from '#features/account';
-import { clearDeletedAccount, signOut, useSessionStore } from '#features/auth';
+import {
+  AuthActionError,
+  clearDeletedAccount,
+  getAppleDeletionCode,
+  showAppleAccessNotice,
+  signOut,
+  useSessionStore,
+} from '#features/auth';
 
 type Pending = 'signOut' | 'delete' | null;
 
@@ -15,6 +22,10 @@ export default function AccountScreen(): ReactElement {
   const styles = useStyles();
   const colors = useColors();
   const email = useSessionStore((state) => state.session?.user.email);
+  const providers = useSessionStore((state) => state.session?.user.app_metadata.providers);
+  // Apple accounts on iOS confirm with Apple once more, so the API can revoke Nexui's access.
+  const confirmsWithApple =
+    Platform.OS === 'ios' && Array.isArray(providers) && providers.includes('apple');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,14 +53,33 @@ export default function AccountScreen(): ReactElement {
     setPending('delete');
     setError(null);
     try {
-      await deleteAccount();
+      const appleCode = confirmsWithApple ? await getAppleDeletionCode() : undefined;
+
+      // Cancelling Apple's sheet keeps the account.
+      if (appleCode === null) {
+        setPending(null);
+
+        return;
+      }
+
+      const { appleAccessRemains } = await deleteAccount(appleCode);
+
+      // Before the session clears, so the sign-in screen can show how to finish.
+      if (appleAccessRemains) {
+        showAppleAccessNotice();
+      }
+
       await clearDeletedAccount();
     } catch (caught) {
       if (__DEV__) {
         console.warn('Account deletion failed', caught);
       }
 
-      setError('Could not delete your account. Check your connection and try again.');
+      setError(
+        caught instanceof AuthActionError
+          ? caught.message
+          : 'Could not delete your account. Check your connection and try again.',
+      );
       setPending(null);
     }
   }
@@ -97,6 +127,9 @@ export default function AccountScreen(): ReactElement {
             <Text style={styles.dangerText}>
               This permanently deletes your Nexui account and signs you out on every device. It
               can’t be undone.
+              {confirmsWithApple
+                ? ' You’ll confirm with Apple so Nexui’s access to your Apple ID is removed too.'
+                : null}
             </Text>
             {confirmingDelete ? (
               <>

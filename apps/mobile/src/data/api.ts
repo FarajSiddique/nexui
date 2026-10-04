@@ -3,6 +3,7 @@ import {
   changesResponseSchema,
   commitResponseSchema,
   createIntentResponseSchema,
+  deleteAccountResponseSchema,
   graphSnapshotSchema,
   healthResponseSchema,
   intentListResponseSchema,
@@ -13,6 +14,8 @@ import {
   type ChangesResponse,
   type CommitResponse,
   type CreateIntentResponse,
+  type DeleteAccountRequest,
+  type DeleteAccountResponse,
   type GraphSnapshot,
   type HealthResponse,
   type IntentListItem,
@@ -53,31 +56,18 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   }
 }
 
-// Permanently deletes the signed-in user's account on the server.
-export async function deleteAccount(): Promise<void> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-
-  try {
-    const response = await fetchWithSession(supabase.auth, `${apiUrl}/api/account`, {
-      method: 'DELETE',
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Account deletion failed: ${response.status}`);
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function callApi<T>(path: string, parser: Parser<T>, init: RequestInit = {}): Promise<T> {
+function callApi<T>(
+  path: string,
+  parser: Parser<T>,
+  init: RequestInit = {},
+  timeoutMs?: number,
+): Promise<T> {
   return requestJson(
     (url, request) => fetchWithSession(supabase.auth, url, request),
     `${apiUrl}${path}`,
     init,
     parser,
+    timeoutMs,
   );
 }
 
@@ -87,6 +77,30 @@ function postJson(body: unknown): RequestInit {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   };
+}
+
+/**
+ * Permanently deletes the signed-in user's account. Pass Apple's authorization code to revoke
+ * Nexui's Apple access too. Allows 20 s: the server may call Apple twice after deleting, and
+ * giving up early would report an account that's already gone as a failure.
+ */
+export function deleteAccount(appleAuthorizationCode?: string): Promise<DeleteAccountResponse> {
+  const body: DeleteAccountRequest = {};
+
+  if (appleAuthorizationCode) {
+    body.appleAuthorizationCode = appleAuthorizationCode;
+  }
+
+  return callApi(
+    '/api/account',
+    deleteAccountResponseSchema,
+    {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    20_000,
+  );
 }
 
 /** Home's cards, most recently active first. */

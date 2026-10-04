@@ -36,6 +36,9 @@ const expected = {
     skyGlow: 'rgba(255, 228, 92, 0.22)',
     skyDetail: '#FFFFFF',
     skyCrater: 'rgba(30, 26, 43, 0.14)',
+    providerFill: '#FFFFFF',
+    providerLine: '#747775',
+    providerInk: '#000000',
   },
   dark: {
     paper: '#15131B',
@@ -65,6 +68,9 @@ const expected = {
     skyGlow: 'rgba(236, 232, 245, 0.06)',
     skyDetail: '#F2EFF8',
     skyCrater: 'rgba(30, 26, 43, 0.14)',
+    providerFill: '#131314',
+    providerLine: '#8E918F',
+    providerInk: '#FFFFFF',
   },
 };
 
@@ -120,6 +126,7 @@ const textPairs = [
   ['card', 'danger'],
   ['ink', 'line'],
   ['card', 'userMark'],
+  ['providerInk', 'providerFill'],
 ];
 
 for (const scheme of ['light', 'dark']) {
