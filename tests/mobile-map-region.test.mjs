@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { fitRegion, MIN_MAP_DELTA } from '../apps/mobile/src/lib/map-region.ts';
+import {
+  fitRegion,
+  MIN_MAP_DELTA,
+} from '../apps/mobile/src/features/workspace/sections/map-region.ts';
 
 const close = (actual, expected, label) =>
   assert.ok(Math.abs(actual - expected) < 1e-6, `${label}: ${actual} ≠ ${expected}`);

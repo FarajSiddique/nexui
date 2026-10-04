@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ApiError, requestJson, UNREACHABLE_MESSAGE } from '../apps/mobile/src/lib/api-request.ts';
-import { UnauthorizedError } from '../apps/mobile/src/lib/authenticated-fetch.ts';
+import { ApiError, requestJson, UNREACHABLE_MESSAGE } from '../apps/mobile/src/data/api-request.ts';
+import { UnauthorizedError } from '../apps/mobile/src/data/authenticated-fetch.ts';
 
 const identity = { parse: (value) => value };
 const json = (body, status = 200) =>

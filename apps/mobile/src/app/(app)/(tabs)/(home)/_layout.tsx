@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import type { ReactElement } from 'react';
 
-import { useColors } from '@/lib/use-theme';
+import { useColors } from '@/theme/use-theme';
 
 // Home and the workspaces pushed over it, under the tab bar (spec section B).
 export default function HomeStackLayout(): ReactElement {

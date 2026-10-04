@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseAppearance, resolveScheme } from '../apps/mobile/src/lib/appearance.ts';
+import { parseAppearance, resolveScheme } from '../apps/mobile/src/theme/appearance.ts';
 
 test('a saved choice reads back as itself', () => {
   assert.equal(parseAppearance('light'), 'light');

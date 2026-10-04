@@ -3,8 +3,11 @@ import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
-import { workspaceFigures } from '../apps/mobile/src/lib/sections.ts';
-import { capabilityFor, optimisticOps } from '../apps/mobile/src/lib/workspace-actions.ts';
+import { workspaceFigures } from '../apps/mobile/src/features/workspace/workspace-layout.ts';
+import {
+  capabilityFor,
+  optimisticOps,
+} from '../apps/mobile/src/features/workspace/workspace-actions.ts';
 import { applyOps } from '../packages/types/src/apply-ops.ts';
 import { KYOTO_ID, snapshotRow, STAMP, TOKYO_ID, TRIP_ID } from './support/graph.mjs';
 

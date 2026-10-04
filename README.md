@@ -131,9 +131,11 @@ cross-origin requests for Expo web, and no cookies are involved.
 apps/
   mobile/
     src/app/                  # Root layout (auth guard), (auth) and (app) route groups
-    src/components/           # Auth screen, connection banner, tab bar/header, list states
-    src/lib/                  # API client, auth and session, Supabase client, theme and appearance, health
-    src/stores/               # Zustand stores, including the auth session mirror and the appearance choice
+    src/features/             # Per-area components, helpers and stores: auth, home, workspace, changes, compose, …
+    src/ui/                   # Shared building blocks: buttons, pills, list states, tab header
+    src/theme/                # Palettes, fonts, useTheme and the appearance choice
+    src/data/                 # API client, Supabase client, TanStack Query hooks, Realtime, health
+    src/lib/                  # Pure helpers shared across features (format.ts)
   api/
     src/app/api/health/        # GET /api/health
     src/app/api/intents/       # GET, POST /api/intents; :id and :id/changesets

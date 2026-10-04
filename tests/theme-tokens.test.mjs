@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import test from 'node:test';
 
-import { palettes } from '../apps/mobile/src/lib/theme.ts';
+import { palettes } from '../apps/mobile/src/theme/theme.ts';
 
 const expected = {
   light: {
@@ -150,7 +150,7 @@ test('no mobile file but theme.ts holds a raw color', () => {
   const root = 'apps/mobile/src';
   const raw = /#[0-9A-Fa-f]{3,8}\b|rgba?\(|['"](white|black)['"]/;
   const offenders = sourceFiles(root)
-    .filter((path) => relative(root, path) !== join('lib', 'theme.ts'))
+    .filter((path) => relative(root, path) !== join('theme', 'theme.ts'))
     .filter((path) => raw.test(readFileSync(path, 'utf8')));
 
   assert.deepEqual(offenders, []);

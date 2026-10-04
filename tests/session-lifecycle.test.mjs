@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { setImmediate as flushRefresh } from 'node:timers/promises';
 import test from 'node:test';
 
-import { startSessionLifecycle } from '../apps/mobile/src/lib/session-lifecycle.ts';
+import { startSessionLifecycle } from '../apps/mobile/src/features/auth/session-lifecycle.ts';
 
 function setup(t, currentState = 'active') {
   let onAuth;

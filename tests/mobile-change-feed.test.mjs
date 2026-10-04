@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildChangeRows, filterRows, groupByDay } from '../apps/mobile/src/lib/change-feed.ts';
+import {
+  buildChangeRows,
+  filterRows,
+  groupByDay,
+} from '../apps/mobile/src/features/changes/change-feed.ts';
 
 const TOKYO = 'a1b2c3d4-0000-4000-8000-000000000003';
 const KYOTO = 'a1b2c3d4-0000-4000-8000-000000000004';

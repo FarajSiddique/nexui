@@ -2,8 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
-import { Button } from '@/components/buttons';
-import { RunCard } from '@/components/run-card';
 import {
   isRunActive,
   useAsk,
@@ -11,13 +9,15 @@ import {
   useCreateIntent,
   useIntent,
   useRun,
-} from '@/lib/queries';
-import { afterAsk } from '@/lib/run-outcome';
-import { fonts } from '@/lib/theme';
-import { createThemedStyles, useColors } from '@/lib/use-theme';
-import { useIntentLive } from '@/lib/use-intent-live';
-import { useKeyboardOverlap } from '@/lib/use-keyboard-overlap';
-import { revealOpenBand } from '@/stores/use-reveal-store';
+} from '@/data/queries';
+import { useIntentLive } from '@/data/use-intent-live';
+import { RunCard } from '@/features/compose/run-card';
+import { afterAsk } from '@/features/compose/run-outcome';
+import { useKeyboardOverlap } from '@/features/compose/use-keyboard-overlap';
+import { revealOpenBand } from '@/features/workspace/use-reveal-store';
+import { fonts } from '@/theme/theme';
+import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { Button } from '@/ui/buttons';
 
 interface Sent {
   text: string;

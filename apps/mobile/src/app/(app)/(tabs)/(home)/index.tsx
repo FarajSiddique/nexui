@@ -4,22 +4,22 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ChangeRowView } from '@/components/change-row';
-import { ConnectionBanner } from '@/components/connection-banner';
-import { IntentCard } from '@/components/intent-card';
-import { ListEmpty, ListError, SkeletonRows } from '@/components/list-states';
-import { SwipeToDelete } from '@/components/swipe-to-delete';
-import { HeaderButton, TabHeader } from '@/components/tab-header';
-import { buildChangeRows } from '@/lib/change-feed';
 import {
   isDrafting,
   useDeleteIntent,
   useIntents,
   usePlanDeletes,
   useRecentChanges,
-} from '@/lib/queries';
-import { fonts } from '@/lib/theme';
-import { createThemedStyles } from '@/lib/use-theme';
+} from '@/data/queries';
+import { buildChangeRows } from '@/features/changes/change-feed';
+import { ChangeRowView } from '@/features/changes/change-row';
+import { ConnectionBanner } from '@/features/home/connection-banner';
+import { IntentCard } from '@/features/home/intent-card';
+import { SwipeToDelete } from '@/features/home/swipe-to-delete';
+import { fonts } from '@/theme/theme';
+import { createThemedStyles } from '@/theme/use-theme';
+import { ListEmpty, ListError, SkeletonRows } from '@/ui/list-states';
+import { HeaderButton, TabHeader } from '@/ui/tab-header';
 
 /**
  * Home: every plan as a card, then the latest three changes. The gear opens Account. Swiping a

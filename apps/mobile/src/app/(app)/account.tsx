@@ -3,14 +3,14 @@ import { useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppearanceCard } from '@/components/appearance-card';
-import { FormError, PrimaryButton, TextButton } from '@/components/auth-screen';
-import { deleteAccount } from '@/lib/api';
-import { clearDeletedAccount, signOut } from '@/lib/auth';
-import { fonts } from '@/lib/theme';
-import { createThemedStyles, useColors } from '@/lib/use-theme';
-import { useHealth } from '@/lib/use-health';
-import { useSessionStore } from '@/stores/use-session-store';
+import { deleteAccount } from '@/data/api';
+import { useHealth } from '@/data/use-health';
+import { AppearanceCard } from '@/features/account/appearance-card';
+import { clearDeletedAccount, signOut } from '@/features/auth/auth';
+import { FormError, PrimaryButton, TextButton } from '@/features/auth/auth-screen';
+import { useSessionStore } from '@/features/auth/use-session-store';
+import { fonts } from '@/theme/theme';
+import { createThemedStyles, useColors } from '@/theme/use-theme';
 
 type Pending = 'signOut' | 'delete' | null;
 

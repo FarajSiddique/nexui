@@ -5,20 +5,24 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { Pressable, ScrollView, Text, View, type LayoutRectangle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ListEmpty, ListError, SkeletonRows } from '@/components/list-states';
-import { Pill } from '@/components/pill';
-import { SectionView } from '@/components/sections/registry';
-import { UndoToast } from '@/components/undo-toast';
-import { ApiError } from '@/lib/api-request';
+import { ApiError } from '@/data/api-request';
+import { queryKeys, useIntent, useIntents, useUndo, useWorkspaceEdit } from '@/data/queries';
+import { useIntentLive } from '@/data/use-intent-live';
+import { SectionView } from '@/features/workspace/sections/registry';
+import { UndoToast } from '@/features/workspace/undo-toast';
+import { focusIntent } from '@/features/workspace/use-focused-intent-store';
+import { revealOpenBand, useRevealStore } from '@/features/workspace/use-reveal-store';
+import {
+  capabilityFor,
+  optimisticOps,
+  type WorkspaceAction,
+} from '@/features/workspace/workspace-actions';
+import { layoutWorkspace } from '@/features/workspace/workspace-layout';
 import { tripMeta } from '@/lib/format';
-import { queryKeys, useIntent, useIntents, useUndo, useWorkspaceEdit } from '@/lib/queries';
-import { layoutWorkspace } from '@/lib/sections';
-import { fonts } from '@/lib/theme';
-import { createThemedStyles } from '@/lib/use-theme';
-import { useIntentLive } from '@/lib/use-intent-live';
-import { capabilityFor, optimisticOps, type WorkspaceAction } from '@/lib/workspace-actions';
-import { focusIntent } from '@/stores/use-focused-intent-store';
-import { revealOpenBand, useRevealStore } from '@/stores/use-reveal-store';
+import { fonts } from '@/theme/theme';
+import { createThemedStyles } from '@/theme/use-theme';
+import { ListEmpty, ListError, SkeletonRows } from '@/ui/list-states';
+import { Pill } from '@/ui/pill';
 
 function anchorMeta(snapshot: GraphSnapshot): string {
   const anchorId = snapshot.workspace?.doc.anchorId;

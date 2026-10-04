@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { planDeletes } from '../apps/mobile/src/lib/plan-deletes.ts';
+import { planDeletes } from '../apps/mobile/src/data/plan-deletes.ts';
 
 const attempt = (id, status, submittedAt) => ({ id, status, submittedAt });
 

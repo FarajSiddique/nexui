@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { AuthActionError, createAuthActions } from '../apps/mobile/src/lib/auth-actions.ts';
+import {
+  AuthActionError,
+  createAuthActions,
+} from '../apps/mobile/src/features/auth/auth-actions.ts';
 
 function setup(t, overrides = {}) {
   const auth = {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { afterAsk } from '../apps/mobile/src/lib/run-outcome.ts';
+import { afterAsk } from '../apps/mobile/src/features/compose/run-outcome.ts';
 
 const entry = (capability, ok = true) => ({
   step: 0,

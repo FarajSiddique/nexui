@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { aiMarkFor } from '../apps/mobile/src/lib/ai-mark.ts';
+import { aiMarkFor } from '../apps/mobile/src/features/workspace/ai-mark.ts';
 import {
   cardText,
   dayLabel,
