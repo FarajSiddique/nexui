@@ -132,8 +132,8 @@ apps/
   mobile/
     src/app/                  # Root layout (auth guard), (auth) and (app) route groups
     src/components/           # Auth screen, connection banner, tab bar/header, list states
-    src/lib/                  # API client, auth and session, Supabase client, theme, health
-    src/stores/               # Zustand stores, including the auth session mirror
+    src/lib/                  # API client, auth and session, Supabase client, theme and appearance, health
+    src/stores/               # Zustand stores, including the auth session mirror and the appearance choice
   api/
     src/app/api/health/        # GET /api/health
     src/app/api/intents/       # GET, POST /api/intents; :id and :id/changesets
