@@ -27,7 +27,7 @@ export function cacheRow(key, overrides = {}) {
   return {
     key,
     status: 'found',
-    lookup_version: 1,
+    lookup_version: 2,
     pinned: false,
     page_title: 'Tokyo',
     page_url: 'https://en.wikipedia.org/wiki/Tokyo',

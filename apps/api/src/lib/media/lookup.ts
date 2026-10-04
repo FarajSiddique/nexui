@@ -261,9 +261,9 @@ export async function resolvePlaceMedia(
     const row = cached.get(place.key);
 
     if (done) {
-      answers[place.id] = toPlaceMedia(done);
+      answers[place.id] = toPlaceMedia(done, () => '');
     } else if (row && (!contact || isFresh(row, now))) {
-      answers[place.id] = toPlaceMedia(row);
+      answers[place.id] = toPlaceMedia(row, () => '');
     } else {
       answers[place.id] = contact ? PENDING : NOTHING;
     }

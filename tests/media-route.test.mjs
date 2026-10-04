@@ -129,7 +129,7 @@ test('a miss asks Wikipedia with our User-Agent and caches the row', async (t) =
     {
       key: TOKYO_KEY,
       status: 'found',
-      lookup_version: 1,
+      lookup_version: 2,
       page_title: 'Tokyo',
       page_url: 'https://en.wikipedia.org/wiki/Tokyo',
       extract: 'Tokyo is a place.',

@@ -60,6 +60,8 @@ export async function readRows(
         pageTitle: row.page_title,
         pageUrl: row.page_url,
         extract: row.extract,
+        photo: null,
+        credit: null,
         expiresAt: row.expires_at,
       });
     }

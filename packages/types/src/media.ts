@@ -70,18 +70,21 @@ export const aboutSchema = z.strictObject({
   url: z.url({ protocol: /^https$/, hostname: /^en\.wikipedia\.org$/ }),
 });
 
+/** Who made a photo and under which licence, shown under it in the stop sheet. */
+export const photoCreditSchema = z.strictObject({
+  author: z.string().max(120),
+  license: z.string().max(60),
+  licenseUrl: z.url({ protocol: /^https?$/ }).optional(),
+  // The file's page on Commons.
+  sourceUrl: z.url({ protocol: /^https$/, hostname: /^commons\.wikimedia\.org$/ }),
+});
+
 export const photoSchema = z.strictObject({
   url: storageUrlSchema, // 960px
   thumbUrl: storageUrlSchema, // 500px
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  credit: z.strictObject({
-    author: z.string().max(120),
-    license: z.string().max(60),
-    licenseUrl: z.url({ protocol: /^https?$/ }).optional(),
-    // The file's page on Commons.
-    sourceUrl: z.url({ protocol: /^https$/, hostname: /^commons\.wikimedia\.org$/ }),
-  }),
+  credit: photoCreditSchema,
 });
 
 /** One place's media: `pending` while its lookup hasn't finished. */
@@ -101,5 +104,6 @@ export const intentMediaSchema = z.strictObject({
 
 export type PlaceAbout = z.infer<typeof aboutSchema>;
 export type PlacePhoto = z.infer<typeof photoSchema>;
+export type PhotoCredit = z.infer<typeof photoCreditSchema>;
 export type PlaceMedia = z.infer<typeof placeMediaSchema>;
 export type IntentMedia = z.infer<typeof intentMediaSchema>;
