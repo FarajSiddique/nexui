@@ -5,7 +5,7 @@ import { OPTIONS, POST } from '../apps/api/src/app/api/intents/[id]/ask/route.ts
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { captureRuns, useMockAi } from './support/ai.mjs';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
-import { INTENT_ID, RUN_ID, runRow, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import { INTENT_ID, RUN_ID, runRow, snapshotRow, TRIP_ID, USER_ID } from './support/graph.mjs';
 import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
 const context = { params: Promise.resolve({ id: INTENT_ID }) };
@@ -59,6 +59,7 @@ test('an ask is routed and answered with 202 while its run works', async (t) => 
   assert.equal(response.status, 202);
   assert.deepEqual(await response.json(), { runId: RUN_ID, route: 'reasoning' });
   assert.deepEqual(created, {
+    p_user_id: USER_ID,
     p_intent_id: INTENT_ID,
     p_kind: 'ask',
     p_input: { text: 'Could we slow the pace down?', route: 'reasoning', perception: 'model' },

@@ -12,6 +12,7 @@ export {
   ChangesetInvalidError,
   GraphNotFoundError,
   mapRpcError,
+  RunLeaseLostError,
 } from './errors.ts';
 export { listChanges, listIntents } from './lists.ts';
 export { validateOps } from './prepare.ts';

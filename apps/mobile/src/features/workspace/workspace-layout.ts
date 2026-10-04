@@ -117,7 +117,12 @@ function derivedValue(figures: TripDerived, key: DerivedKey): number | Money | n
   }
 }
 
-function legBetween(snapshot: GraphSnapshot, fromId: string, toId: string): GraphObject | null {
+/** The leg from one stop to another, if the graph has one. */
+export function legBetween(
+  snapshot: GraphSnapshot,
+  fromId: string,
+  toId: string,
+): GraphObject | null {
   const end = (legId: string, type: 'leg_from' | 'leg_to'): string | undefined =>
     snapshot.relationships.find((edge) => edge.sourceId === legId && edge.type === type)?.targetId;
 

@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useMutationState,
@@ -23,6 +24,8 @@ import {
   type CreateIntentResponse,
   type GraphSnapshot,
   type IntentListItem,
+  type IntentMedia,
+  type PlaceAbout,
   type RunRecord,
 } from '@nexui/types';
 
@@ -33,17 +36,21 @@ import {
   createIntent,
   deleteIntent,
   getIntent,
+  getPlaceMedia,
   getRun,
   listChanges,
   listIntents,
   undoEvent,
 } from './api';
 import { ApiError } from './api-request';
+import { mediaKeyIds, mediaPollInterval, mediaStaleTime, placeAbout } from './place-media';
 import { planDeletes, type DeleteAttempt, type PlanDeletes } from './plan-deletes';
 
 export const queryKeys = {
   intents: ['intents'] as const,
   intent: (id: string): readonly ['intent', string] => ['intent', id] as const,
+  media: (intentId: string, ids: string): readonly ['media', string, string] =>
+    ['media', intentId, ids] as const,
   runs: ['run'] as const,
   run: (id: string): readonly ['run', string] => ['run', id] as const,
   changes: ['changes'] as const,
@@ -113,6 +120,47 @@ export function useIntent(
       !(error instanceof ApiError && error.status === 404) && failures < 1,
     refetchInterval: () =>
       poll && client.isMutating({ mutationKey: editKey(id ?? '') }) === 0 ? 4_000 : false,
+  });
+}
+
+/**
+ * Wikipedia details for an intent's places, keyed by its sorted place ids so a stop the model
+ * adds starts a fetch. While any lookup is pending it asks again every 2 seconds, up to ten
+ * times. The last answer stays on screen while a new key loads.
+ */
+export function usePlaceMedia(
+  intentId: string,
+  placeIds: readonly string[],
+): UseQueryResult<IntentMedia, Error> {
+  const ids = mediaKeyIds(placeIds);
+
+  return useQuery({
+    queryKey: queryKeys.media(intentId, ids),
+    queryFn: ({ signal }) => getPlaceMedia(intentId, signal),
+    enabled: ids.length > 0,
+    staleTime: (query) => mediaStaleTime(query.state.data),
+    placeholderData: keepPreviousData,
+    refetchInterval: (query) => mediaPollInterval(query.state.data, query.state.dataUpdateCount),
+  });
+}
+
+/**
+ * What a stop sheet's About shows for one place (`placeAbout`), from the same query as
+ * `usePlaceMedia`. A lookup still pending once the polls have run out shows nothing.
+ */
+export function usePlaceAbout(
+  intentId: string,
+  placeIds: readonly string[],
+  placeId: string,
+): PlaceAbout | 'pending' | null {
+  const client = useQueryClient();
+  const media = usePlaceMedia(intentId, placeIds);
+  const answers =
+    client.getQueryState(queryKeys.media(intentId, mediaKeyIds(placeIds)))?.dataUpdateCount ?? 0;
+
+  return placeAbout(media.data, placeId, {
+    loading: media.isPending || media.isPlaceholderData,
+    answers,
   });
 }
 

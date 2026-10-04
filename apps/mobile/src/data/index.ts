@@ -11,12 +11,15 @@ export {
   useDeleteIntent,
   useIntent,
   useIntents,
+  usePlaceAbout,
+  usePlaceMedia,
   usePlanDeletes,
   useRecentChanges,
   useRun,
   useUndo,
   useWorkspaceEdit,
 } from './queries';
+export { mediaPlaceIds } from './place-media';
 export { QueryProvider, queryClient } from './query-provider';
 export { supabase } from './supabase';
 export { useHealth } from './use-health';

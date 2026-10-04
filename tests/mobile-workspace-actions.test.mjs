@@ -6,6 +6,7 @@ import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { workspaceFigures } from '../apps/mobile/src/features/workspace/workspace-layout.ts';
 import {
   capabilityFor,
+  daysAction,
   optimisticOps,
 } from '../apps/mobile/src/features/workspace/workspace-actions.ts';
 import { applyOps } from '../packages/types/src/apply-ops.ts';
@@ -90,4 +91,14 @@ test('decisions and insight buttons go to the server as they are, with nothing o
   assert.deepEqual(capabilityFor(button, graph), { name: button.name, input: button.input });
   assert.deepEqual(optimisticOps(dismiss, graph), []);
   assert.deepEqual(optimisticOps(button, graph), []);
+});
+
+test('a stepper tap is a setDays action only when the value is new and in range', () => {
+  const tokyo = snapshot().objects.find((object) => object.id === TOKYO_ID);
+
+  assert.deepEqual(daysAction(tokyo, 5), { type: 'setDays', placeId: TOKYO_ID, days: 5 });
+  assert.equal(daysAction(tokyo, 4), null);
+  assert.equal(daysAction(tokyo, -1), null);
+  assert.equal(daysAction(tokyo, 366), null);
+  assert.equal(daysAction(tokyo, 2.5), null);
 });

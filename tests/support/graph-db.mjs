@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { mapSnapshotRow } from '../../apps/api/src/lib/graph/mappers.ts';
 import { applyOps } from '../../packages/types/src/apply-ops.ts';
 import { pgError, postgrest } from './graph-api.mjs';
-import { eventRow, runRow, USER_ID } from './graph.mjs';
+import { eventRow, LEASE_ID, runRow, USER_ID } from './graph.mjs';
 
 /** A contract-shaped snapshot as `get_intent_snapshot` returns it. */
 export function toSnapshotRow(snapshot) {
@@ -100,7 +100,10 @@ export function editObject(state, id, changes) {
 /**
  * A stateful PostgREST stand-in for one user and one intent. Commits apply their ops to the
  * in-memory intent, and the run functions keep one run with the SQL's statuses, including
- * `stopping`, so a whole run can execute against it.
+ * `stopping`, and its lease, so a whole run can execute against it. The default run is already
+ * claimed with `LEASE_ID`; a run from `create_run` is unclaimed until `claim_runs`, which hands
+ * out `LEASE_ID`. Each `applied` entry names its `rpc`.
+ * `onStep(state, n)` runs after the nth recorded step, so a test can take the lease away.
  * `onApply(state, n)` runs after the nth commit and `onLoad(state, n)` before the nth snapshot
  * read, to simulate a cancel or an edit from elsewhere. `failApplyOnce` fails the first
  * `apply_changeset` call with that SQLSTATE (e.g. `'NXU08'`) instead of applying it, so a test can
@@ -109,7 +112,14 @@ export function editObject(state, id, changes) {
  */
 export function graphDb(
   initialRow = null,
-  { run = runRow(), onApply, onLoad, failApplyOnce, failCreateRun } = {},
+  {
+    run = runRow({ lease_id: LEASE_ID, attempts: 1 }),
+    onApply,
+    onLoad,
+    onStep,
+    failApplyOnce,
+    failCreateRun,
+  } = {},
 ) {
   const now = () => new Date().toISOString();
   const state = {
@@ -119,6 +129,8 @@ export function graphDb(
     attempts: [],
     steps: [],
     loads: 0,
+    claims: [],
+    reaps: 0,
     created: null,
     createdRun: null,
     discarded: null,
@@ -126,6 +138,38 @@ export function graphDb(
   };
   let pendingFailure = failApplyOnce ?? null;
   const active = () => ['queued', 'running', 'stopping'].includes(state.run.status);
+  const leaseLost = (args) => args.p_lease_id !== state.run.lease_id;
+
+  // Both commit paths: the user's apply_changeset and the worker's run_apply_changeset.
+  const apply = (rpc, args) => {
+    state.attempts.push({ rpc, ...args });
+
+    if (pendingFailure) {
+      const code = pendingFailure;
+
+      pendingFailure = null;
+
+      return pgError(code);
+    }
+
+    const stamp = now();
+
+    state.applied.push({ rpc, ...args });
+    state.snapshot = applyOps(state.snapshot, args.p_ops, stamp);
+    state.snapshot = {
+      ...state.snapshot,
+      intent: { ...state.snapshot.intent, lastActivityAt: stamp },
+    };
+    onApply?.(state, state.applied.length);
+
+    return {
+      ...eventRow,
+      id: randomUUID(),
+      actor: args.p_actor,
+      run_id: args.p_run_id,
+      ops: null,
+    };
+  };
 
   const fetch = postgrest({
     get_intent_snapshot: () => {
@@ -161,34 +205,13 @@ export function graphDb(
 
       return {};
     },
-    apply_changeset: (args) => {
-      state.attempts.push(args);
-
-      if (pendingFailure) {
-        const code = pendingFailure;
-
-        pendingFailure = null;
-
-        return pgError(code);
+    apply_changeset: (args) => apply('apply_changeset', args),
+    run_apply_changeset: (args) => {
+      if (leaseLost(args) || !['running', 'stopping'].includes(state.run.status)) {
+        return pgError('NXU13');
       }
 
-      const stamp = now();
-
-      state.applied.push(args);
-      state.snapshot = applyOps(state.snapshot, args.p_ops, stamp);
-      state.snapshot = {
-        ...state.snapshot,
-        intent: { ...state.snapshot.intent, lastActivityAt: stamp },
-      };
-      onApply?.(state, state.applied.length);
-
-      return {
-        ...eventRow,
-        id: randomUUID(),
-        actor: args.p_actor,
-        run_id: args.p_run_id,
-        ops: null,
-      };
+      return apply('run_apply_changeset', { ...args, p_actor: 'ai' });
     },
     create_run: (args) => {
       if (failCreateRun) {
@@ -202,6 +225,8 @@ export function graphDb(
         kind: args.p_kind,
         input: args.p_input,
         status: 'queued',
+        attempts: 0,
+        lease_id: null,
       };
 
       return state.run;
@@ -212,7 +237,32 @@ export function graphDb(
 
       return null;
     },
-    record_run_step: (args) => {
+    claim_runs: (args) => {
+      state.claims.push(args);
+
+      const claimable =
+        state.run.status === 'queued' &&
+        !state.run.lease_id &&
+        (args.p_run_id === null || args.p_run_id === state.run.id);
+
+      if (!claimable) {
+        return [];
+      }
+
+      state.run = { ...state.run, lease_id: LEASE_ID, attempts: state.run.attempts + 1 };
+
+      return [state.run];
+    },
+    reap_runs: () => {
+      state.reaps += 1;
+
+      return 0;
+    },
+    run_record_step: (args) => {
+      if (leaseLost(args)) {
+        return pgError('NXU13');
+      }
+
       state.steps.push(args);
 
       if (active()) {
@@ -223,9 +273,15 @@ export function graphDb(
         };
       }
 
+      onStep?.(state, state.steps.length);
+
       return state.run.status;
     },
-    finish_run: (args) => {
+    run_finish: (args) => {
+      if (leaseLost(args)) {
+        return pgError('NXU13');
+      }
+
       state.finished = args;
 
       if (state.run.status === 'stopping') {

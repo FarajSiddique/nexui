@@ -144,6 +144,7 @@ export const eventRow = {
 };
 
 export const RUN_ID = 'c0000000-0000-4000-8000-000000000001';
+export const LEASE_ID = 'd0000000-0000-4000-8000-000000000001';
 
 /** A `runs` row. It is created now, so it isn't stale unless a test says so. */
 export function runRow(overrides = {}) {
@@ -165,6 +166,9 @@ export function runRow(overrides = {}) {
     started_at: null,
     finished_at: null,
     created_at: new Date().toISOString(),
+    attempts: 0,
+    lease_id: null,
+    lease_expires_at: null,
     ...overrides,
   };
 }

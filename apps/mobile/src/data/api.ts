@@ -7,6 +7,7 @@ import {
   graphSnapshotSchema,
   healthResponseSchema,
   intentListResponseSchema,
+  intentMediaSchema,
   runRecordSchema,
   type AskResponse,
   type CapabilityRequest,
@@ -18,6 +19,7 @@ import {
   type GraphSnapshot,
   type HealthResponse,
   type IntentListItem,
+  type IntentMedia,
   type RunRecord,
 } from '@nexui/types';
 
@@ -111,6 +113,11 @@ export async function listIntents(signal?: AbortSignal): Promise<IntentListItem[
 /** One intent with its workspace and every live object and relationship. */
 export function getIntent(id: string, signal?: AbortSignal): Promise<GraphSnapshot> {
   return callApi(`/api/intents/${id}`, graphSnapshotSchema, { signal });
+}
+
+/** Wikipedia details for every place in an intent; places still being looked up are pending. */
+export function getPlaceMedia(intentId: string, signal?: AbortSignal): Promise<IntentMedia> {
+  return callApi(`/api/intents/${intentId}/media`, intentMediaSchema, { signal });
 }
 
 // A 204 answer has no body to parse.

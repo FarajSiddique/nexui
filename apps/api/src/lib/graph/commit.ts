@@ -14,7 +14,11 @@ import { loadSnapshot } from './snapshot.ts';
 export interface CommitInput {
   intentId: string;
   actor: Actor;
-  runId?: string | null;
+  /**
+   * The run committing and its worker's lease. The commit then goes through
+   * `run_apply_changeset`, which takes the user, intent and actor from the run.
+   */
+  run?: { id: string; lease: string } | null;
   ops: readonly ChangesetOp[];
   /**
    * Rebuilds `ops` over the snapshot the commit is about to apply to, when the intent moved on
@@ -48,10 +52,19 @@ async function applyFromSnapshot(
 
   const ops = prepareChangeset(before, staged, input.actor, now, newId);
 
+  if (input.run) {
+    return db.rpc('run_apply_changeset', {
+      p_run_id: input.run.id,
+      p_lease_id: input.run.lease,
+      p_ops: ops,
+      p_expected_activity_at: before.intent.lastActivityAt,
+    });
+  }
+
   return db.rpc('apply_changeset', {
     p_intent_id: input.intentId,
     p_actor: input.actor,
-    p_run_id: input.runId ?? null,
+    p_run_id: null,
     p_ops: ops,
     p_expected_activity_at: before.intent.lastActivityAt,
   });
