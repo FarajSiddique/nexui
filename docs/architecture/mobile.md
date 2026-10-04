@@ -25,6 +25,10 @@ edits, and Realtime.
   `usePlaceMedia`, `usePlacePhotos` and the `PhotoState` type), and Realtime (`use-intent-live.ts`).
 - **`lib/`**: pure helpers that several features share (`format.ts`).
 
+Outside `src/`, `apps/mobile/assets/images/` holds the app icon and favicon that `app.config.ts`
+points to. They're exported from the SVG sources in
+[`docs/design/app-icons/`](../design/app-icons/README.md).
+
 Imports run one way. Routes import from anywhere. Features import `ui`, `theme`, `data` and `lib`,
 and another feature only where a screen needs that area's piece (the + tab button reads
 `workspace`'s focused-intent store). `ui` imports only `theme`; `data`, `theme` and `lib` import
