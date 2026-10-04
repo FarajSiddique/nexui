@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   authErrorSchema,
+  deleteAccountRequestSchema,
+  deleteAccountResponseSchema,
   emailCodeRequestSchema,
   emailCodeVerificationSchema,
 } from '../packages/types/src/index.ts';
@@ -29,4 +31,21 @@ test('verification accepts exactly six digits, keeping leading zeros', () => {
 test('auth errors carry a message', () => {
   assert.equal(authErrorSchema.safeParse({ error: 'Sign in to continue.' }).success, true);
   assert.equal(authErrorSchema.safeParse({}).success, false);
+});
+
+test('account deletion takes an optional Apple code of 1 to 1024 characters', () => {
+  assert.deepEqual(deleteAccountRequestSchema.parse({}), {});
+  assert.deepEqual(deleteAccountRequestSchema.parse({ appleAuthorizationCode: 'c.1' }), {
+    appleAuthorizationCode: 'c.1',
+  });
+  for (const appleAuthorizationCode of ['', 'x'.repeat(1025), 42, null]) {
+    assert.equal(deleteAccountRequestSchema.safeParse({ appleAuthorizationCode }).success, false);
+  }
+});
+
+test('account deletion answers whether Apple access remains', () => {
+  assert.deepEqual(deleteAccountResponseSchema.parse({ appleAccessRemains: true }), {
+    appleAccessRemains: true,
+  });
+  assert.equal(deleteAccountResponseSchema.safeParse({}).success, false);
 });
