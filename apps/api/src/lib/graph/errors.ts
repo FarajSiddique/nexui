@@ -7,6 +7,9 @@ export class ChangesetInvalidError extends Error {}
 /** Something changed underneath the request. `message` is safe to show the user. */
 export class ChangesetConflictError extends Error {}
 
+/** A run's lease moved on: the run was reaped or claimed again, so its old worker must stop. */
+export class RunLeaseLostError extends Error {}
+
 /** A database error the graph doesn't recognise. Keeps only its code, for the log. */
 export class GraphDatabaseError extends Error {
   readonly code: string | undefined;
@@ -35,6 +38,8 @@ export function mapRpcError(error: { code?: string }): Error {
       return new ChangesetConflictError('That already exists.');
     case 'NXU12':
       return new ChangesetConflictError('Nexui is still working on this plan.');
+    case 'NXU13':
+      return new RunLeaseLostError('This run moved on.');
     case 'NXU22':
       return new ChangesetInvalidError('That change is not valid.');
     default:

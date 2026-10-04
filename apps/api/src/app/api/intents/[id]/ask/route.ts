@@ -4,11 +4,12 @@ import { sessionOpener } from '#lib/ai';
 import { graphErrorResponse } from '#lib/graph';
 import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
 import { startAsk } from '#lib/orchestrator';
+import { runWorker } from '#lib/runs';
 import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['POST'], ['Authorization', 'Content-Type']);
 
-// The run continues in `after()` once the 202 is sent.
+// The worker claims the run in `after()`, once the 202 is sent.
 export const maxDuration = 300;
 
 interface AskRouteContext {
@@ -50,7 +51,7 @@ export async function POST(request: Request, { params }: AskRouteContext): Promi
 
   try {
     const started = await startAsk(
-      { db: getUserClient(user.accessToken), openSession: sessionOpener() },
+      { db: getUserClient(user.accessToken), openSession: sessionOpener(), worker: runWorker() },
       id,
       parsed.data.text,
     );

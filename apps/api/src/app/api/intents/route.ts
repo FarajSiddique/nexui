@@ -8,11 +8,12 @@ import { sessionOpener } from '#lib/ai';
 import { graphErrorResponse, listIntents } from '#lib/graph';
 import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
 import { startIntent } from '#lib/orchestrator';
+import { runWorker } from '#lib/runs';
 import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET', 'POST'], ['Authorization', 'Content-Type']);
 
-// The run that fills in a new trip continues in `after()` once the response is sent.
+// The worker claims the run that fills in a new trip in `after()`, once the response is sent.
 export const maxDuration = 300;
 
 export function OPTIONS(): Response {
@@ -61,7 +62,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const started = await startIntent(
-      { db: getUserClient(user.accessToken), openSession: sessionOpener() },
+      { db: getUserClient(user.accessToken), openSession: sessionOpener(), worker: runWorker() },
       parsed.data.goal,
     );
 

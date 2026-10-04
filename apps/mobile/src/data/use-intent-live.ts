@@ -1,22 +1,22 @@
-import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { createIntentChannels } from './intent-channel';
 import { editKey, queryKeys } from './queries';
 import { supabase } from './supabase';
 
-const TABLES = ['objects', 'relationships', 'workspaces', 'runs', 'events'] as const;
+const intentChannels = createIntentChannels(supabase);
 
 /**
  * Keeps an open intent current while the server writes to it without the client asking (a run
- * filling it in). Realtime inserts and updates, scoped by RLS, are only the signal: a burst of
- * row changes becomes one refresh. The run, intents and changes lists are always refetched,
- * since they can't disturb an optimistic edit. The intent snapshot itself waits while the user's own edits are in flight
- * (so a refetch can't briefly undo an optimistic change) by re-arming only its own retry until
- * they settle, rather than dropping the signal or repeating the list refresh. `subscribe`'s
- * status callback runs the same catch-up on every `SUBSCRIBED`, including a rejoin after a
- * dropped socket or a `CHANNEL_ERROR`/`TIMED_OUT`, since `postgres_changes` gives no other sign
- * that events were missed while disconnected.
+ * filling it in). The database broadcasts a `changed` signal on the intent's private channel for
+ * each changeset and run write; a burst of signals becomes one refresh. The run, intents and
+ * changes lists are always refetched, since they can't disturb an optimistic edit. The intent
+ * snapshot itself waits while the user's own edits are in flight (so a refetch can't briefly
+ * undo an optimistic change) by re-arming only its own retry until they settle, rather than
+ * dropping the signal or repeating the list refresh. Every join runs the same catch-up,
+ * including a rejoin after a dropped socket or a `CHANNEL_ERROR`/`TIMED_OUT`, since Broadcast
+ * doesn't replay what was sent while disconnected.
  */
 export function useIntentLive(intentId: string | null): void {
   const client = useQueryClient();
@@ -46,7 +46,7 @@ export function useIntentLive(intentId: string | null): void {
       catchUpIntent();
     };
 
-    const onRowChange = (): void => {
+    const onChange = (): void => {
       if (burstTimer) {
         return;
       }
@@ -57,34 +57,7 @@ export function useIntentLive(intentId: string | null): void {
       }, 300);
     };
 
-    // A fresh topic per mount: `supabase.channel` returns an existing channel for a topic
-    // already in use, which throws on a second `.on(...)` call for a remount of the same intent,
-    // or leaves a quick remount without a subscription while the old one is still leaving.
-    const channel = supabase.channel(`intent-${intentId}-${Math.random().toString(36).slice(2)}`);
-
-    // No DELETE events: Realtime sends those to every subscriber, unfiltered and without RLS, so
-    // every user's deleted plan would reach this channel. Rows here are only deleted with their
-    // whole plan, or by an Undo, which also inserts its own `events` row.
-    for (const table of TABLES) {
-      const filter = `intent_id=eq.${intentId}`;
-
-      channel.on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table, filter },
-        onRowChange,
-      );
-      channel.on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table, filter },
-        onRowChange,
-      );
-    }
-
-    channel.subscribe((status) => {
-      if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-        catchUp();
-      }
-    });
+    const release = intentChannels.watch(intentId, { onChange, onSubscribed: catchUp });
 
     return () => {
       if (burstTimer) {
@@ -95,7 +68,7 @@ export function useIntentLive(intentId: string | null): void {
         clearTimeout(intentTimer);
       }
 
-      void supabase.removeChannel(channel);
+      release();
     };
   }, [client, intentId]);
 }

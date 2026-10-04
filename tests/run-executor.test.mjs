@@ -16,6 +16,7 @@ import { editObject, graphDb, removeObject } from './support/graph-db.mjs';
 import {
   idSequence,
   KYOTO_ID,
+  LEASE_ID,
   RUN_ID,
   runRow,
   seedRow,
@@ -95,7 +96,10 @@ test('each model step commits one changeset as the run, and the run succeeds', a
   const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'));
   const run = createRun();
 
-  await executeRun({ db, run, session: mockSession(run, [createFixture]) }, deps());
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
 
   const { state } = fake;
   const places = state.snapshot.objects.filter((object) => object.kind === 'place');
@@ -132,7 +136,12 @@ test('each model step commits one changeset as the run, and the run succeeds', a
       [],
     ],
   );
-  assert.deepEqual(state.finished, { p_run_id: RUN_ID, p_status: 'succeeded', p_error: null });
+  assert.deepEqual(state.finished, {
+    p_run_id: RUN_ID,
+    p_lease_id: LEASE_ID,
+    p_status: 'succeeded',
+    p_error: null,
+  });
 });
 
 test('Stop lets the current step commit and record, then the run ends cancelled', async (t) => {
@@ -143,7 +152,10 @@ test('Stop lets the current step commit and record, then the run ends cancelled'
   });
   const run = createRun();
 
-  await executeRun({ db, run, session: mockSession(run, [createFixture]) }, deps());
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
 
   const { state } = fake;
 
@@ -154,17 +166,67 @@ test('Stop lets the current step commit and record, then the run ends cancelled'
     [0, 3],
   );
   assert.equal(state.run.progress.length, 3);
-  assert.deepEqual(state.finished, { p_run_id: RUN_ID, p_status: 'cancelled', p_error: null });
+  assert.deepEqual(state.finished, {
+    p_run_id: RUN_ID,
+    p_lease_id: LEASE_ID,
+    p_status: 'cancelled',
+    p_error: null,
+  });
   assert.equal(state.run.status, 'cancelled');
+});
+
+test('each step commits through the run, with its lease', async (t) => {
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'));
+  const run = createRun();
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
+
+  assert.deepEqual(
+    fake.state.applied.map((args) => [args.rpc, args.p_run_id, args.p_lease_id]),
+    [
+      ['run_apply_changeset', RUN_ID, LEASE_ID],
+      ['run_apply_changeset', RUN_ID, LEASE_ID],
+    ],
+  );
+  assert.ok(fake.state.applied.every((args) => !('p_intent_id' in args)));
+});
+
+test('a run whose lease moved on stops without writing or finishing', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'), {
+    // Once the run has started, it is reaped and claimed again by another worker.
+    onStep: (state, n) => {
+      if (n === 1) {
+        state.run = { ...state.run, lease_id: 'd0000000-0000-4000-8000-000000000002' };
+      }
+    },
+  });
+  const run = createRun();
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
+
+  assert.equal(fake.state.applied.length, 0);
+  assert.equal(fake.state.finished, null);
+  assert.equal(fake.state.run.status, 'running');
+  assert.deepEqual(logged.mock.calls[0].arguments, ['[runs]', 'A run moved on from this worker.']);
 });
 
 test('a run cancelled before it starts does nothing', async (t) => {
   const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'), {
-    run: runRow({ status: 'cancelled' }),
+    run: runRow({ status: 'cancelled', lease_id: LEASE_ID }),
   });
   const run = createRun();
 
-  await executeRun({ db, run, session: mockSession(run, [createFixture]) }, deps());
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
 
   assert.equal(fake.state.loads, 0);
   assert.equal(fake.state.applied.length, 0);
@@ -176,11 +238,12 @@ test('two invalid steps in a row fail the run and write nothing', async (t) => {
   const run = askRun('edit');
   const fixture = askFixture('edit', [[setDays('o2', 400)], [setDays('o2', 400)]]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 0);
   assert.deepEqual(fake.state.finished, {
     p_run_id: RUN_ID,
+    p_lease_id: LEASE_ID,
     p_status: 'failed',
     p_error: INVALID_RUN_ERROR,
   });
@@ -191,11 +254,12 @@ test('an edit that fails and then gives up in text fails the run as invalid', as
   const run = askRun('edit');
   const fixture = askFixture('edit', [[setDays('o2', 400)]]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 0);
   assert.deepEqual(fake.state.finished, {
     p_run_id: RUN_ID,
+    p_lease_id: LEASE_ID,
     p_status: 'failed',
     p_error: INVALID_RUN_ERROR,
   });
@@ -206,7 +270,7 @@ test('a call refused for its schema still shows in progress, and the run goes on
   const run = askRun('edit');
   const fixture = askFixture('edit', [[setDays('o2', 400)], [setDays('o2', 3)]]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   const refused = entriesOf(fake.state).filter((entry) => !entry.ok);
 
@@ -233,7 +297,7 @@ test('a stop the user deletes mid-run is skipped by the step, and progress says 
   const run = askRun('reasoning');
   const fixture = askFixture('reasoning', [[setDays('o2', 3)], [setDays('o1', 5)]]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 1);
   assert.equal(fake.state.finished.p_status, 'succeeded');
@@ -267,7 +331,7 @@ test('a model error fails the run, keeps the steps before it and logs no detail'
     providerOptions: () => undefined,
   };
 
-  await executeRun({ db, run, session }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session }, deps());
 
   assert.equal(fake.state.applied.length, 1);
   assert.equal(fake.state.finished.p_error, FAILED_RUN_ERROR);
@@ -298,7 +362,7 @@ test('a user edit made while a step runs survives, and the step merges around it
     ],
   ]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 1);
   assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
@@ -314,7 +378,7 @@ test('a step call that would undo the field the user just changed is dropped', a
   const run = askRun('reasoning');
   const fixture = askFixture('reasoning', [[setDays('o2', 3), setDays('o1', 5)]]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
   assert.equal(placeData(fake.state, KYOTO_ID).days, 5);
@@ -335,7 +399,7 @@ test('a step whose every call was superseded commits nothing and the run goes on
   const run = askRun('reasoning');
   const fixture = askFixture('reasoning', [[setDays('o2', 3)]]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   assert.equal(fake.state.applied.length, 0);
   assert.equal(placeData(fake.state, TOKYO_ID).days, 6);
@@ -370,7 +434,7 @@ test('a double restage after NXU08 keeps the edit and reuses the same ids', asyn
     ],
   ]);
 
-  await executeRun({ db, run, session: mockSession(run, [fixture]) }, deps());
+  await executeRun({ db, run, leaseId: LEASE_ID, session: mockSession(run, [fixture]) }, deps());
 
   // The first apply_changeset attempt is refused with NXU08 (the user's edit landed underneath
   // it); commitChangeset reloads and restages a second time, which is the one that lands.

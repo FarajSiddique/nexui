@@ -29,14 +29,17 @@ import {
   GraphNotFoundError,
   logLine,
   loadSnapshot,
+  RunLeaseLostError,
 } from '#lib/graph';
 import type { AiSession, ModelTier } from '#lib/ai';
 
 import { finishRun, recordRunStep } from './store.ts';
 
 export interface RunJob {
+  /** The worker's service-role client; every run write names the run and its lease. */
   db: SupabaseClient;
   run: RunRecord;
+  leaseId: string;
   session: AiSession;
 }
 
@@ -87,6 +90,7 @@ interface StepContext {
   db: SupabaseClient;
   intentId: string;
   runId: string;
+  leaseId: string;
   stager: Stager;
   clock: () => Date;
   newId: () => string;
@@ -129,6 +133,7 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
           intentId: step.intentId,
           actor: 'ai',
           runId: step.runId,
+          lease: step.leaseId,
           ops,
           restage: (current) => step.stager.restage(current),
         },
@@ -148,7 +153,7 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
     }
   }
 
-  const status = await recordRunStep(step.db, step.runId, entries, report.usage);
+  const status = await recordRunStep(step.db, step.runId, step.leaseId, entries, report.usage);
 
   if (failure) {
     throw failure.error;
@@ -158,13 +163,13 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
 }
 
 /**
- * Runs one AI request to the end (spec section F). Each model step's calls commit as one
+ * Runs one claimed AI request to the end (spec section F). Each model step's calls commit as one
  * changeset, so Undo in Changes reverts a step; Stop lets the current step commit, then the
  * run ends cancelled; a failure keeps the committed steps. Never throws: the outcome is
- * written to the run.
+ * written to the run, unless the lease moved on, when the run is no longer this worker's.
  */
 export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void> {
-  const { db, run, session } = job;
+  const { db, run, leaseId, session } = job;
   const clock = deps.clock ?? ((): Date => new Date());
   const newId = deps.newId ?? randomUUID;
   const capabilities = deps.capabilities ?? CAPABILITIES;
@@ -176,7 +181,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       throw new GraphNotFoundError('Not found.');
     }
 
-    if ((await recordRunStep(db, run.id, [], null)) !== 'running') {
+    if ((await recordRunStep(db, run.id, leaseId, [], null)) !== 'running') {
       return;
     }
 
@@ -191,7 +196,16 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       clock,
     });
     const route = ROUTES[run.input.route];
-    const step: StepContext = { db, intentId, runId: run.id, stager, clock, newId, capabilities };
+    const step: StepContext = {
+      db,
+      intentId,
+      runId: run.id,
+      leaseId,
+      stager,
+      clock,
+      newId,
+      capabilities,
+    };
     const outcome = await runModel({
       model: session.languageModel(route.tier),
       providerOptions: session.providerOptions(route.tier),
@@ -204,17 +218,23 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
     });
 
     if (outcome === 'invalid') {
-      await finishRun(db, run.id, 'failed', INVALID_RUN_ERROR);
+      await finishRun(db, run.id, leaseId, 'failed', INVALID_RUN_ERROR);
     } else if (outcome === 'stopped') {
-      await finishRun(db, run.id, 'cancelled', null);
+      await finishRun(db, run.id, leaseId, 'cancelled', null);
     } else {
-      await finishRun(db, run.id, 'succeeded', null);
+      await finishRun(db, run.id, leaseId, 'succeeded', null);
     }
   } catch (error) {
+    if (error instanceof RunLeaseLostError) {
+      console.error('[runs]', 'A run moved on from this worker.');
+
+      return;
+    }
+
     console.error('[runs]', describeFailure(error));
 
     try {
-      await finishRun(db, run.id, 'failed', runErrorMessage(error));
+      await finishRun(db, run.id, leaseId, 'failed', runErrorMessage(error));
     } catch {
       console.error('[runs]', 'Could not record a failed run.');
     }

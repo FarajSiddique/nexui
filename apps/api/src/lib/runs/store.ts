@@ -14,8 +14,12 @@ import {
 
 import { GraphNotFoundError, mapRpcError } from '#lib/graph';
 
-/** A queued, running or stopping run older than this has stopped: its function instance ended. */
-export const RUN_STALE_MS = 6 * 60 * 1000;
+/**
+ * A queued, running or stopping run older than this has stopped: every run must finish within
+ * 15 minutes of creation (two leases plus cron slack). `reap_runs` settles such runs; reading
+ * them as failed is the backstop for when the cron isn't running.
+ */
+export const RUN_STALE_MS = 15 * 60 * 1000;
 
 export const STALE_RUN_ERROR = 'This run stopped unexpectedly.';
 
@@ -57,7 +61,10 @@ export function mapRunRow(row: unknown, now: Date = new Date()): RunRecord {
   return record;
 }
 
-/** Starts a queued run. Throws a 409-mapped error while another run works on the intent. */
+/**
+ * Queues a run on one of the caller's intents, for a worker to claim. Throws a 409-mapped error
+ * while another run works on the intent.
+ */
 export async function createRun(
   db: SupabaseClient,
   run: { intentId: string; kind: RunKind; input: RunInput },
@@ -75,18 +82,69 @@ export async function createRun(
   return mapRunRow(data);
 }
 
+/** A run a worker claimed, with the lease every write as that run must present. */
+export interface ClaimedRun {
+  run: RunRecord;
+  leaseId: string;
+}
+
+export interface ClaimOptions {
+  /** One run (the request that created it), or null for the oldest runs nobody claimed. */
+  runId: string | null;
+  limit: number;
+  leaseSeconds: number;
+  /** The most runs holding a live lease at once, across every worker. */
+  maxActive: number;
+}
+
+/** Claims runs for this worker with the service-role client. Empty when there is nothing to do. */
+export async function claimRuns(db: SupabaseClient, options: ClaimOptions): Promise<ClaimedRun[]> {
+  const { data, error } = await db.rpc('claim_runs', {
+    p_run_id: options.runId,
+    p_limit: options.limit,
+    p_lease_seconds: options.leaseSeconds,
+    p_max_active: options.maxActive,
+  });
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  return ((data ?? []) as Row[]).map((row) => ({
+    run: mapRunRow(row),
+    leaseId: String(row.lease_id),
+  }));
+}
+
+/**
+ * Settles runs whose worker is gone or that passed the deadline: retried, failed or cancelled
+ * (see `reap_runs`). Returns how many it settled.
+ */
+export async function reapRuns(db: SupabaseClient): Promise<number> {
+  const { data, error } = await db.rpc('reap_runs');
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  return Number(data);
+}
+
 /**
  * Marks the run running and appends one step's calls and usage. Returns the run's status:
- * anything but `running` (a cancel) means stop after this step.
+ * anything but `running` (a cancel) means stop after this step. Throws `RunLeaseLostError` when
+ * the lease moved on.
  */
 export async function recordRunStep(
   db: SupabaseClient,
   runId: string,
+  leaseId: string,
   entries: readonly RunProgressEntry[],
   usage: RunUsage | null,
 ): Promise<RunStatus> {
-  const { data, error } = await db.rpc('record_run_step', {
+  const { data, error } = await db.rpc('run_record_step', {
     p_run_id: runId,
+    p_lease_id: leaseId,
     p_entries: entries,
     p_usage: usage ?? {},
   });
@@ -105,11 +163,13 @@ export async function recordRunStep(
 export async function finishRun(
   db: SupabaseClient,
   runId: string,
+  leaseId: string,
   status: 'succeeded' | 'failed' | 'cancelled',
   error: string | null,
 ): Promise<RunRecord> {
-  const result = await db.rpc('finish_run', {
+  const result = await db.rpc('run_finish', {
     p_run_id: runId,
+    p_lease_id: leaseId,
     p_status: status,
     p_error: error,
   });
