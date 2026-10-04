@@ -22,6 +22,10 @@ const LABELS: Record<Provider, string> = {
   google: 'Continue with Google',
 };
 
+// Every title sits in a box as wide as the longest one, so "Continue" starts at the same place
+// in each button while the box stays centered.
+const LONGEST_LABEL = LABELS.google;
+
 // Apple's rules: the logo file (here its large, 39 × 44 version, sized to sit beside Google's G)
 // is as tall as the button, and the title is 43% of the button's height.
 const HEIGHT = 52;
@@ -29,8 +33,9 @@ const LOGO_SLOT = (HEIGHT * 39) / 44;
 
 /**
  * "Continue with Apple" or "Continue with Google", drawn the same way for both so they match: a
- * pill in the brands' white (light) or black (dark), the official logo on the left, the title
- * centered. While `busy`, it shows a spinner; while `disabled`, it dims but stays visible.
+ * pill in the brands' white (light) or black (dark), the official logo on the left, the title in
+ * the middle, lined up with the other button's. While `busy`, it shows a spinner; while
+ * `disabled`, it dims but stays visible.
  *
  * @example
  * <ProviderButton provider="apple" busy={pending === 'apple'} disabled={pending !== null} onPress={…} />
@@ -74,9 +79,22 @@ export function ProviderButton({
           <Image source={googleLogo} style={styles.googleLogo} />
         )}
       </View>
-      <Text numberOfLines={1} adjustsFontSizeToFit style={styles.label}>
-        {LABELS[provider]}
-      </Text>
+      <View style={styles.titleArea}>
+        <View>
+          <Text
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            numberOfLines={1}
+            style={[styles.label, styles.sizer]}
+          >
+            {LONGEST_LABEL}
+          </Text>
+          <Text numberOfLines={1} style={[styles.label, styles.title]}>
+            {LABELS[provider]}
+          </Text>
+        </View>
+      </View>
       <View style={styles.slot}>
         {busy ? <ActivityIndicator color={colors.providerInk} /> : null}
       </View>
@@ -100,9 +118,10 @@ const useStyles = createThemedStyles((colors) => ({
   slot: { width: LOGO_SLOT, alignItems: 'center', justifyContent: 'center' },
   appleLogo: { width: LOGO_SLOT, height: HEIGHT },
   googleLogo: { width: 22, height: 22 },
+  titleArea: { flex: 1, alignItems: 'center' },
+  sizer: { opacity: 0 },
+  title: { position: 'absolute', left: 0, top: 0 },
   label: {
-    flex: 1,
-    textAlign: 'center',
     fontFamily: fonts.body,
     fontSize: Math.round(HEIGHT * 0.43),
     color: colors.providerInk,
