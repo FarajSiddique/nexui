@@ -39,6 +39,7 @@ import {
   undoEvent,
 } from './api';
 import { ApiError } from './api-request';
+import { planDeletes, type DeleteAttempt, type PlanDeletes } from './plan-deletes';
 
 export const queryKeys = {
   intents: ['intents'] as const,
@@ -229,9 +230,9 @@ export function useUndo(): UseMutationResult<CommitResponse, Error, string> {
 const deleteKey = ['deleteIntent'] as const;
 
 /**
- * Deletes a plan for good. Home hides its card while the delete is pending
- * (`useDeletingIntents`), so a failure just shows it again; a plan that's already gone counts as
- * deleted. Its changes go with it, so the change feeds refetch too.
+ * Deletes a plan for good. Home hides its card while the delete is pending (`usePlanDeletes`),
+ * so a failure just shows it again; a plan that's already gone counts as deleted. Its changes go
+ * with it, so the change feeds refetch too.
  */
 export function useDeleteIntent(): UseMutationResult<void, Error, string> {
   const client = useQueryClient();
@@ -257,12 +258,21 @@ export function useDeleteIntent(): UseMutationResult<void, Error, string> {
   });
 }
 
-/** The ids of the plans being deleted right now, whose cards Home hides. */
-export function useDeletingIntents(): string[] {
-  return useMutationState({
-    filters: { mutationKey: deleteKey, status: 'pending' },
-    select: (mutation) => String(mutation.state.variables),
+/**
+ * The plans being deleted right now and those whose delete failed, from every delete still in
+ * the mutation cache (a failure is dropped with its mutation, after 5 minutes).
+ */
+export function usePlanDeletes(): PlanDeletes {
+  const attempts = useMutationState({
+    filters: { mutationKey: deleteKey },
+    select: (mutation): DeleteAttempt => ({
+      id: String(mutation.state.variables),
+      status: mutation.state.status,
+      submittedAt: mutation.state.submittedAt,
+    }),
   });
+
+  return planDeletes(attempts);
 }
 
 export function useCreateIntent(): UseMutationResult<CreateIntentResponse, Error, string> {

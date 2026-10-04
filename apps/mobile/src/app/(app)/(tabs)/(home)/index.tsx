@@ -14,8 +14,8 @@ import { buildChangeRows } from '@/lib/change-feed';
 import {
   isDrafting,
   useDeleteIntent,
-  useDeletingIntents,
   useIntents,
+  usePlanDeletes,
   useRecentChanges,
 } from '@/lib/queries';
 import { fonts } from '@/lib/theme';
@@ -30,7 +30,7 @@ export default function HomeScreen(): ReactElement {
   const intents = useIntents();
   const recent = useRecentChanges();
   const remove = useDeleteIntent();
-  const deleting = useDeletingIntents();
+  const deletes = usePlanDeletes();
   const openRow = useRef<SwipeableMethods | null>(null);
   const rows = useMemo(() => buildChangeRows(recent.data?.items ?? []).slice(0, 3), [recent.data]);
   const now = new Date();
@@ -43,10 +43,9 @@ export default function HomeScreen(): ReactElement {
     openRow.current = row;
   };
 
-  const retryDelete = (): void => {
-    if (remove.variables) {
-      remove.mutate(remove.variables);
-    }
+  const deletePlan = (id: string): void => {
+    openRow.current = null;
+    remove.mutate(id);
   };
 
   const renderPlans = (): ReactElement => {
@@ -58,7 +57,8 @@ export default function HomeScreen(): ReactElement {
       return <ListError message={intents.error.message} onRetry={() => void intents.refetch()} />;
     }
 
-    const plans = intents.data.filter((item) => !deleting.includes(item.id));
+    const plans = intents.data.filter((item) => !deletes.deleting.includes(item.id));
+    const failed = deletes.failed.filter((id) => plans.some((item) => item.id === id));
 
     return (
       <>
@@ -73,21 +73,27 @@ export default function HomeScreen(): ReactElement {
             </Text>
           </Pressable>
         ) : null}
-        {remove.isError ? (
-          <Pressable accessibilityRole="button" onPress={retryDelete} style={styles.notice}>
+        {failed.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => failed.forEach(deletePlan)}
+            style={styles.notice}
+          >
             <Text accessibilityLiveRegion="polite" style={styles.deleteErrorText}>
-              {"Couldn't delete that plan. Tap to try again."}
+              {failed.length === 1
+                ? "Couldn't delete that plan. Tap to try again."
+                : `Couldn't delete ${failed.length} plans. Tap to try again.`}
             </Text>
           </Pressable>
         ) : null}
-        {plans.length === 0 ? (
+        {intents.data.length === 0 ? (
           <ListEmpty text="Your plans will show here. Tap + and say what you're trying to do." />
         ) : (
           <View style={styles.cards}>
             {plans.map((item) => {
               // Nexui is still writing to a Drafting plan, so it can't be deleted yet.
               const drafting = isDrafting(item);
-              const onDelete = (): void => remove.mutate(item.id);
+              const onDelete = (): void => deletePlan(item.id);
 
               return (
                 <SwipeToDelete
