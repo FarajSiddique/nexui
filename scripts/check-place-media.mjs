@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { readMediaConfig } from '../apps/api/src/lib/media/config.ts';
 import { matchArticle } from '../apps/api/src/lib/media/rules.ts';
 import { searchArticles } from '../apps/api/src/lib/media/wikipedia.ts';
+import { normalizePlaceName, roundCoordinate } from '../packages/types/src/media.ts';
 
 const CASES = [
   { place: { name: 'Berlin', placeType: 'city', lat: 52.52, lng: 13.405 }, title: 'Berlin' },
@@ -54,7 +55,14 @@ for (const { place, title } of CASES) {
   const label = `${place.name} (${place.lat}, ${place.lng})`;
 
   try {
-    const match = matchArticle(place, await searchArticles(place.name, contact));
+    // As the lookup does it: the key's normalized name and rounded coordinates.
+    const keyed = {
+      ...place,
+      name: normalizePlaceName(place.name),
+      lat: roundCoordinate(place.lat),
+      lng: roundCoordinate(place.lng),
+    };
+    const match = matchArticle(keyed, await searchArticles(keyed.name, contact));
     const pass = match?.title === title && match.extract.length > 0;
 
     if (!pass) {

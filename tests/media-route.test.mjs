@@ -37,12 +37,11 @@ const plan = (overrides) => snapshotRow(travelWorkspace(TRIP_ID), overrides);
 const get = (id = INTENT_ID) =>
   GET(authed(`http://localhost/api/intents/${id}/media`), context(id));
 
-// Each search answers with an article named like the search, at that fixture place.
+// Each search (the key's normalized name) answers with that fixture place's article.
 function wikipedia(url) {
-  const name = url.searchParams.get('gsrsearch');
-  const place = name === 'Tokyo' ? tokyoData : kyotoData;
+  const place = url.searchParams.get('gsrsearch') === 'tokyo' ? tokyoData : kyotoData;
 
-  return Response.json(searchBody([article(name, place.lat, place.lng)]));
+  return Response.json(searchBody([article(place.name, place.lat, place.lng)]));
 }
 
 // Lookups past the budget would call after(), which needs a Next.js request.
@@ -157,7 +156,7 @@ test('a row from an older lookup version is looked up again', async (t) => {
 
   assert.deepEqual(
     state.searches.map((search) => search.url.searchParams.get('gsrsearch')),
-    ['Tokyo'],
+    ['tokyo'],
   );
 });
 

@@ -24,9 +24,14 @@ export function normalizePlaceName(name: string): string {
     .trim();
 }
 
-// One decimal place is about 11 km. Adding 0 turns -0 into 0.
-function roundCoordinate(value: number): string {
-  return (Math.round(value * 10) / 10 + 0).toFixed(1);
+/**
+ * A coordinate rounded to 0.1° (about 11 km), as the media key holds it. Adding 0 turns -0
+ * into 0.
+ *
+ * @example roundCoordinate(48.8127) // 48.8
+ */
+export function roundCoordinate(value: number): number {
+  return Math.round(value * 10) / 10 + 0;
 }
 
 /**
@@ -41,8 +46,8 @@ export function placeMediaKey(place: Pick<PlaceData, 'name' | 'country' | 'lat' 
   return [
     normalizePlaceName(place.name),
     place.country,
-    roundCoordinate(place.lat),
-    roundCoordinate(place.lng),
+    roundCoordinate(place.lat).toFixed(1),
+    roundCoordinate(place.lng).toFixed(1),
   ].join('|');
 }
 

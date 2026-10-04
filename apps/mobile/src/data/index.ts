@@ -11,6 +11,7 @@ export {
   useDeleteIntent,
   useIntent,
   useIntents,
+  usePlaceAbout,
   usePlaceMedia,
   usePlanDeletes,
   useRecentChanges,

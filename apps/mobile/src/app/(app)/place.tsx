@@ -2,13 +2,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 
-import type { IntentMedia } from '@nexui/types';
-
-import { mediaPlaceIds, useIntent, usePlaceMedia, useUndo, useWorkspaceEdit } from '#data';
+import { mediaPlaceIds, useIntent, usePlaceAbout, useUndo, useWorkspaceEdit } from '#data';
 import { placeName } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
-import { PlaceSheet, type AboutState } from '#features/place';
+import { PlaceSheet } from '#features/place';
 import {
   UndoToast,
   capabilityFor,
@@ -19,20 +17,14 @@ import {
   useEditMemoryStore,
 } from '#features/workspace';
 
-// What About shows for one place: its introduction, a placeholder while the lookup runs or the
-// answer loads, or nothing (no article, a failed lookup, or the request failed).
-function aboutState(media: IntentMedia | undefined, placeId: string, loading: boolean): AboutState {
-  const entry = media?.places[placeId];
-
-  if (entry?.status === 'ready') {
-    return entry.about;
+// Closes the sheet onto its plan. A sheet opened from a link or a reload on web has no history
+// to go back to, so it opens the plan instead.
+function close(intentId: string): void {
+  if (router.canGoBack()) {
+    router.back();
+  } else {
+    router.replace({ pathname: '/intent/[id]', params: { id: intentId } });
   }
-
-  if (entry?.status === 'pending' || loading) {
-    return 'pending';
-  }
-
-  return null;
 }
 
 /**
@@ -47,7 +39,7 @@ export default function PlaceScreen(): ReactElement {
   const intent = useIntent(intentId);
   const snapshot = intent.data;
   const placeIds = useMemo(() => (snapshot ? mediaPlaceIds(snapshot) : []), [snapshot]);
-  const media = usePlaceMedia(intentId, placeIds);
+  const about = usePlaceAbout(intentId, placeIds, placeId);
   const edit = useWorkspaceEdit(intentId);
   const undo = useUndo();
   const wasDays = useEditMemoryStore((state) => state.wasDays);
@@ -105,7 +97,7 @@ export default function PlaceScreen(): ReactElement {
       return (
         <View style={styles.gone}>
           <ListEmpty text="This stop is no longer on your route." />
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label="Done" onPress={() => close(intentId)} />
         </View>
       );
     }
@@ -113,9 +105,9 @@ export default function PlaceScreen(): ReactElement {
     return (
       <PlaceSheet
         details={details}
-        about={aboutState(media.data, details.place.id, media.isPending || media.isPlaceholderData)}
+        about={about}
         was={wasDays[details.place.id]}
-        onDone={() => router.back()}
+        onDone={() => close(intentId)}
         onDays={setDays}
         onNext={(next) => router.setParams({ placeId: next })}
         onFindStay={findStay}

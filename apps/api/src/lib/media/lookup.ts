@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { placeDataSchema, placeMediaKey, type GraphSnapshot, type PlaceMedia } from '@nexui/types';
+import {
+  normalizePlaceName,
+  placeDataSchema,
+  placeMediaKey,
+  roundCoordinate,
+  type GraphSnapshot,
+  type PlaceMedia,
+} from '@nexui/types';
 
 import { logLine } from '#lib/graph';
 
@@ -26,7 +33,11 @@ const BUDGET_MS = 6_000;
 const PENDING: PlaceMedia = { status: 'pending' };
 const NOTHING: PlaceMedia = { status: 'ready', about: null, photo: null };
 
-/** A place to answer for: its graph id, its cache key and what the lookup reads. */
+/**
+ * A place to answer for: its graph id, its cache key and what the lookup reads. The name and
+ * coordinates are the key's (normalized and rounded), so every place sharing a key is looked
+ * up the same way, and no one's spelling decides what everyone sees.
+ */
 export interface MediaPlace extends LookupPlace {
   id: string;
   key: string;
@@ -46,7 +57,8 @@ export interface MediaDeps {
 
 interface LookupResult {
   row: MediaRow;
-  throttled: boolean;
+  /** Set when Wikipedia throttled us: how long it asked us to wait, in milliseconds. */
+  retryAfter: number | null;
 }
 
 let warnedOff = false;
@@ -62,7 +74,16 @@ export function mediaPlaces(snapshot: GraphSnapshot): MediaPlace[] {
 
     const { name, placeType, lat, lng } = parsed.data;
 
-    return [{ id: object.id, key: placeMediaKey(parsed.data), name, placeType, lat, lng }];
+    return [
+      {
+        id: object.id,
+        key: placeMediaKey(parsed.data),
+        name: normalizePlaceName(name),
+        placeType,
+        lat: roundCoordinate(lat),
+        lng: roundCoordinate(lng),
+      },
+    ];
   });
 }
 
@@ -85,11 +106,20 @@ function logCounts(counts: Record<MediaStatus, number>): void {
   }
 }
 
+// Caches a row. A failed write is logged with its code, and the row still answers.
+async function store(deps: MediaDeps, row: MediaRow, now: Date): Promise<void> {
+  try {
+    await saveRow(deps.db, row, now);
+  } catch (error) {
+    console.error('[media]', logLine(error, 'Could not cache a lookup'));
+  }
+}
+
 // One lookup: search, match and cache. Never throws; a failure becomes a `failed` row.
 async function lookUp(deps: MediaDeps, contact: string, place: MediaPlace): Promise<LookupResult> {
   const now = deps.now?.() ?? new Date();
   let row: MediaRow;
-  let throttled = false;
+  let retryAfter: number | null = null;
 
   try {
     const articles = await searchArticles(place.name, contact);
@@ -97,8 +127,8 @@ async function lookUp(deps: MediaDeps, contact: string, place: MediaPlace): Prom
     row = lookupRow(place.key, matchArticle(place, articles), now);
   } catch (error) {
     if (error instanceof WikipediaThrottledError) {
-      throttled = true;
-      row = failedRow(place.key, now, retryAfterMs(error.retryAfter, now));
+      retryAfter = retryAfterMs(error.retryAfter, now);
+      row = failedRow(place.key, now, retryAfter);
     } else {
       row = failedRow(place.key, now);
     }
@@ -111,13 +141,9 @@ async function lookUp(deps: MediaDeps, contact: string, place: MediaPlace): Prom
     );
   }
 
-  try {
-    await saveRow(deps.db, row, now);
-  } catch (error) {
-    console.error('[media]', logLine(error, 'Could not cache a lookup'));
-  }
+  await store(deps, row, now);
 
-  return { row, throttled };
+  return { row, retryAfter };
 }
 
 // True when `work` settles within `ms`.
@@ -146,25 +172,50 @@ async function lookUpWithin(
   const budget = deps.budgetMs ?? BUDGET_MS;
   const deadline = Date.now() + budget;
   const counts: Record<MediaStatus, number> = { found: 0, none: 0, failed: 0 };
-  let throttled = false;
+  const started = new Set<string>();
+  let throttleWait: number | null = null;
 
   const worker = async (): Promise<void> => {
     for (let place = queue.shift(); place; place = queue.shift()) {
-      if (throttled || Date.now() >= deadline) {
+      if (throttleWait !== null || Date.now() >= deadline) {
         return;
       }
+
+      started.add(place.key);
 
       const result = await lookUp(deps, contact, place);
 
       finished.set(place.key, result.row);
       counts[result.row.status] += 1;
-      throttled ||= result.throttled;
+      throttleWait ??= result.retryAfter;
     }
   };
 
-  const work = Promise.all(Array.from({ length: CONCURRENCY }, worker)).then(() =>
-    logCounts(counts),
-  );
+  // After a throttle, every place this request didn't start waits out Retry-After too, so the
+  // app's polls don't keep asking a Wikipedia that asked us to back off.
+  const holdBack = async (): Promise<void> => {
+    const wait = throttleWait;
+
+    if (wait === null) {
+      return;
+    }
+
+    const now = deps.now?.() ?? new Date();
+    const skipped = places.filter((place) => !started.has(place.key));
+
+    await Promise.all(
+      skipped.map(async (place) => {
+        const row = failedRow(place.key, now, wait);
+
+        finished.set(place.key, row);
+        await store(deps, row, now);
+      }),
+    );
+  };
+
+  const work = Promise.all(Array.from({ length: CONCURRENCY }, worker))
+    .then(holdBack)
+    .then(() => logCounts(counts));
 
   if (!(await settlesWithin(work, budget))) {
     deps.defer(() => work);

@@ -25,6 +25,7 @@ import {
   type GraphSnapshot,
   type IntentListItem,
   type IntentMedia,
+  type PlaceAbout,
   type RunRecord,
 } from '@nexui/types';
 
@@ -42,7 +43,7 @@ import {
   undoEvent,
 } from './api';
 import { ApiError } from './api-request';
-import { mediaKeyIds, mediaPollInterval } from './place-media';
+import { mediaKeyIds, mediaPollInterval, mediaStaleTime, placeAbout } from './place-media';
 import { planDeletes, type DeleteAttempt, type PlanDeletes } from './plan-deletes';
 
 export const queryKeys = {
@@ -137,9 +138,29 @@ export function usePlaceMedia(
     queryKey: queryKeys.media(intentId, ids),
     queryFn: ({ signal }) => getPlaceMedia(intentId, signal),
     enabled: ids.length > 0,
-    staleTime: 5 * 60_000,
+    staleTime: (query) => mediaStaleTime(query.state.data),
     placeholderData: keepPreviousData,
     refetchInterval: (query) => mediaPollInterval(query.state.data, query.state.dataUpdateCount),
+  });
+}
+
+/**
+ * What a stop sheet's About shows for one place (`placeAbout`), from the same query as
+ * `usePlaceMedia`. A lookup still pending once the polls have run out shows nothing.
+ */
+export function usePlaceAbout(
+  intentId: string,
+  placeIds: readonly string[],
+  placeId: string,
+): PlaceAbout | 'pending' | null {
+  const client = useQueryClient();
+  const media = usePlaceMedia(intentId, placeIds);
+  const answers =
+    client.getQueryState(queryKeys.media(intentId, mediaKeyIds(placeIds)))?.dataUpdateCount ?? 0;
+
+  return placeAbout(media.data, placeId, {
+    loading: media.isPending || media.isPlaceholderData,
+    answers,
   });
 }
 

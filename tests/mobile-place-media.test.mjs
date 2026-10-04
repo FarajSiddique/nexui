@@ -9,6 +9,8 @@ import {
   mediaKeyIds,
   mediaPlaceIds,
   mediaPollInterval,
+  mediaStaleTime,
+  placeAbout,
 } from '../apps/mobile/src/data/place-media.ts';
 import {
   KYOTO_ID,
@@ -56,4 +58,29 @@ test('it polls every 2 seconds while a lookup is pending, ten times at most', ()
   assert.equal(mediaPollInterval(pending, MEDIA_POLLS + 1), false);
   assert.equal(mediaPollInterval(done, 1), false);
   assert.equal(mediaPollInterval(undefined, 0), false);
+});
+
+test('About shows the introduction, a placeholder while looking, then nothing', () => {
+  const about = {
+    title: 'Tokyo',
+    extract: 'Tokyo is…',
+    url: 'https://en.wikipedia.org/wiki/Tokyo',
+  };
+  const media = {
+    places: {
+      [TOKYO_ID]: { status: 'ready', about, photo: null },
+      [KYOTO_ID]: { status: 'pending' },
+    },
+  };
+
+  assert.equal(placeAbout(media, TOKYO_ID, { loading: false, answers: 1 }), about);
+  assert.equal(placeAbout(media, KYOTO_ID, { loading: false, answers: 1 }), 'pending');
+  assert.equal(placeAbout(media, KYOTO_ID, { loading: false, answers: MEDIA_POLLS + 1 }), null);
+  assert.equal(placeAbout(undefined, TOKYO_ID, { loading: true, answers: 0 }), 'pending');
+  assert.equal(placeAbout(undefined, TOKYO_ID, { loading: false, answers: 0 }), null);
+});
+
+test('an answer with a pending lookup is stale at once, so opening the plan again asks again', () => {
+  assert.equal(mediaStaleTime({ places: { [TOKYO_ID]: { status: 'pending' } } }), 0);
+  assert.equal(mediaStaleTime({ places: { [TOKYO_ID]: ready } }), 5 * 60_000);
 });

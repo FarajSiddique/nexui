@@ -106,28 +106,26 @@ test('at most 20 lookups start per request; the rest answer pending', async (t) 
   assert.equal(deferred.length, 0);
 });
 
-test('a throttle stops new lookups and caches failed until Retry-After', async (t) => {
+test('a throttle stops new lookups and caches every unstarted place until Retry-After', async (t) => {
   const upstream = mediaUpstream({
     wikipedia: () => new Response('slow down', { status: 429, headers: { 'Retry-After': '3600' } }),
   });
   const { deps, errors } = setup(t, upstream);
-  const places = Array.from({ length: 6 }, (_, index) => spot(index + 1));
+  const places = Array.from({ length: 25 }, (_, index) => spot(index + 1));
 
   const answers = await resolvePlaceMedia(deps, places);
 
   assert.equal(upstream.state.searches.length, 4);
-  assert.equal(upstream.state.saved.length, 4);
+  assert.equal(upstream.state.saved.length, 25);
 
   for (const row of upstream.state.saved) {
     assert.equal(row.status, 'failed');
     assert.equal(row.expires_at, new Date(NOW.getTime() + 3_600_000).toISOString());
   }
 
-  assert.deepEqual(
-    Object.values(answers)
-      .map((answer) => answer.status)
-      .sort(),
-    ['pending', 'pending', 'ready', 'ready', 'ready', 'ready'],
+  assert.ok(
+    Object.values(answers).every((answer) => answer.status === 'ready'),
+    'nothing is left pending for the app to poll',
   );
   assert.ok(
     errors.mock.calls.every((call) => !call.arguments.join(' ').includes('Place')),
@@ -240,4 +238,29 @@ test('every valid place is asked about, decision candidates included', () => {
     mediaPlaces(snapshot).map((place) => place.key),
     ['tokyo|JP|35.7|139.7', 'kyoto|JP|35.0|135.8', 'nara|JP|34.7|135.8'],
   );
+});
+
+test('the search and the match depend only on the key, not the raw name', async (t) => {
+  const odd = objectRow('a1b2c3d4-0000-4000-8000-000000000103', 'place', {
+    ...kyotoData,
+    name: '-Kyōto~',
+    lat: 35.04,
+    lng: 135.77,
+  });
+  const places = mediaPlaces(
+    mapSnapshotRow(snapshotRow(travelWorkspace(TRIP_ID), { objects: [tripRow, odd] })),
+  );
+  const upstream = mediaUpstream({
+    wikipedia: () => Response.json(searchBody([article('Kyoto', 35.0, 135.8)])),
+  });
+  const { deps } = setup(t, upstream);
+
+  assert.deepEqual(
+    places.map(({ key, name, lat, lng }) => ({ key, name, lat, lng })),
+    [{ key: 'kyoto|JP|35.0|135.8', name: 'kyoto', lat: 35, lng: 135.8 }],
+  );
+
+  await resolvePlaceMedia(deps, places);
+
+  assert.equal(upstream.state.searches[0].url.searchParams.get('gsrsearch'), 'kyoto');
 });
