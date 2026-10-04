@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { fonts, createThemedStyles, useColors } from '#theme';
 
 import type { Placement } from './placement';
 

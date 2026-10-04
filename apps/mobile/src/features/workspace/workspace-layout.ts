@@ -14,7 +14,8 @@ import {
   type WorkspaceDoc,
 } from '@nexui/types';
 
-import { placeName } from '../../lib/format.ts';
+import { placeName } from '#lib';
+
 import { aiMarkFor } from './ai-mark.ts';
 
 export interface MapPin {

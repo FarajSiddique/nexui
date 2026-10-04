@@ -1,3 +1,6 @@
+import type { ReactElement } from 'react';
+import { Text, View } from 'react-native';
+
 import {
   readField,
   type DecisionData,
@@ -5,17 +8,13 @@ import {
   type PlaceData,
   type Section,
 } from '@nexui/types';
-import type { ReactElement } from 'react';
-import { Text, View } from 'react-native';
 
-import { aiMarkFor } from '@/features/workspace/ai-mark';
-import type { DecisionOption } from '@/features/workspace/workspace-layout';
-import { cardText, formatField, formatMoney, humanizeKey } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { AiText, NexuiTag } from '@/ui/ai-text';
-import { Button } from '@/ui/buttons';
+import { cardText, formatField, formatMoney, humanizeKey } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
+import { AiText, NexuiTag, Button } from '#ui';
 
+import type { DecisionOption } from '../workspace-layout';
+import { aiMarkFor } from '../ai-mark';
 import { ComparisonTable, type ComparisonRow } from './comparison-table';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';

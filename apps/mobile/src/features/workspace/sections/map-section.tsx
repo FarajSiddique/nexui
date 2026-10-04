@@ -3,8 +3,7 @@ import { useMemo, type ReactElement } from 'react';
 import { Platform, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors, useScheme } from '@/theme/use-theme';
+import { fonts, createThemedStyles, useColors, useScheme } from '#theme';
 
 import { MapFallback } from './map-fallback';
 import { fitRegion } from './map-region';

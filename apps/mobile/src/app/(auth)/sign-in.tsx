@@ -3,12 +3,15 @@ import { router } from 'expo-router';
 import { useState, type ReactElement } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
 
-import { AuthActionError, sendEmailCode, signInWithGoogle } from '@/features/auth/auth';
-import { AuthScreen, useAuthStyles } from '@/features/auth/auth-screen';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
-import { Button } from '@/ui/buttons';
-import { FormError } from '@/ui/form-messages';
+import { fonts, createThemedStyles, useColors } from '#theme';
+import { Button, FormError } from '#ui';
+import {
+  AuthActionError,
+  sendEmailCode,
+  signInWithGoogle,
+  AuthScreen,
+  useAuthStyles,
+} from '#features/auth';
 
 type Pending = 'email' | 'google' | null;
 

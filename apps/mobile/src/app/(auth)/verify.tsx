@@ -2,11 +2,15 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactElement } from 'react';
 import { TextInput } from 'react-native';
 
-import { AuthActionError, sendEmailCode, verifyEmailCode } from '@/features/auth/auth';
-import { AuthScreen, useAuthStyles } from '@/features/auth/auth-screen';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
-import { Button } from '@/ui/buttons';
-import { FormError, FormNotice } from '@/ui/form-messages';
+import { createThemedStyles, useColors } from '#theme';
+import { Button, FormError, FormNotice } from '#ui';
+import {
+  AuthActionError,
+  sendEmailCode,
+  verifyEmailCode,
+  AuthScreen,
+  useAuthStyles,
+} from '#features/auth';
 
 const CODE_LENGTH = 6;
 // Match the email resend interval configured in Supabase.

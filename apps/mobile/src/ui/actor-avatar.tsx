@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { fonts, createThemedStyles } from '#theme';
 
 const GLYPH = { user: 'You', ai: 'N', derived: '∑' } as const;
 const NAME = { user: 'You', ai: 'Nexui', derived: 'Auto-calculated' } as const;

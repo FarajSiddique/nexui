@@ -2,9 +2,8 @@ import { Tabs } from 'expo-router/js-tabs';
 import type { ReactElement } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PlusTabButton, TAB_BAR_HEIGHT, TabIcon } from '@/features/shell/tab-bar-items';
-import { fonts } from '@/theme/theme';
-import { useColors } from '@/theme/use-theme';
+import { fonts, useColors } from '#theme';
+import { PlusTabButton, TAB_BAR_HEIGHT, TabIcon } from '#features/shell';
 
 // Home · (+) · Changes. The order and the + button never move.
 export default function TabsLayout(): ReactElement {

@@ -1,28 +1,33 @@
-import type { GraphSnapshot, TripData } from '@nexui/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ApiError } from '@/data/api-request';
-import { queryKeys, useIntent, useIntents, useUndo, useWorkspaceEdit } from '@/data/queries';
-import { useIntentLive } from '@/data/use-intent-live';
-import { SectionView } from '@/features/workspace/sections/registry';
-import { UndoToast } from '@/features/workspace/undo-toast';
-import { focusIntent } from '@/features/workspace/use-focused-intent-store';
-import { useRevealOpenBand } from '@/features/workspace/use-reveal-open-band';
+import type { GraphSnapshot, TripData } from '@nexui/types';
+
 import {
+  ApiError,
+  queryKeys,
+  useIntent,
+  useIntents,
+  useUndo,
+  useWorkspaceEdit,
+  useIntentLive,
+} from '#data';
+import { tripMeta } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
+import { ListEmpty, ListError, RefetchNotice, SkeletonRows, Pill } from '#ui';
+import {
+  SectionView,
+  UndoToast,
+  focusIntent,
+  useRevealOpenBand,
   capabilityFor,
   optimisticOps,
   type WorkspaceAction,
-} from '@/features/workspace/workspace-actions';
-import { layoutWorkspace } from '@/features/workspace/workspace-layout';
-import { tripMeta } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { ListEmpty, ListError, RefetchNotice, SkeletonRows } from '@/ui/list-states';
-import { Pill } from '@/ui/pill';
+  layoutWorkspace,
+} from '#features/workspace';
 
 function anchorMeta(snapshot: GraphSnapshot): string {
   const anchorId = snapshot.workspace?.doc.anchorId;

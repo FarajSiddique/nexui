@@ -1,7 +1,7 @@
 import type { GraphSnapshot, Section } from '@nexui/types';
 
-import type { WorkspaceAction } from '@/features/workspace/workspace-actions';
-import type { SectionDataOf } from '@/features/workspace/workspace-layout';
+import type { WorkspaceAction } from '../workspace-actions';
+import type { SectionDataOf } from '../workspace-layout';
 
 /**
  * What every primitive receives (spec section D). Primitives render and report actions; they

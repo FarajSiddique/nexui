@@ -1,12 +1,12 @@
-import { readField } from '@nexui/types';
 import type { ReactElement } from 'react';
 import { Text } from 'react-native';
 
-import { aiMarkFor } from '@/features/workspace/ai-mark';
-import { cardText, formatField } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { readField } from '@nexui/types';
 
+import { cardText, formatField } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
+
+import { aiMarkFor } from '../ai-mark';
 import { ComparisonTable } from './comparison-table';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';

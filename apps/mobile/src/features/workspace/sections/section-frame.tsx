@@ -1,8 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { fonts, createThemedStyles } from '#theme';
 
 /** A section's card. `accent` marks something waiting on the user; `tentative` a proposal. */
 export function SectionFrame({

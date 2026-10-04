@@ -1,8 +1,7 @@
 import { useEffect, type ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
+import { fonts, createThemedStyles } from '#theme';
 
 /**
  * "Saved" with Undo, for five seconds after an edit. Pass a stable `onDismiss` and key the

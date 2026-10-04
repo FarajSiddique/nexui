@@ -9,15 +9,12 @@ import {
   useCreateIntent,
   useIntent,
   useRun,
-} from '@/data/queries';
-import { useIntentLive } from '@/data/use-intent-live';
-import { RunCard } from '@/features/compose/run-card';
-import { afterAsk } from '@/features/compose/run-outcome';
-import { useKeyboardOverlap } from '@/features/compose/use-keyboard-overlap';
-import { revealOpenBand } from '@/features/workspace/use-reveal-store';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
-import { Button } from '@/ui/buttons';
+  useIntentLive,
+} from '#data';
+import { fonts, createThemedStyles, useColors } from '#theme';
+import { Button } from '#ui';
+import { RunCard, afterAsk, useKeyboardOverlap } from '#features/compose';
+import { revealOpenBand } from '#features/workspace';
 
 interface Sent {
   text: string;

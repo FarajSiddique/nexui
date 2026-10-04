@@ -1,8 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { Platform, Pressable, Text, TextInput, View, type TextStyle } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { fonts, createThemedStyles, useColors } from '#theme';
 
 /**
  * A tab's fixed header: large title on the left, tools on the right. When `filter` is

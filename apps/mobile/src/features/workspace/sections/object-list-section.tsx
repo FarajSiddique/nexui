@@ -1,13 +1,13 @@
-import type { GraphObject, ThingData } from '@nexui/types';
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import { aiMarkFor } from '@/features/workspace/ai-mark';
-import { cardText } from '@/lib/format';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { AiText } from '@/ui/ai-text';
+import type { GraphObject, ThingData } from '@nexui/types';
 
+import { cardText } from '#lib';
+import { fonts, createThemedStyles } from '#theme';
+import { AiText } from '#ui';
+
+import { aiMarkFor } from '../ai-mark';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 

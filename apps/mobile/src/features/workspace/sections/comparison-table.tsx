@@ -1,9 +1,8 @@
 import type { ReactElement, ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { fonts } from '@/theme/theme';
-import { createThemedStyles } from '@/theme/use-theme';
-import { AiText } from '@/ui/ai-text';
+import { fonts, createThemedStyles } from '#theme';
+import { AiText } from '#ui';
 
 export interface ComparisonColumn {
   id: string;

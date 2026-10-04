@@ -1,6 +1,6 @@
 import type { ChangeItem } from '@nexui/types';
 
-import { dayLabel } from '../../lib/format.ts';
+import { dayLabel } from '#lib';
 
 export type ChangeFilter = 'all' | 'you' | 'nexui' | 'auto';
 

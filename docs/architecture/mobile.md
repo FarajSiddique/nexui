@@ -27,13 +27,46 @@ edits, and Realtime.
 Imports run one way. Routes import from anywhere. Features import `ui`, `theme`, `data` and `lib`,
 and another feature only where a screen needs that area's piece (the + tab button reads
 `workspace`'s focused-intent store). `ui` imports only `theme`; `data`, `theme` and `lib` import
-none of the others. Files in one folder import each other as `./name`; across folders, use the
-`@/` alias, except in the pure files below.
+none of the others.
 
-`pnpm lint` enforces these directions with `import/no-restricted-paths` in
-`apps/mobile/eslint.config.js`, one zone per folder. `eslint-import-resolver-typescript` resolves
-the `@/` alias, so an aliased import is checked the same as a relative one. Lint doesn't police
-imports between features; keep those to what a screen needs.
+### Barrels
+
+`data`, `lib`, `theme`, `ui` and each `features/<area>` have an `index.ts` barrel that
+re-exports, by name, what other folders may use. Import another folder only through its barrel:
+
+```ts
+import { useIntents } from '#data';
+import { useSessionStore } from '#features/auth';
+import { Button } from '#ui';
+```
+
+- `#data`, `#lib`, `#theme`, `#ui` and `#features/*` are Node subpath imports in
+  `apps/mobile/package.json`, so Metro, `tsc` and the Node test runner all resolve them. There is
+  no `@/` alias.
+- Inside a folder, import files as `./name`, never the folder's own barrel. A feature's subfolder
+  (`workspace/sections/`) reaches its feature with `../name`.
+- A barrel holds only `export { … } from './file'` and `export type { … } from './file'` lines.
+  Leave the extension off so Metro still picks platform files such as `map-section.web.tsx`;
+  `lib/index.ts` is the exception (see the pure display layer below). When another folder needs
+  a new name, add it to the barrel; a new feature needs its `index.ts` before
+  `#features/<area>` resolves. A new top-level `src/` folder also needs an entry under
+  `imports` in `package.json` and an `onlyImports` zone in `eslint.config.js`.
+- Import groups go in this order: packages, `@nexui/*`, `#…` barrels, then relative paths, with
+  a blank line between groups.
+
+`pnpm lint` enforces all of this in `apps/mobile/eslint.config.js`:
+
+- `import/no-restricted-paths` holds the folder directions above, with one zone per folder.
+  `eslint-import-resolver-typescript` follows the `#` imports, so a barrel import is checked like
+  a relative one.
+- `no-restricted-imports` bans `../` out of a folder, `@/`, `#<folder>/<file>` and a folder's
+  own barrel.
+- `no-restricted-syntax` keeps barrels to re-exports.
+- `import/order` sets the groups.
+- `import/no-cycle` keeps the graph acyclic, since a barrel makes a cycle easy to close and Metro
+  warns about require cycles at runtime.
+
+Lint doesn't police imports between features; keep those to what a screen needs.
 
 ## The Home stack and the workspace route
 
@@ -74,11 +107,15 @@ into a close.
 
 ## The pure display layer
 
-These files under `apps/mobile/src/` have no `react-native` import and import each other by
-relative `.ts` paths (not through the `@/` alias), so `tests/mobile-*.test.mjs` can run them under
-plain Node with no RN runtime: `lib/format.ts`; `ai-mark.ts`, `workspace-layout.ts`,
-`workspace-actions.ts` and `sections/map-region.ts` in `features/workspace/`;
-`features/changes/change-feed.ts`; and `plan-deletes.ts` and `api-request.ts` in `data/`.
+These files under `apps/mobile/src/` have no `react-native` import, so `tests/mobile-*.test.mjs`
+can run them under plain Node with no RN runtime: `lib/format.ts`; `ai-mark.ts`,
+`workspace-layout.ts`, `workspace-actions.ts` and `sections/map-region.ts` in
+`features/workspace/`; `features/changes/change-feed.ts`; and `plan-deletes.ts` and
+`api-request.ts` in `data/`.
+
+They import siblings by relative `.ts` paths. The only barrel they may import is `#lib`, whose
+`index.ts` also uses `.ts` paths so Node can load it. Any other barrel, such as `#data`, pulls in
+React Native and breaks the tests.
 
 - **`format.ts`**: numbers, money, dates and relative times as display strings; `cardText` reads
   an object's title/subtitle from `KIND_CARDS`.

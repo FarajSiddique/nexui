@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import type { ReactElement } from 'react';
 import { Platform, View } from 'react-native';
 
-import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { createThemedStyles, useColors } from '#theme';
 
 // The signed-in shell: the tabs, the + sheet and Account.
 export default function AppLayout(): ReactElement {

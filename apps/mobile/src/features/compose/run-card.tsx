@@ -1,12 +1,11 @@
-import type { RunRecord } from '@nexui/types';
 import { useEffect, useState, type ReactElement } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
-import { isRunActive } from '@/data/queries';
-import { fonts } from '@/theme/theme';
-import { createThemedStyles, useColors } from '@/theme/use-theme';
-import { AiText } from '@/ui/ai-text';
-import { Button } from '@/ui/buttons';
+import type { RunRecord } from '@nexui/types';
+
+import { isRunActive } from '#data';
+import { fonts, createThemedStyles, useColors } from '#theme';
+import { AiText, Button } from '#ui';
 
 const TITLES: Record<RunRecord['status'], string> = {
   queued: 'Starting…',
