@@ -7,10 +7,11 @@ import { deleteAccount } from '@/data/api';
 import { useHealth } from '@/data/use-health';
 import { AppearanceCard } from '@/features/account/appearance-card';
 import { clearDeletedAccount, signOut } from '@/features/auth/auth';
-import { FormError, PrimaryButton, TextButton } from '@/features/auth/auth-screen';
 import { useSessionStore } from '@/features/auth/use-session-store';
 import { fonts } from '@/theme/theme';
 import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { Button } from '@/ui/buttons';
+import { FormError } from '@/ui/form-messages';
 
 type Pending = 'signOut' | 'delete' | null;
 
@@ -86,11 +87,13 @@ export default function AccountScreen(): ReactElement {
           <Text style={styles.label}>Appearance</Text>
           <AppearanceCard />
 
-          <PrimaryButton
+          <Button
+            variant="ink"
             label="Sign out"
             busy={pending === 'signOut'}
             disabled={pending !== null}
             onPress={() => void onSignOut()}
+            style={styles.signOut}
           />
 
           <View style={styles.danger}>
@@ -115,17 +118,21 @@ export default function AccountScreen(): ReactElement {
                     {pending === 'delete' ? 'Deleting…' : 'Delete permanently'}
                   </Text>
                 </Pressable>
-                <TextButton
+                <Button
+                  variant="text"
                   label="Cancel"
                   disabled={pending !== null}
                   onPress={() => setConfirmingDelete(false)}
+                  style={styles.link}
                 />
               </>
             ) : (
-              <TextButton
+              <Button
+                variant="text"
                 label="Delete my account"
                 disabled={pending !== null}
                 onPress={() => setConfirmingDelete(true)}
+                style={styles.link}
               />
             )}
           </View>
@@ -148,6 +155,7 @@ const useStyles = createThemedStyles((colors) => ({
   status: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 8 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { fontFamily: fonts.bodyBold, fontSize: 16 },
+  signOut: { marginTop: 16 },
   danger: {
     marginTop: 40,
     padding: 16,
@@ -175,5 +183,6 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.card,
     textAlign: 'center',
   },
+  link: { alignSelf: 'center', marginTop: 8 },
   dimmed: { opacity: 0.6 },
 }));

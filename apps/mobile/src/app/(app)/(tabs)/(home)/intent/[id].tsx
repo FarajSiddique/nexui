@@ -1,8 +1,8 @@
 import type { GraphSnapshot, TripData } from '@nexui/types';
 import { useQueryClient } from '@tanstack/react-query';
-import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Pressable, ScrollView, Text, View, type LayoutRectangle } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/data/api-request';
@@ -11,7 +11,7 @@ import { useIntentLive } from '@/data/use-intent-live';
 import { SectionView } from '@/features/workspace/sections/registry';
 import { UndoToast } from '@/features/workspace/undo-toast';
 import { focusIntent } from '@/features/workspace/use-focused-intent-store';
-import { revealOpenBand, useRevealStore } from '@/features/workspace/use-reveal-store';
+import { useRevealOpenBand } from '@/features/workspace/use-reveal-open-band';
 import {
   capabilityFor,
   optimisticOps,
@@ -21,7 +21,7 @@ import { layoutWorkspace } from '@/features/workspace/workspace-layout';
 import { tripMeta } from '@/lib/format';
 import { fonts } from '@/theme/theme';
 import { createThemedStyles } from '@/theme/use-theme';
-import { ListEmpty, ListError, SkeletonRows } from '@/ui/list-states';
+import { ListEmpty, ListError, RefetchNotice, SkeletonRows } from '@/ui/list-states';
 import { Pill } from '@/ui/pill';
 
 function anchorMeta(snapshot: GraphSnapshot): string {
@@ -29,14 +29,6 @@ function anchorMeta(snapshot: GraphSnapshot): string {
   const anchor = snapshot.objects.find((object) => object.id === anchorId);
 
   return anchor?.kind === 'trip' ? tripMeta(anchor.data as Partial<TripData>) : '';
-}
-
-/**
- * A view's top edge once it is laid out, else null. On Expo web the screen under the + sheet is
- * display:none and reports a 0-height layout at y 0; that is "not measured", not a position.
- */
-function measuredY(layout: LayoutRectangle): number | null {
-  return layout.height > 0 ? layout.y : null;
 }
 
 function goBack(): void {
@@ -67,10 +59,6 @@ export default function WorkspaceScreen(): ReactElement {
   const hideUndo = useCallback(() => setUndoable(null), []);
   const wasDrafting = useRef(drafting);
   const scroll = useRef<ScrollView>(null);
-  const isFocused = useIsFocused();
-  const [pageY, setPageY] = useState<number | null>(null);
-  const [openY, setOpenY] = useState<number | null>(null);
-  const reveal = useRevealStore((state) => state.intentId === id);
 
   useEffect(() => {
     if (wasDrafting.current && !drafting) {
@@ -96,28 +84,11 @@ export default function WorkspaceScreen(): ReactElement {
     [snapshot],
   );
   const hasOpenBand = blocks.some((block) => block.kind === 'open');
-  const bandTop = hasOpenBand && pageY !== null && openY !== null ? pageY + openY : null;
-
-  // A band that unmounts leaves no position behind for the next one to be mistaken for.
-  if (!hasOpenBand && openY !== null) {
-    setOpenY(null);
-  }
-
-  // "See the choice" in the + sheet: once this screen is focused again, bring the Open band into
-  // view when it's laid out, or give up when the loaded plan has nothing open (it was settled
-  // meanwhile).
-  useEffect(() => {
-    if (!reveal || !isFocused) {
-      return;
-    }
-
-    if (bandTop !== null) {
-      scroll.current?.scrollTo({ y: Math.max(0, bandTop - 8), animated: true });
-      revealOpenBand(null);
-    } else if (!hasOpenBand && intent.isSuccess && !intent.isFetching) {
-      revealOpenBand(null);
-    }
-  }, [reveal, isFocused, bandTop, hasOpenBand, intent.isSuccess, intent.isFetching]);
+  const band = useRevealOpenBand(scroll, {
+    intentId: id,
+    hasOpenBand,
+    settled: intent.isSuccess && !intent.isFetching,
+  });
 
   const handleAction = (action: WorkspaceAction): void => {
     if (action.type === 'ask') {
@@ -162,7 +133,7 @@ export default function WorkspaceScreen(): ReactElement {
     const meta = anchorMeta(data);
 
     return (
-      <View style={styles.page} onLayout={(event) => setPageY(measuredY(event.nativeEvent.layout))}>
+      <View style={styles.page} onLayout={band.onPageLayout}>
         <View style={styles.header}>
           <Text accessibilityRole="header" style={styles.title}>
             {data.intent.goal}
@@ -171,15 +142,7 @@ export default function WorkspaceScreen(): ReactElement {
           {drafting ? <Pill text="Drafting" tone="running" /> : null}
         </View>
         {intent.isRefetchError ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void intent.refetch()}
-            style={styles.notice}
-          >
-            <Text accessibilityLiveRegion="polite" style={styles.noticeText}>
-              {"Couldn't refresh this plan. Showing what was last loaded. Tap to try again."}
-            </Text>
-          </Pressable>
+          <RefetchNotice subject="this plan" onRetry={() => void intent.refetch()} />
         ) : null}
         {edit.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
@@ -196,11 +159,7 @@ export default function WorkspaceScreen(): ReactElement {
         )}
         {blocks.map((block) =>
           block.kind === 'open' ? (
-            <View
-              key="open"
-              style={styles.open}
-              onLayout={(event) => setOpenY(measuredY(event.nativeEvent.layout))}
-            >
+            <View key="open" style={styles.open} onLayout={band.onBandLayout}>
               {block.entries.map((entry) => (
                 <SectionView
                   key={entry.section.id}
@@ -269,8 +228,6 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.ink,
   },
   meta: { fontFamily: fonts.body, fontSize: 15, color: colors.muted },
-  notice: { minHeight: 44, justifyContent: 'center' },
-  noticeText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },
   open: { gap: 12 },
 }));

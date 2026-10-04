@@ -18,7 +18,7 @@ import { IntentCard } from '@/features/home/intent-card';
 import { SwipeToDelete } from '@/features/home/swipe-to-delete';
 import { fonts } from '@/theme/theme';
 import { createThemedStyles } from '@/theme/use-theme';
-import { ListEmpty, ListError, SkeletonRows } from '@/ui/list-states';
+import { ListEmpty, ListError, RefetchNotice, SkeletonRows } from '@/ui/list-states';
 import { HeaderButton, TabHeader } from '@/ui/tab-header';
 
 /**
@@ -63,15 +63,11 @@ export default function HomeScreen(): ReactElement {
     return (
       <>
         {intents.isRefetchError ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void intents.refetch()}
-            style={styles.notice}
-          >
-            <Text accessibilityLiveRegion="polite" style={styles.noticeText}>
-              {"Couldn't refresh your plans. Showing what was last loaded. Tap to try again."}
-            </Text>
-          </Pressable>
+          <RefetchNotice
+            subject="your plans"
+            onRetry={() => void intents.refetch()}
+            style={styles.refetch}
+          />
         ) : null}
         {failed.length > 0 ? (
           <Pressable
@@ -207,7 +203,7 @@ const useStyles = createThemedStyles((colors) => ({
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
   wordmark: { fontFamily: fonts.display, fontSize: 16, letterSpacing: -0.3, color: colors.muted },
   notice: { marginTop: 12, minHeight: 44, justifyContent: 'center' },
-  noticeText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
+  refetch: { marginTop: 12 },
   deleteErrorText: { fontFamily: fonts.body, fontSize: 13, color: colors.danger },
   cards: { gap: 12, marginTop: 12 },
   changes: { gap: 8, marginTop: 24 },

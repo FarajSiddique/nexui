@@ -3,15 +3,10 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { TextInput } from 'react-native';
 
 import { AuthActionError, sendEmailCode, verifyEmailCode } from '@/features/auth/auth';
-import {
-  AuthScreen,
-  FormError,
-  FormNotice,
-  PrimaryButton,
-  TextButton,
-  useAuthStyles,
-} from '@/features/auth/auth-screen';
+import { AuthScreen, useAuthStyles } from '@/features/auth/auth-screen';
 import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { Button } from '@/ui/buttons';
+import { FormError, FormNotice } from '@/ui/form-messages';
 
 const CODE_LENGTH = 6;
 // Match the email resend interval configured in Supabase.
@@ -116,21 +111,27 @@ export default function VerifyScreen(): ReactElement {
       />
       <FormError message={error} />
       <FormNotice message={notice} />
-      <PrimaryButton
+      <Button
+        variant="ink"
         label="Verify"
         busy={verifying}
         disabled={code.length !== CODE_LENGTH || resending}
         onPress={() => void verify(code)}
+        style={authStyles.submit}
       />
-      <TextButton
+      <Button
+        variant="text"
         label={resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
         disabled={resendIn > 0 || resending || verifying}
         onPress={() => void resend()}
+        style={authStyles.link}
       />
-      <TextButton
+      <Button
+        variant="text"
         label="Use a different email"
         disabled={verifying || resending}
         onPress={useDifferentEmail}
+        style={authStyles.link}
       />
     </AuthScreen>
   );

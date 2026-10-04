@@ -4,6 +4,8 @@ import { Pressable, Text, View } from 'react-native';
 import { fonts } from '@/theme/theme';
 import { createThemedStyles } from '@/theme/use-theme';
 
+import type { Placement } from './placement';
+
 /** Placeholder rows in the shape of the list while it loads (no spinner). */
 export function SkeletonRows({ count = 5 }: { count?: number }): ReactElement {
   const styles = useStyles();
@@ -51,6 +53,45 @@ export function ListEmpty({ text }: { text: string }): ReactElement {
   );
 }
 
+/**
+ * Shown over data still on screen when a refetch failed: "Couldn't refresh {subject}. Showing
+ * what was last loaded." With `onRetry` it's a 44-point button that adds "Tap to try again.";
+ * without it, plain text, for a screen that refetches on its own. `style` only places it.
+ *
+ * @example
+ * <RefetchNotice subject="your plans" onRetry={() => void intents.refetch()} />
+ */
+export function RefetchNotice({
+  subject,
+  onRetry,
+  style,
+}: {
+  subject: string;
+  onRetry?: () => void;
+  style?: Placement;
+}): ReactElement {
+  const styles = useStyles();
+  const text = `Couldn't refresh ${subject}. Showing what was last loaded.`;
+
+  if (!onRetry) {
+    return (
+      <View style={style}>
+        <Text accessibilityLiveRegion="polite" style={styles.notice}>
+          {text}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <Pressable accessibilityRole="button" onPress={onRetry} style={[styles.noticeButton, style]}>
+      <Text accessibilityLiveRegion="polite" style={styles.notice}>
+        {text} Tap to try again.
+      </Text>
+    </Pressable>
+  );
+}
+
 const useStyles = createThemedStyles((colors) => ({
   skeleton: { marginTop: 8 },
   skeletonRow: { flexDirection: 'row', gap: 14, paddingVertical: 14 },
@@ -69,4 +110,6 @@ const useStyles = createThemedStyles((colors) => ({
   pressed: { opacity: 0.7 },
   error: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.danger },
   empty: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.muted },
+  noticeButton: { minHeight: 44, justifyContent: 'center' },
+  notice: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
 }));

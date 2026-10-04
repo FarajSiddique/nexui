@@ -14,7 +14,7 @@ import { ChangeRowView } from '@/features/changes/change-row';
 import { fonts } from '@/theme/theme';
 import { createThemedStyles, useColors } from '@/theme/use-theme';
 import { Button } from '@/ui/buttons';
-import { ListEmpty, ListError, SkeletonRows } from '@/ui/list-states';
+import { ListEmpty, ListError, RefetchNotice, SkeletonRows } from '@/ui/list-states';
 import { TabHeader } from '@/ui/tab-header';
 
 const FILTERS: { value: ChangeFilter; label: string }[] = [
@@ -131,11 +131,7 @@ export default function ChangesScreen(): ReactElement {
             );
           })}
         </ScrollView>
-        {feed.isRefetchError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.notice}>
-            Couldn&apos;t refresh changes. Showing what was last loaded.
-          </Text>
-        ) : null}
+        {feed.isRefetchError ? <RefetchNotice subject="changes" style={styles.notice} /> : null}
         {undo.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
             {undo.error.message}
@@ -165,13 +161,7 @@ const useStyles = createThemedStyles((colors) => ({
   chipOn: { backgroundColor: colors.userMark },
   chipText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
   chipTextOn: { color: colors.card },
-  notice: {
-    marginBottom: 8,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.muted,
-  },
+  notice: { marginBottom: 8 },
   error: {
     marginBottom: 8,
     fontFamily: fonts.body,

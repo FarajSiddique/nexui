@@ -4,9 +4,11 @@ import { useState, type ReactElement } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
 
 import { AuthActionError, sendEmailCode, signInWithGoogle } from '@/features/auth/auth';
-import { AuthScreen, FormError, PrimaryButton, useAuthStyles } from '@/features/auth/auth-screen';
+import { AuthScreen, useAuthStyles } from '@/features/auth/auth-screen';
 import { fonts } from '@/theme/theme';
 import { createThemedStyles, useColors } from '@/theme/use-theme';
+import { Button } from '@/ui/buttons';
+import { FormError } from '@/ui/form-messages';
 
 type Pending = 'email' | 'google' | null;
 
@@ -96,11 +98,13 @@ export default function SignInScreen(): ReactElement {
         style={authStyles.input}
       />
       <FormError message={error} />
-      <PrimaryButton
+      <Button
+        variant="ink"
         label="Email me a code"
         busy={pending === 'email'}
         disabled={pending !== null || !email.trim()}
         onPress={() => void submitEmail()}
+        style={authStyles.submit}
       />
     </AuthScreen>
   );
