@@ -11,3 +11,4 @@ export * from './runs.ts';
 export * from './api.ts';
 export * from './query.ts';
 export * from './apply-ops.ts';
+export * from './media.ts';
