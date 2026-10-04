@@ -1,25 +1,53 @@
 import { router } from 'expo-router';
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useRef, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import type { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChangeRowView } from '@/components/change-row';
 import { ConnectionBanner } from '@/components/connection-banner';
 import { IntentCard } from '@/components/intent-card';
 import { ListEmpty, ListError, SkeletonRows } from '@/components/list-states';
+import { SwipeToDelete } from '@/components/swipe-to-delete';
 import { HeaderButton, TabHeader } from '@/components/tab-header';
 import { buildChangeRows } from '@/lib/change-feed';
-import { useIntents, useRecentChanges } from '@/lib/queries';
+import {
+  isDrafting,
+  useDeleteIntent,
+  useDeletingIntents,
+  useIntents,
+  useRecentChanges,
+} from '@/lib/queries';
 import { fonts } from '@/lib/theme';
 import { createThemedStyles } from '@/lib/use-theme';
 
-/** Home: every plan as a card, then the latest three changes. The gear opens Account. */
+/**
+ * Home: every plan as a card, then the latest three changes. The gear opens Account. Swiping a
+ * card left shows Delete, which deletes the plan for good; one card is open at a time.
+ */
 export default function HomeScreen(): ReactElement {
   const styles = useStyles();
   const intents = useIntents();
   const recent = useRecentChanges();
+  const remove = useDeleteIntent();
+  const deleting = useDeletingIntents();
+  const openRow = useRef<SwipeableMethods | null>(null);
   const rows = useMemo(() => buildChangeRows(recent.data?.items ?? []).slice(0, 3), [recent.data]);
   const now = new Date();
+
+  const showOpenRow = (row: SwipeableMethods): void => {
+    if (openRow.current !== row) {
+      openRow.current?.close();
+    }
+
+    openRow.current = row;
+  };
+
+  const retryDelete = (): void => {
+    if (remove.variables) {
+      remove.mutate(remove.variables);
+    }
+  };
 
   const renderPlans = (): ReactElement => {
     if (intents.isPending) {
@@ -29,6 +57,8 @@ export default function HomeScreen(): ReactElement {
     if (intents.isLoadingError) {
       return <ListError message={intents.error.message} onRetry={() => void intents.refetch()} />;
     }
+
+    const plans = intents.data.filter((item) => !deleting.includes(item.id));
 
     return (
       <>
@@ -43,17 +73,39 @@ export default function HomeScreen(): ReactElement {
             </Text>
           </Pressable>
         ) : null}
-        {intents.data.length === 0 ? (
+        {remove.isError ? (
+          <Pressable accessibilityRole="button" onPress={retryDelete} style={styles.notice}>
+            <Text accessibilityLiveRegion="polite" style={styles.deleteErrorText}>
+              {"Couldn't delete that plan. Tap to try again."}
+            </Text>
+          </Pressable>
+        ) : null}
+        {plans.length === 0 ? (
           <ListEmpty text="Your plans will show here. Tap + and say what you're trying to do." />
         ) : (
           <View style={styles.cards}>
-            {intents.data.map((item) => (
-              <IntentCard
-                key={item.id}
-                item={item}
-                onPress={() => router.push({ pathname: '/intent/[id]', params: { id: item.id } })}
-              />
-            ))}
+            {plans.map((item) => {
+              // Nexui is still writing to a Drafting plan, so it can't be deleted yet.
+              const drafting = isDrafting(item);
+              const onDelete = (): void => remove.mutate(item.id);
+
+              return (
+                <SwipeToDelete
+                  key={item.id}
+                  enabled={!drafting}
+                  onDelete={onDelete}
+                  onOpen={showOpenRow}
+                >
+                  <IntentCard
+                    item={item}
+                    onPress={() =>
+                      router.push({ pathname: '/intent/[id]', params: { id: item.id } })
+                    }
+                    onDelete={drafting ? undefined : onDelete}
+                  />
+                </SwipeToDelete>
+              );
+            })}
           </View>
         )}
       </>
@@ -107,7 +159,11 @@ export default function HomeScreen(): ReactElement {
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
-      <ScrollView style={styles.list} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.content}
+        onScrollBeginDrag={() => openRow.current?.close()}
+      >
         <Text style={styles.wordmark}>nexui</Text>
         <TabHeader
           title="Plans"
@@ -146,6 +202,7 @@ const useStyles = createThemedStyles((colors) => ({
   wordmark: { fontFamily: fonts.display, fontSize: 16, letterSpacing: -0.3, color: colors.muted },
   notice: { marginTop: 12, minHeight: 44, justifyContent: 'center' },
   noticeText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
+  deleteErrorText: { fontFamily: fonts.body, fontSize: 13, color: colors.danger },
   cards: { gap: 12, marginTop: 12 },
   changes: { gap: 8, marginTop: 24 },
   subhead: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink },

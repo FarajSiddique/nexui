@@ -7,13 +7,18 @@ import { Pill } from '@/components/pill';
 import { fonts } from '@/lib/theme';
 import { createThemedStyles } from '@/lib/use-theme';
 
-/** A plan on Home: its goal, badge, summary line and a mini route of its stops. */
+/**
+ * A plan on Home: its goal, badge, summary line and a mini route of its stops. With `onDelete`,
+ * screen readers also offer a Delete action, the counterpart of swiping the card away.
+ */
 export function IntentCard({
   item,
   onPress,
+  onDelete,
 }: {
   item: IntentListItem;
   onPress: () => void;
+  onDelete?: () => void;
 }): ReactElement {
   const styles = useStyles();
   const { summary } = item;
@@ -23,6 +28,12 @@ export function IntentCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={[item.goal, summary.badge?.text, summary.line].filter(Boolean).join(', ')}
+      accessibilityActions={onDelete ? [{ name: 'delete', label: 'Delete' }] : undefined}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'delete') {
+          onDelete?.();
+        }
+      }}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >

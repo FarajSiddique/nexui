@@ -1,5 +1,5 @@
--- Paste into the Supabase SQL editor (or run with psql). Checks the run functions and
--- discard_intent as two throwaway users and rolls everything back.
+-- Paste into the Supabase SQL editor (or run with psql). Checks the run functions,
+-- discard_intent and delete_intent as two throwaway users and rolls everything back.
 begin;
 
 insert into auth.users (id, email) values
@@ -178,9 +178,16 @@ begin
   exception when sqlstate 'NXU04' then
     null;
   end;
+
+  begin
+    perform public.delete_intent('20000000-0000-4000-8000-000000000005');
+    assert false, 'no deleting another user''s intent';
+  exception when sqlstate 'NXU04' then
+    null;
+  end;
 end $$;
 
--- The first user's run-less trip survived the other user's discard.
+-- The first user's run-less trip survived the other user's discard and delete.
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
@@ -188,7 +195,46 @@ do $$
 begin
   assert exists (
     select 1 from public.intents i where i.id = '20000000-0000-4000-8000-000000000005'
-  ), 'another user''s discard leaves the intent';
+  ), 'another user''s discard or delete leaves the intent';
+end $$;
+
+-- delete_intent waits out a working run, then deletes the plan with its graph, runs and events.
+do $$
+declare
+  made jsonb;
+begin
+  made := public.create_run('20000000-0000-4000-8000-000000000001', 'ask',
+    '{"text":"One more thing","route":"fast","perception":"model"}');
+
+  begin
+    perform public.delete_intent('20000000-0000-4000-8000-000000000001');
+    assert false, 'no deleting a plan a run is working on';
+  exception when sqlstate 'NXU12' then
+    null;
+  end;
+
+  perform public.cancel_run((made ->> 'id')::uuid);
+  perform public.delete_intent('20000000-0000-4000-8000-000000000001');
+
+  assert not exists (
+    select 1 from public.intents i where i.id = '20000000-0000-4000-8000-000000000001'
+  ), 'the plan is deleted';
+  assert not exists (
+    select 1 from public.objects o where o.intent_id = '20000000-0000-4000-8000-000000000001'
+  ), 'its objects go with it';
+  assert not exists (
+    select 1 from public.runs r where r.intent_id = '20000000-0000-4000-8000-000000000001'
+  ), 'its runs go with it';
+  assert not exists (
+    select 1 from public.events e where e.intent_id = '20000000-0000-4000-8000-000000000001'
+  ), 'its changes go with it';
+
+  begin
+    perform public.delete_intent('20000000-0000-4000-8000-000000000001');
+    assert false, 'a deleted plan is gone';
+  exception when sqlstate 'NXU04' then
+    null;
+  end;
 end $$;
 
 rollback;

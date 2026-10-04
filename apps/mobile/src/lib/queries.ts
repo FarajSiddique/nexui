@@ -1,6 +1,7 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -30,6 +31,7 @@ import {
   callCapability,
   cancelRun,
   createIntent,
+  deleteIntent,
   getIntent,
   getRun,
   listChanges,
@@ -55,8 +57,13 @@ export function isRunActive(run: RunRecord | undefined): boolean {
   return isActiveRunStatus(run?.status);
 }
 
+/** Nexui is still writing to this plan (its card reads Drafting). */
+export function isDrafting(item: IntentListItem): boolean {
+  return item.summary.badge?.tone === 'running';
+}
+
 function anyDrafting(items: IntentListItem[] | undefined): boolean {
-  return items?.some((item) => item.summary.badge?.tone === 'running') ?? false;
+  return items?.some(isDrafting) ?? false;
 }
 
 /**
@@ -216,6 +223,45 @@ export function useUndo(): UseMutationResult<CommitResponse, Error, string> {
       client.setQueryData(queryKeys.intent(result.snapshot.intent.id), result.snapshot);
       refreshLists(client);
     },
+  });
+}
+
+const deleteKey = ['deleteIntent'] as const;
+
+/**
+ * Deletes a plan for good. Home hides its card while the delete is pending
+ * (`useDeletingIntents`), so a failure just shows it again; a plan that's already gone counts as
+ * deleted. Its changes go with it, so the change feeds refetch too.
+ */
+export function useDeleteIntent(): UseMutationResult<void, Error, string> {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationKey: deleteKey,
+    mutationFn: async (id) => {
+      try {
+        await deleteIntent(id);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+      }
+    },
+    onSuccess: (_result, id) => {
+      client.setQueryData<IntentListItem[]>(queryKeys.intents, (items) =>
+        items?.filter((item) => item.id !== id),
+      );
+      client.removeQueries({ queryKey: queryKeys.intent(id) });
+    },
+    onSettled: () => refreshLists(client),
+  });
+}
+
+/** The ids of the plans being deleted right now, whose cards Home hides. */
+export function useDeletingIntents(): string[] {
+  return useMutationState({
+    filters: { mutationKey: deleteKey, status: 'pending' },
+    select: (mutation) => String(mutation.state.variables),
   });
 }
 
