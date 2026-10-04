@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import { aiMarkFor } from '../apps/mobile/src/features/workspace/ai-mark.ts';
 import {
+  capitalize,
   cardText,
+  countryName,
   dayLabel,
   formatDays,
   formatField,
@@ -11,6 +13,9 @@ import {
   formatMoney,
   formatRelative,
   humanizeKey,
+  legFigures,
+  ordinalWord,
+  travelTo,
   tripMeta,
 } from '../apps/mobile/src/lib/format.ts';
 
@@ -116,4 +121,39 @@ test('only unreviewed AI objects carry the highlighter; options are tentative', 
     highlight: false,
     tentative: false,
   });
+});
+
+test('ordinals read as words to ten, then as numbers', () => {
+  assert.deepEqual([1, 2, 3, 4, 10].map(ordinalWord), [
+    'first',
+    'second',
+    'third',
+    'fourth',
+    'tenth',
+  ]);
+  assert.deepEqual([11, 12, 13, 21, 22, 23, 101, 111].map(ordinalWord), [
+    '11th',
+    '12th',
+    '13th',
+    '21st',
+    '22nd',
+    '23rd',
+    '101st',
+    '111th',
+  ]);
+});
+
+test('country names come from the code, which is kept when there is no name', () => {
+  assert.equal(countryName('DE'), 'Germany');
+  assert.equal(countryName('AA'), 'AA');
+});
+
+test('a leg reads as its mode, time and cost', () => {
+  const train = { mode: 'train', estHours: 4.25, estCost: { amount: 40, currency: 'USD' } };
+
+  assert.equal(travelTo('train', 'Prague'), 'Train to Prague');
+  assert.equal(travelTo('car', 'Salzburg'), 'Drive to Salzburg');
+  assert.equal(legFigures(train), '4h 15m, ≈ $40');
+  assert.equal(legFigures({ mode: 'other' }), '');
+  assert.equal(capitalize('region'), 'Region');
 });

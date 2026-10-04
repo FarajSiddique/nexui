@@ -13,10 +13,13 @@ export type WorkspaceAction =
   | { type: 'move'; placeId: string; by: -1 | 1 }
   | { type: 'resolveDecision'; decisionId: string; optionId: string | null }
   | { type: 'capability'; name: string; input: CapabilityRequest['input'] }
-  | { type: 'ask'; prompt: string };
+  | { type: 'ask'; prompt: string }
+  | { type: 'openPlace'; placeId: string };
 
-/** Every action except `ask`, which opens the + sheet instead of calling the API. */
-export type ServerAction = Exclude<WorkspaceAction, { type: 'ask' }>;
+/** Every action that calls the API; `ask` and `openPlace` open a sheet instead. */
+export type ServerAction = Exclude<WorkspaceAction, { type: 'ask' } | { type: 'openPlace' }>;
+
+type SetDaysAction = Extract<WorkspaceAction, { type: 'setDays' }>;
 
 export const MAX_PLACE_DAYS = 365;
 
@@ -58,6 +61,20 @@ function validDays(snapshot: GraphSnapshot, placeId: string, days: number): bool
     days <= MAX_PLACE_DAYS &&
     (place.data as PlaceData).days !== days
   );
+}
+
+/**
+ * The action for a day stepper tap, or null when the new value is out of range or unchanged.
+ * The route and the stop sheet both report it, after `rememberDays`.
+ */
+export function daysAction(place: GraphObject, days: number): SetDaysAction | null {
+  const before = (place.data as PlaceData).days;
+
+  if (!Number.isInteger(days) || days < 0 || days > MAX_PLACE_DAYS || days === before) {
+    return null;
+  }
+
+  return { type: 'setDays', placeId: place.id, days };
 }
 
 /**

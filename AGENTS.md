@@ -5,10 +5,10 @@
 This pnpm/Turborepo monorepo contains four private workspaces:
 
 - `apps/mobile/src/app/`: Expo Router screens and root layout, routes only. Each area's components, helpers and Zustand stores live in `src/features/<area>/`; shared building blocks in `src/ui/`, palettes and appearance in `src/theme/`, API, Supabase and query code in `src/data/`, shared pure helpers in `src/lib/` (see "Where code lives" in `docs/architecture/mobile.md`).
-- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, and templates in `src/lib/templates/`; Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
+- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, templates in `src/lib/templates/`, and the place media lookup and cache in `src/lib/media/` (see `docs/architecture/place-media.md`); Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
 - `packages/types/src/`: shared Zod schemas and inferred TypeScript contracts, imported through `@nexui/types`.
 - `packages/config/`: strict TypeScript defaults, shared ESLint rules, and Prettier configuration.
-- `supabase/migrations/`: Postgres schema, RLS and the graph functions (see `docs/architecture/intent-graph.md`).
+- `supabase/migrations/`: Postgres schema, RLS and the graph functions (see `docs/architecture/intent-graph.md`; the `place_media` cache is in `docs/architecture/place-media.md`).
 
 `tests/` contains Node tests; `docs/architecture/` contains short guides to current behavior. Keep new assets within their owning app. Keep server code out of shared contracts and mobile imports.
 
@@ -28,6 +28,7 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `node scripts/try-run.mjs goal "<goal>"`: start a run as the QA user and print what it did (`ask` and `free-day` too).
 - `node scripts/record-fixture.mjs <runId> <name> <phrases>`: save a succeeded live run as a mock fixture.
 - `pnpm eval:travel`: run the eight travel prompts against the running API as the QA user and check each plan, a manual live gate (`--case <name>` for one, `--clean` to delete the plans it left).
+- `node scripts/check-place-media.mjs`: run the place media lookup against live Wikipedia for eight places and print pass or fail per case, a manual live gate; needs `WIKIMEDIA_CONTACT`.
 - `pnpm lint:fix`: apply ESLint fixes across the workspaces.
 - `pnpm fix`: apply ESLint fixes, then Prettier formatting.
 - `pnpm format` / `pnpm format:check`: apply or verify formatting.

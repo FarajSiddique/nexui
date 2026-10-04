@@ -13,15 +13,15 @@ edits, and Realtime.
 - **`app/`**: Expo Router routes only. Every file here becomes a route, so components and helpers
   live in the folders below.
 - **`features/<area>/`**: what one area of the app needs: `auth`, `home`, `workspace` (with its
-  `sections/` primitives), `changes`, `compose` (the + sheet), `account`, and `shell` (the tab
-  bar). A Zustand store lives in the feature that owns it, as `use-<name>-store.ts`.
+  `sections/` primitives), `changes`, `compose` (the + sheet), `account`, `place` (a stop's details sheet), and
+  `shell` (the tab bar). A Zustand store lives in the feature that owns it, as `use-<name>-store.ts`.
 - **`ui/`**: shared building blocks such as `Button` (its `ink` variant is a screen's main
   action, like Sign out), `Pill`, the list states including `RefetchNotice`, `FormError` and
   `FormNotice`, and the tab header.
 - **`theme/`**: the palettes and fonts, `useColors`/`createThemedStyles`, and the appearance
   choice.
-- **`data/`**: the API and Supabase clients, the TanStack Query hooks and keys (`queries.ts`), and
-  Realtime (`use-intent-live.ts`).
+- **`data/`**: the API and Supabase clients, the TanStack Query hooks and keys (`queries.ts`, with
+  `usePlaceMedia`), and Realtime (`use-intent-live.ts`).
 - **`lib/`**: pure helpers that several features share (`format.ts`).
 
 Imports run one way. Routes import from anywhere. Features import `ui`, `theme`, `data` and `lib`,
@@ -81,8 +81,7 @@ The workspace screen loads the intent's `GraphSnapshot` (`useIntent`), lays it o
 `layoutWorkspace`, and draws each block with `SectionView`. It shows a full-page skeleton or
 error while nothing has loaded yet, a "Drafting" pill while a run is working (from `useIntents`'
 list, since a single intent's own query doesn't carry that), and turns whatever a primitive
-reports (a `WorkspaceAction`) into either a capability call (`useWorkspaceEdit`) or a push to `+`
-for an `ask`.
+reports (a `WorkspaceAction`) into either a capability call (`useWorkspaceEdit`) or a push for the actions that open a sheet: `+` for an `ask`, `/place` for an `openPlace`.
 
 ### Deleting a plan
 
@@ -109,23 +108,28 @@ into a close.
 
 These files under `apps/mobile/src/` have no `react-native` import, so `tests/mobile-*.test.mjs`
 can run them under plain Node with no RN runtime: `lib/format.ts`; `ai-mark.ts`,
-`workspace-layout.ts`, `workspace-actions.ts` and `sections/map-region.ts` in
+`workspace-layout.ts`, `workspace-actions.ts`, `stop-details.ts` and `sections/map-region.ts` in
 `features/workspace/`; `features/changes/change-feed.ts`; and `plan-deletes.ts`,
-`api-request.ts` and `intent-channel.ts` in `data/`.
+`api-request.ts`, `intent-channel.ts` and `place-media.ts` in `data/`.
 
 They import siblings by relative `.ts` paths. The only barrel they may import is `#lib`, whose
 `index.ts` also uses `.ts` paths so Node can load it. Any other barrel, such as `#data`, pulls in
 React Native and breaks the tests.
 
 - **`format.ts`**: numbers, money, dates and relative times as display strings; `cardText` reads
-  an object's title/subtitle from `KIND_CARDS`.
+  an object's title/subtitle from `KIND_CARDS`; `capitalize`, `ordinalWord`, `countryName`,
+  `travelTo` and `legFigures` build the route and place sheet's wording.
 - **`ai-mark.ts`**: `aiMarkFor`, the one place that decides what's marked as Nexui's work.
 - **`workspace-layout.ts`**: `layoutWorkspace` and `sectionData`, which turn a `WorkspaceDoc` and a
   `GraphSnapshot` into `WorkspaceBlock[]` — each section's data, evaluated with `evaluateQuery`
   from `@nexui/types`, and the Open band placement.
-- **`workspace-actions.ts`**: `capabilityFor` turns a `WorkspaceAction` into a `CapabilityRequest`
-  (or `null` when there's nothing to send), and `optimisticOps` builds the `ChangesetOp[]` a
-  `setDays` or `move` shows at once.
+- **`workspace-actions.ts`**: `capabilityFor` turns a `ServerAction` (any `WorkspaceAction` except `ask` and
+  `openPlace`) into a `CapabilityRequest` (or `null` when there's nothing to send), `daysAction`
+  builds the `setDays` action the route's and the sheet's steppers share, and `optimisticOps`
+  builds the `ChangesetOp[]` a `setDays` or `move` shows at once.
+- **`stop-details.ts`**: `stopDetails(snapshot, placeId)`, what the stop's sheet shows.
+- **`place-media.ts`**: `mediaPlaceIds`, `mediaKeyIds` and `mediaPollInterval` for
+  `usePlaceMedia`.
 - **`map-region.ts`**: `fitRegion`, the map's camera for a set of points.
 - **`change-feed.ts`**: `buildChangeRows`, `filterRows` and `groupByDay` for the Changes feed and
   Home's "What changed".
@@ -141,7 +145,10 @@ React Native and breaks the tests.
 receives `{ section, data, snapshot, onAction, busy }` (`SectionProps<T>` in `./types.ts`): it
 renders and reports a `WorkspaceAction` through `onAction`, and never calls the API itself — the
 workspace screen (`intent/[id].tsx`) is the only place a `WorkspaceAction` becomes a capability
-request or a push to `+`.
+request or a push to `+` or `/place`.
+
+A route row is one button per stop (`openPlace`), with the ↑↓ and the day stepper on a line below.
+`DayStepper` lives in `features/workspace/day-stepper.tsx`, shared with the place sheet.
 
 ## The Open band
 
@@ -276,6 +283,19 @@ already set, so this re-sends the goal as an `ask` on that plan — there's no A
 original `create_intent` run itself. While the retry is in flight, `RunCard`'s `retrying` prop
 (`ask.isPending || create.isPending`) puts the Try again button in its `busy` state, so a second
 tap can't fire a second retry underneath the first.
+
+## The place sheet
+
+Tapping a stop pushes `apps/mobile/src/app/(app)/place.tsx`, an iOS form sheet (a modal on Android
+and web) registered with the same options as the + sheet. It builds `stopDetails` from the cached
+plan and renders `PlaceSheet` (`features/place/place-sheet.tsx`); its day changes go through the
+same edit path as the route (see "Optimistic edits"). Like the + sheet, its root `View` is
+`collapsable={false}` with an empty `<View collapsable={false} />` first child; without them
+react-native-screens resizes the ScrollView and the iOS form sheet shows blank. `usePlaceMedia(intentId, placeIds)` fetches
+`GET /api/intents/:id/media`, refetching every 2 s while any place is pending, up to ten times, and
+the workspace screen calls it for every place in the plan so the sheet usually opens with its
+introduction. The lookup and cache are in
+[`docs/architecture/place-media.md`](./place-media.md).
 
 ## Error display
 

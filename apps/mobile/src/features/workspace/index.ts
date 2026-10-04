@@ -1,8 +1,13 @@
+export { aiMarkFor } from './ai-mark';
+export { DayStepper } from './day-stepper';
 export { SectionView } from './sections/registry';
+export { stayLine, stopDetails, stopSubtitle } from './stop-details';
+export type { StopDetails } from './stop-details';
 export { UndoToast } from './undo-toast';
+export { rememberDays, useEditMemoryStore } from './use-edit-memory-store';
 export { focusIntent, useFocusedIntentStore } from './use-focused-intent-store';
 export { useRevealOpenBand } from './use-reveal-open-band';
 export { revealOpenBand } from './use-reveal-store';
-export { capabilityFor, optimisticOps } from './workspace-actions';
+export { capabilityFor, daysAction, optimisticOps } from './workspace-actions';
 export type { WorkspaceAction } from './workspace-actions';
 export { layoutWorkspace } from './workspace-layout';

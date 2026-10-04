@@ -118,6 +118,6 @@ test('RUN_MAX_ACTIVE is a positive whole number, or 100', () => {
 test('the worker needs the secret key', () => {
   assert.throws(
     () => runWorker({ SUPABASE_URL: 'https://nexui-test.supabase.co', AI_PROVIDER: 'mock' }),
-    { message: 'SUPABASE_SECRET_KEY is required for runs and account deletion.' },
+    { message: 'SUPABASE_SECRET_KEY is required for runs, account deletion and place details.' },
   );
 });

@@ -5,7 +5,8 @@ shared contracts package.
 
 - `clients.ts`: cached clients without sessions. `getAuthClient()` uses the
   publishable key; `getAdminClient()` uses `SUPABASE_SECRET_KEY` and bypasses
-  row-level security, so it's only for admin actions such as account deletion and the AI run worker.
+  row-level security, so it's only for admin actions such as account deletion, the AI run
+  worker and the shared place media cache (after the route checks the caller owns the plan).
   `getUserClient(accessToken)` also uses the publishable key but sends the user's
   token, so Postgres row-level security limits every query to that user's rows.
   Use it for all user data.

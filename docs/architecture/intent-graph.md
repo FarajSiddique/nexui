@@ -16,7 +16,8 @@ model; this doc cites the code that implements it.
 
 ## Tables and writers
 
-Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are
+Six tables (the shared `place_media` cache of Wikipedia lookups is outside the graph; see
+[`place-media.md`](./place-media.md)), defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are
 in `20260929000000_runs.sql`, redefined by `20260930000000_run_cutoff.sql`,
 `20261003000000_run_stopping.sql` and `20261004130000_run_queue.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
 `workspaces`, and `runs` (one per AI request; see "AI runs"). Every table is owner-scoped by RLS.

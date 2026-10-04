@@ -3,92 +3,23 @@ import { Pressable, Text, View } from 'react-native';
 
 import type { GraphObject, LegData, PlaceData } from '@nexui/types';
 
-import { formatDays, formatHours, formatMoney, placeName } from '#lib';
+import { capitalize, formatDays, legFigures, placeName } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText } from '#ui';
 
 import { aiMarkFor } from '../ai-mark';
+import { DayStepper, SmallButton } from '../day-stepper';
+import { stopButtonLabel, stopKind } from '../stop-details';
 import { rememberDays, useEditMemoryStore } from '../use-edit-memory-store';
-import { MAX_PLACE_DAYS } from '../workspace-actions';
+import { daysAction } from '../workspace-actions';
 import type { RouteStop, SectionDataOf } from '../workspace-layout';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 
-const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
-
-function SmallButton({
-  glyph,
-  label,
-  disabled,
-  onPress,
-}: {
-  glyph: string;
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-}): ReactElement {
-  const styles = useStyles();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      hitSlop={4}
-      onPress={onPress}
-      style={({ pressed }) => [styles.small, pressed && styles.pressed, disabled && styles.dimmed]}
-    >
-      <Text style={styles.smallGlyph}>{glyph}</Text>
-    </Pressable>
-  );
-}
-
-function DayStepper({
-  name,
-  days,
-  was,
-  onDays,
-}: {
-  name: string;
-  days: number;
-  was: number | undefined;
-  onDays: (days: number) => void;
-}): ReactElement {
-  const styles = useStyles();
-
-  return (
-    <View
-      accessible
-      accessibilityRole="adjustable"
-      accessibilityLabel={`Days in ${name}`}
-      accessibilityValue={{ text: formatDays(days) }}
-      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-      onAccessibilityAction={(event) =>
-        onDays(event.nativeEvent.actionName === 'increment' ? days + 1 : days - 1)
-      }
-      style={styles.stepper}
-    >
-      <SmallButton
-        glyph="−"
-        label={`One day less in ${name}`}
-        disabled={days <= 0}
-        onPress={() => onDays(days - 1)}
-      />
-      <View style={styles.dayValue}>
-        <Text style={styles.days}>{formatDays(days)}</Text>
-        {was !== undefined && was !== days ? <Text style={styles.was}>was {was}</Text> : null}
-      </View>
-      <SmallButton
-        glyph="+"
-        label={`One more day in ${name}`}
-        disabled={days >= MAX_PLACE_DAYS}
-        onPress={() => onDays(days + 1)}
-      />
-    </View>
-  );
-}
-
+/**
+ * One stop: its name, type and `why` are one button that opens the stop's details, with the
+ * order and day controls on a line below.
+ */
 function StopRow({
   stop,
   was,
@@ -98,6 +29,7 @@ function StopRow({
   isLast,
   onDays,
   onMove,
+  onOpen,
 }: {
   stop: RouteStop;
   was: number | undefined;
@@ -107,24 +39,39 @@ function StopRow({
   isLast: boolean;
   onDays: (days: number) => void;
   onMove: (by: -1 | 1) => void;
+  onOpen: () => void;
 }): ReactElement {
   const styles = useStyles();
   const data = stop.place.data as PlaceData;
   const name = placeName(stop.place);
-  const detail = [capitalize(data.placeType), data.why].filter(Boolean).join(' · ');
 
   return (
     <View style={styles.stop}>
-      <View style={styles.number}>
-        <Text style={styles.numberText}>{stop.order}</Text>
-      </View>
-      <View style={styles.body}>
-        <AiText text={name} highlight={aiMarkFor(stop.place).highlight} style={styles.name} />
-        {detail ? (
-          <Text style={styles.detail} numberOfLines={2}>
-            {detail}
-          </Text>
-        ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={stopButtonLabel(name, stop.order, data.days)}
+        onPress={onOpen}
+        style={({ pressed }) => [styles.open, pressed && styles.pressed]}
+      >
+        <View style={styles.number}>
+          <Text style={styles.numberText}>{stop.order}</Text>
+        </View>
+        <View style={styles.body}>
+          <View style={styles.nameRow}>
+            <View style={styles.nameText}>
+              <AiText text={name} highlight={aiMarkFor(stop.place).highlight} style={styles.name} />
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </View>
+          <Text style={styles.kind}>{stopKind(data)}</Text>
+          {data.why ? (
+            <Text style={styles.detail} numberOfLines={2}>
+              {data.why}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+      <View style={styles.controls}>
         {canOrder ? (
           <View style={styles.moves}>
             <SmallButton
@@ -140,13 +87,15 @@ function StopRow({
               onPress={() => onMove(1)}
             />
           </View>
-        ) : null}
+        ) : (
+          <View />
+        )}
+        {canDays ? (
+          <DayStepper name={name} days={data.days} was={was} onDays={onDays} />
+        ) : (
+          <Text style={styles.days}>{formatDays(data.days)}</Text>
+        )}
       </View>
-      {canDays ? (
-        <DayStepper name={name} days={data.days} was={was} onDays={onDays} />
-      ) : (
-        <Text style={styles.days}>{formatDays(data.days)}</Text>
-      )}
     </View>
   );
 }
@@ -154,11 +103,9 @@ function StopRow({
 function LegRow({ leg }: { leg: GraphObject }): ReactElement {
   const styles = useStyles();
   const data = leg.data as LegData;
-  const parts = [
-    data.mode === 'other' ? 'Travel' : capitalize(data.mode),
-    data.estHours === undefined ? null : formatHours(data.estHours),
-    data.estCost ? `≈ ${formatMoney(data.estCost)}` : null,
-  ].filter(Boolean);
+  const parts = [data.mode === 'other' ? 'Travel' : capitalize(data.mode), legFigures(data)].filter(
+    Boolean,
+  );
 
   return (
     <View style={styles.leg}>
@@ -191,7 +138,10 @@ function UnallocatedRow({ data }: { data: SectionDataOf<'route'> }): ReactElemen
   );
 }
 
-/** The stops in order, with legs between them; days and order are editable when allowed. */
+/**
+ * The stops in order, with legs between them; days and order are editable when allowed, and
+ * each stop opens its details.
+ */
 export function RouteSection({ section, data, onAction }: SectionProps<'route'>): ReactElement {
   const styles = useStyles();
   const wasDays = useEditMemoryStore((state) => state.wasDays);
@@ -199,14 +149,14 @@ export function RouteSection({ section, data, onAction }: SectionProps<'route'>)
   const canOrder = section.editable.includes('order');
 
   const setDays = (place: GraphObject, days: number): void => {
-    const before = (place.data as PlaceData).days;
+    const action = daysAction(place, days);
 
-    if (days < 0 || days > MAX_PLACE_DAYS || days === before) {
+    if (!action) {
       return;
     }
 
-    rememberDays(place.id, before, days);
-    onAction({ type: 'setDays', placeId: place.id, days });
+    rememberDays(place.id, (place.data as PlaceData).days, days);
+    onAction(action);
   };
 
   return (
@@ -227,6 +177,7 @@ export function RouteSection({ section, data, onAction }: SectionProps<'route'>)
             isLast={index === data.stops.length - 1}
             onDays={(days) => setDays(stop.place, days)}
             onMove={(by) => onAction({ type: 'move', placeId: stop.place.id, by })}
+            onOpen={() => onAction({ type: 'openPlace', placeId: stop.place.id })}
           />
           {stop.legAfter ? <LegRow leg={stop.legAfter} /> : null}
         </View>
@@ -238,7 +189,8 @@ export function RouteSection({ section, data, onAction }: SectionProps<'route'>)
 
 const useStyles = createThemedStyles((colors) => ({
   empty: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
-  stop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
+  stop: { gap: 6, paddingVertical: 8 },
+  open: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 44 },
   number: {
     width: 26,
     height: 26,
@@ -249,30 +201,22 @@ const useStyles = createThemedStyles((colors) => ({
     backgroundColor: colors.userMark,
   },
   numberText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.card },
-  body: { flex: 1, gap: 3 },
-  name: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink },
+  body: { flex: 1, gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nameText: { flexShrink: 1 },
+  name: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22, color: colors.ink },
+  chevron: { marginLeft: 'auto', fontFamily: fonts.bodyBold, fontSize: 20, color: colors.faint },
+  kind: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.faint },
   detail: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
-  moves: { flexDirection: 'row', gap: 6, marginTop: 4 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dayValue: { minWidth: 56, alignItems: 'center' },
-  days: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
-  was: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.faint,
-    textDecorationLine: 'line-through',
-  },
-  small: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  controls: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.soft,
+    justifyContent: 'space-between',
+    paddingLeft: 38,
   },
-  smallGlyph: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.ink },
+  moves: { flexDirection: 'row', gap: 6 },
+  days: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
   pressed: { opacity: 0.7 },
-  dimmed: { opacity: 0.4 },
   leg: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 12, minHeight: 28 },
   legLine: { width: 2, alignSelf: 'stretch', backgroundColor: colors.line },
   legText: { flex: 1, fontFamily: fonts.body, fontSize: 13, color: colors.muted },

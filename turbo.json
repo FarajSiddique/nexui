@@ -10,6 +10,7 @@
         "NEXUI_MODEL_*",
         "NEXT_PUBLIC_*",
         "SUPABASE_*",
+        "WIKIMEDIA_CONTACT",
         "CI"
       ]
     },
