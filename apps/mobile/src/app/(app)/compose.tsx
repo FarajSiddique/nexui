@@ -134,17 +134,18 @@ export default function ComposeSheet(): ReactElement {
             onSeeChanges={seeChanges}
           />
         ) : null}
+        {sent && !params.intentId ? (
+          <Button label="Open plan" variant="primary" onPress={openPlan} />
+        ) : null}
+      </ScrollView>
+      <View style={styles.composer}>
+        {/* Above the input, so the next step stays in view while the keyboard is up. */}
         {next === 'choice' ? (
           <Button label="See the choice" variant="primary" onPress={seeChoice} />
         ) : null}
         {next === 'plan' ? (
           <Button label="Back to plan" variant="primary" onPress={() => router.dismiss()} />
         ) : null}
-        {sent && !params.intentId ? (
-          <Button label="Open plan" variant="primary" onPress={openPlan} />
-        ) : null}
-      </ScrollView>
-      <View style={styles.composer}>
         {error ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
             {error.message}
