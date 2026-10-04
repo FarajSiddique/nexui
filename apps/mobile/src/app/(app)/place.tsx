@@ -2,7 +2,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 
-import { mediaPlaceIds, useIntent, usePlaceAbout, useUndo, useWorkspaceEdit } from '#data';
+import {
+  mediaPlaceIds,
+  useIntent,
+  usePlaceAbout,
+  usePlacePhotos,
+  useUndo,
+  useWorkspaceEdit,
+} from '#data';
 import { placeName } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
@@ -29,7 +36,8 @@ function close(intentId: string): void {
 
 /**
  * A route stop's details, opened from its row on the workspace (spec section 5). It reads the
- * plan from the workspace's cache and the place's Wikipedia details from the media query. Day
+ * plan from the workspace's cache and the place's Wikipedia details and photo from the media
+ * query. Day
  * changes go through the same capability, optimistic op and Undo as the route; Next stop
  * swaps in the next stop's details.
  */
@@ -40,6 +48,7 @@ export default function PlaceScreen(): ReactElement {
   const snapshot = intent.data;
   const placeIds = useMemo(() => (snapshot ? mediaPlaceIds(snapshot) : []), [snapshot]);
   const about = usePlaceAbout(intentId, placeIds, placeId);
+  const photo = usePlacePhotos(intentId, placeIds)[placeId] ?? null;
   const edit = useWorkspaceEdit(intentId);
   const undo = useUndo();
   const wasDays = useEditMemoryStore((state) => state.wasDays);
@@ -106,12 +115,13 @@ export default function PlaceScreen(): ReactElement {
       <PlaceSheet
         details={details}
         about={about}
+        photo={photo}
         was={wasDays[details.place.id]}
         onDone={() => close(intentId)}
         onDays={setDays}
         onNext={(next) => router.setParams({ placeId: next })}
         onFindStay={findStay}
-        onReadMore={(url) => void Linking.openURL(url).catch(() => undefined)}
+        onOpenLink={(url) => void Linking.openURL(url).catch(() => undefined)}
       />
     );
   };
@@ -152,6 +162,7 @@ export default function PlaceScreen(): ReactElement {
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.card },
   scroll: { flex: 1, width: '100%', maxWidth: 488, alignSelf: 'center' },
+  // PlaceSheet's photo bleeds through this padding.
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 96 },
   gone: { gap: 12 },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },

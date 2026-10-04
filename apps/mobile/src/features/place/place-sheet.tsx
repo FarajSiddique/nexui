@@ -1,11 +1,12 @@
 import type { ReactElement, ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import type { LegData, PlaceAbout, StayData } from '@nexui/types';
+import type { LegData, PhotoCredit, PlaceAbout, StayData } from '@nexui/types';
 
-import { formatDays, formatMoney, legFigures, placeName, travelTo } from '#lib';
+import type { PhotoState } from '#data';
+import { formatDays, formatMoney, legFigures, photoCredit, placeName, travelTo } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
-import { AiText, Button } from '#ui';
+import { AiText, Button, PlacePhoto } from '#ui';
 import {
   aiMarkFor,
   DayStepper,
@@ -33,11 +34,11 @@ function SheetSection({ title, children }: { title: string; children: ReactNode 
 function About({
   name,
   about,
-  onReadMore,
+  onOpenLink,
 }: {
   name: string;
   about: AboutState;
-  onReadMore: (url: string) => void;
+  onOpenLink: (url: string) => void;
 }): ReactElement | null {
   const styles = useStyles();
 
@@ -58,12 +59,28 @@ function About({
       <Text style={styles.paragraph}>{about.extract}</Text>
       <Pressable
         accessibilityRole="link"
-        onPress={() => onReadMore(about.url)}
+        onPress={() => onOpenLink(about.url)}
         style={({ pressed }) => [styles.link, pressed && styles.pressed]}
       >
         <Text style={styles.linkText}>Read more on Wikipedia</Text>
       </Pressable>
     </SheetSection>
+  );
+}
+
+function Credit({ credit, onPress }: { credit: PhotoCredit; onPress: () => void }): ReactElement {
+  const styles = useStyles();
+  const line = photoCredit(credit);
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`${line}. Open the photo's page`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.credit, pressed && styles.pressed]}
+    >
+      <Text style={styles.creditText}>{line}</Text>
+    </Pressable>
   );
 }
 
@@ -140,29 +157,32 @@ function Stays({
 }
 
 /**
- * A route stop's details (spec section 5): its name and place on the route, days and daily
- * cost, why it's on the route, Wikipedia's introduction, the next stop and where you'll stay.
- * It only reports taps; the place screen does the work.
+ * A route stop's details (spec section 5): its photo and credit, its name and place on the
+ * route, days and daily cost, why it's on the route, Wikipedia's introduction, the next stop
+ * and where you'll stay. It only reports taps; the place screen does the work.
  */
 export function PlaceSheet({
   details,
   about,
+  photo,
   was,
   onDone,
   onDays,
   onNext,
   onFindStay,
-  onReadMore,
+  onOpenLink,
 }: {
   details: StopDetails;
   about: AboutState;
+  photo: PhotoState;
   /** The days before this session's first change, for "was 4". */
   was: number | undefined;
   onDone: () => void;
   onDays: (days: number) => void;
   onNext: (placeId: string) => void;
   onFindStay: () => void;
-  onReadMore: (url: string) => void;
+  /** Opens a link outside the app: the Wikipedia article or the photo's Commons page. */
+  onOpenLink: (url: string) => void;
 }): ReactElement {
   const styles = useStyles();
   const { data, next } = details;
@@ -171,7 +191,27 @@ export function PlaceSheet({
 
   return (
     <View>
-      <Button label="Done" onPress={onDone} style={styles.done} />
+      {photo === null ? (
+        <Button label="Done" onPress={onDone} style={styles.done} />
+      ) : (
+        <View style={styles.hero}>
+          <PlacePhoto
+            uri={photo === 'pending' ? null : photo.url}
+            height={244}
+            label={photo === 'pending' ? undefined : `Photo of ${name}`}
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={onDone}
+            style={({ pressed }) => [styles.photoDone, pressed && styles.pressed]}
+          >
+            <Text style={styles.photoDoneText}>Done</Text>
+          </Pressable>
+        </View>
+      )}
+      {photo !== null && photo !== 'pending' ? (
+        <Credit credit={photo.credit} onPress={() => onOpenLink(photo.credit.sourceUrl)} />
+      ) : null}
       <View style={styles.header}>
         <AiText text={name} highlight={highlight} style={styles.title} />
         <Text style={styles.subtitle}>{stopSubtitle(details)}</Text>
@@ -200,7 +240,7 @@ export function PlaceSheet({
           <AiText text={data.why} highlight={highlight} style={styles.paragraph} />
         </SheetSection>
       ) : null}
-      <About name={name} about={about} onReadMore={onReadMore} />
+      <About name={name} about={about} onOpenLink={onOpenLink} />
       {next ? <NextStop next={next} onPress={() => onNext(next.place.id)} /> : null}
       <Stays stays={details.stays} onFindStay={onFindStay} />
     </View>
@@ -209,6 +249,27 @@ export function PlaceSheet({
 
 const useStyles = createThemedStyles((colors) => ({
   done: { alignSelf: 'flex-end' },
+  // Bleeds through the place screen's padding (20 at the sides, 12 on top) to the sheet's edges.
+  hero: { marginHorizontal: -20, marginTop: -12 },
+  photoDone: {
+    position: 'absolute',
+    top: 16,
+    right: 14,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    justifyContent: 'center',
+    backgroundColor: colors.photoScrim,
+  },
+  photoDoneText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.photoInk },
+  credit: { minHeight: 44, justifyContent: 'center' },
+  creditText: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.faint,
+    textDecorationLine: 'underline',
+  },
   header: { gap: 4, paddingTop: 6 },
   title: {
     fontFamily: fonts.display,
