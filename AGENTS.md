@@ -5,7 +5,7 @@
 This pnpm/Turborepo monorepo contains four private workspaces:
 
 - `apps/mobile/src/app/`: Expo Router screens and root layout, routes only. Each area's components, helpers and Zustand stores live in `src/features/<area>/`; shared building blocks in `src/ui/`, palettes and appearance in `src/theme/`, API, Supabase and query code in `src/data/`, shared pure helpers in `src/lib/` (see "Where code lives" in `docs/architecture/mobile.md`).
-- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, and templates in `src/lib/templates/`; Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
+- `apps/api/src/app/`: Next.js App Router pages and routes, including `api/health/route.ts`. Graph code lives in `src/lib/graph/`, derivations in `src/lib/kinds/`, templates in `src/lib/templates/`, account deletion in `src/lib/account/`, and Apple token revocation in `src/lib/apple/`; Supabase and shared response code belong in `src/lib/supabase/` and `src/lib/http/`. API-specific rules live in `apps/api/AGENTS.md`.
 - `packages/types/src/`: shared Zod schemas and inferred TypeScript contracts, imported through `@nexui/types`.
 - `packages/config/`: strict TypeScript defaults, shared ESLint rules, and Prettier configuration.
 - `supabase/migrations/`: Postgres schema, RLS and the graph functions (see `docs/architecture/intent-graph.md`).

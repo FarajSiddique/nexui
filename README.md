@@ -110,9 +110,9 @@ computer's firewall. The API binds to `0.0.0.0` for LAN access. `localhost` on a
 phone refers to the phone itself. Expo tunneling does not tunnel the API; an API
 URL reachable from the device is still required. Restart Expo after changing env.
 
-Supabase and Google values are required for sign-in; the `.env.example` files list
-them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` lives only
-in `apps/api/.env.local`, where account deletion uses it.
+Supabase, Google and Apple values are required for sign-in; the `.env.example` files
+list them. The mobile app gets only the publishable key. `SUPABASE_SECRET_KEY` and the
+`APPLE_*` values live only in `apps/api/.env.local`, where account deletion uses them.
 
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.
 Never use either prefix for secrets. Future server credentials belong only in the
@@ -141,7 +141,9 @@ apps/
     src/app/api/intents/       # GET, POST /api/intents; :id and :id/changesets
     src/app/api/events/        # POST /api/events/:id/undo
     src/app/api/changes/       # GET /api/changes
-    src/app/api/account/       # DELETE /api/account (deletes the signed-in user)
+    src/app/api/account/       # DELETE /api/account (deletes the signed-in user, revokes Apple access)
+    src/lib/account/           # deleteAccount: delete the user, then revoke Apple access
+    src/lib/apple/             # Apple client secret and token revocation
     src/lib/graph/             # applyChangeset, undo, snapshot loading, error mapping
     src/lib/kinds/             # Per-kind derivations (derive.trip)
     src/lib/templates/         # Per-template seed ops and derivation dispatch
