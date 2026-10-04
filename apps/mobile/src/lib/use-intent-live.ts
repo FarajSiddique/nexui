@@ -9,9 +9,9 @@ const TABLES = ['objects', 'relationships', 'workspaces', 'runs', 'events'] as c
 
 /**
  * Keeps an open intent current while the server writes to it without the client asking (a run
- * filling it in). Realtime, scoped by RLS, is only the signal: a burst of row changes becomes
- * one refresh. The run, intents and changes lists are always refetched, since they can't disturb
- * an optimistic edit. The intent snapshot itself waits while the user's own edits are in flight
+ * filling it in). Realtime inserts and updates, scoped by RLS, are only the signal: a burst of
+ * row changes becomes one refresh. The run, intents and changes lists are always refetched,
+ * since they can't disturb an optimistic edit. The intent snapshot itself waits while the user's own edits are in flight
  * (so a refetch can't briefly undo an optimistic change) by re-arming only its own retry until
  * they settle, rather than dropping the signal or repeating the list refresh. `subscribe`'s
  * status callback runs the same catch-up on every `SUBSCRIBED`, including a rejoin after a
@@ -62,10 +62,20 @@ export function useIntentLive(intentId: string | null): void {
     // or leaves a quick remount without a subscription while the old one is still leaving.
     const channel = supabase.channel(`intent-${intentId}-${Math.random().toString(36).slice(2)}`);
 
+    // No DELETE events: Realtime sends those to every subscriber, unfiltered and without RLS, so
+    // every user's deleted plan would reach this channel. Rows here are only deleted with their
+    // whole plan, or by an Undo, which also inserts its own `events` row.
     for (const table of TABLES) {
+      const filter = `intent_id=eq.${intentId}`;
+
       channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `intent_id=eq.${intentId}` },
+        { event: 'INSERT', schema: 'public', table, filter },
+        onRowChange,
+      );
+      channel.on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table, filter },
         onRowChange,
       );
     }

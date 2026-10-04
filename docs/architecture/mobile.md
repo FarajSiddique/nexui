@@ -12,7 +12,8 @@ edits, and Realtime.
 (`_layout.tsx`): `index.tsx` is Home (every plan as a card, then the latest three changes), and
 `intent/[id].tsx` is the workspace for one intent, pushed over Home under the tab bar rather than
 replacing it. Its back link (`‹ Plans`) calls `router.back()` when there's history, else
-`router.replace('/')`.
+`router.replace('/')`. `GestureHandlerRootView` wraps the root layout
+(`apps/mobile/src/app/_layout.tsx`) for the swipe below.
 
 The workspace screen loads the intent's `GraphSnapshot` (`useIntent`), lays it out with
 `layoutWorkspace`, and draws each block with `SectionView`. It shows a full-page skeleton or
@@ -21,12 +22,33 @@ list, since a single intent's own query doesn't carry that), and turns whatever 
 reports (a `WorkspaceAction`) into either a capability call (`useWorkspaceEdit`) or a push to `+`
 for an `ask`.
 
+### Deleting a plan
+
+Swiping a plan card left on Home reveals a red Delete button
+(`apps/mobile/src/components/swipe-to-delete.tsx`, RNGH `ReanimatedSwipeable`). Tapping it deletes
+the plan for good, with no undo. One row is open at a time: opening one closes the other, and
+scrolling closes it. A Drafting plan can't be swiped, and a row that becomes Drafting while open
+closes. The card offers a VoiceOver/TalkBack "Delete" accessibility action; the swipe button
+itself is `aria-hidden` and out of tab order. Web has no keyboard or screen-reader path to delete.
+
+`useDeleteIntent` (`queries.ts`) calls `DELETE /api/intents/[id]`; a 404 counts as deleted. On
+success it removes the card from the intents cache and the intent query, then refetches intents
+and changes. `usePlanDeletes` reads every delete in the mutation cache through the pure
+`planDeletes` (`apps/mobile/src/lib/plan-deletes.ts`); only each plan's latest attempt counts.
+Home hides cards whose delete is pending. Failed ones show "Couldn't delete that plan. Tap to try
+again." (or "N plans"), and tapping retries them all.
+
+On web, React Native Web fires `onPress` from the DOM click, which also ends a mouse swipe, and
+the swipeable's `pointerEvents: 'box-only'` guard for an open row doesn't apply. A capture-phase
+listener in `swipe-to-delete.tsx` stops the click after a drag and turns a click on an open row
+into a close.
+
 ## The pure display layer
 
 `apps/mobile/src/lib/format.ts`, `ai-mark.ts`, `sections.ts`, `workspace-actions.ts`,
-`map-region.ts`, `change-feed.ts` and `api-request.ts` have no `react-native` import and import
-each other as sibling `.ts` files (not through the `@/` alias), so `tests/mobile-*.test.mjs` can
-run them under plain Node with no RN runtime:
+`map-region.ts`, `change-feed.ts`, `plan-deletes.ts` and `api-request.ts` have no `react-native`
+import and import each other as sibling `.ts` files (not through the `@/` alias), so
+`tests/mobile-*.test.mjs` can run them under plain Node with no RN runtime:
 
 - **`format.ts`**: numbers, money, dates and relative times as display strings; `cardText` reads
   an object's title/subtitle from `KIND_CARDS`.
@@ -40,6 +62,8 @@ run them under plain Node with no RN runtime:
 - **`map-region.ts`**: `fitRegion`, the map's camera for a set of points.
 - **`change-feed.ts`**: `buildChangeRows`, `filterRows` and `groupByDay` for the Changes feed and
   Home's "What changed".
+- **`plan-deletes.ts`**: `planDeletes`, which reduces the plan deletes in the mutation cache to
+  the ids to hide (pending) and the failed ones to retry, counting each plan's latest attempt.
 - **`api-request.ts`**: `requestJson`, the one function that sends a request, applies a timeout,
   and turns a failure into an `ApiError`.
 
@@ -91,13 +115,17 @@ The route's user-callable capabilities — `trip.setPlaceDays`, `trip.reorderPla
 
 `useIntentLive(intentId)` (`apps/mobile/src/lib/use-intent-live.ts`) keeps an open workspace
 current while the server writes to it without the client asking — a run filling it in, or another
-device's edit. It subscribes to `objects`, `relationships`, `workspaces`, `runs` and `events`,
-filtered to `intent_id=eq.<id>`, scoped by RLS. A burst of row changes collapses into one refetch
-per 300 ms: the run, intents and changes lists always refetch, but the intent snapshot itself
-waits (re-arming only its own retry, not the lists') while the user's own edit is still in flight,
-so a refetch can't briefly undo an optimistic change. Each mount opens a channel with a unique
-topic (`intent-<id>-<random>`), because `supabase.channel` returns an existing channel for a topic
-already in use, which would throw on a second `.on(...)` for a remount of the same intent.
+device's edit. It subscribes to INSERT and UPDATE on `objects`, `relationships`, `workspaces`,
+`runs` and `events`, filtered to `intent_id=eq.<id>`, scoped by RLS. It never subscribes to
+DELETE, because Realtime delivers DELETE events to every subscriber without RLS or filters, so
+every user's plan delete would reach every open channel. Rows under a plan are only hard-deleted
+with the whole plan or by an Undo, which also inserts an `events` row. A burst of row changes
+collapses into one refetch per 300 ms: the run, intents and changes lists always refetch, but the
+intent snapshot itself waits (re-arming only its own retry, not the lists') while the user's own
+edit is still in flight, so a refetch can't briefly undo an optimistic change. Each mount opens a
+channel with a unique topic (`intent-<id>-<random>`), because `supabase.channel` returns an
+existing channel for a topic already in use, which would throw on a second `.on(...)` for a
+remount of the same intent.
 
 `subscribe` takes a status callback: on every `SUBSCRIBED` — including a rejoin after
 `CHANNEL_ERROR` or `TIMED_OUT`, or the socket dropping and reconnecting — it runs the same
@@ -177,6 +205,8 @@ failed refetch (`isRefetchError`) shows a small inline notice — a 44 pt `Press
 the stale data instead of replacing it; tapping it calls `refetch()` again. The Changes tab shows
 the equivalent notice as plain (non-interactive) text, since its feed already refetches on its own
 whenever the tab regains focus.
+
+A failed plan delete shows a similar tappable notice on Home (see "Deleting a plan").
 
 ## The map
 

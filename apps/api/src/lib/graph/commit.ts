@@ -146,6 +146,18 @@ export async function discardIntent(db: SupabaseClient, intentId: string): Promi
   }
 }
 
+/**
+ * Deletes one of the caller's plans for good, with its graph, runs and change history. Refused
+ * while a run is still working on it (`ChangesetConflictError`).
+ */
+export async function deleteIntent(db: SupabaseClient, intentId: string): Promise<void> {
+  const { error } = await db.rpc('delete_intent', { p_intent_id: intentId });
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+}
+
 /** Undo (or Redo, on an Undo event): restores each row's earlier values. */
 export async function revertEvent(db: SupabaseClient, eventId: string): Promise<CommitResult> {
   const { data, error } = await db.rpc('revert_event', { p_event_id: eventId });

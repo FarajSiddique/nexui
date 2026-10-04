@@ -1,6 +1,7 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -30,6 +31,7 @@ import {
   callCapability,
   cancelRun,
   createIntent,
+  deleteIntent,
   getIntent,
   getRun,
   listChanges,
@@ -37,6 +39,7 @@ import {
   undoEvent,
 } from './api';
 import { ApiError } from './api-request';
+import { planDeletes, type DeleteAttempt, type PlanDeletes } from './plan-deletes';
 
 export const queryKeys = {
   intents: ['intents'] as const,
@@ -55,8 +58,13 @@ export function isRunActive(run: RunRecord | undefined): boolean {
   return isActiveRunStatus(run?.status);
 }
 
+/** Nexui is still writing to this plan (its card reads Drafting). */
+export function isDrafting(item: IntentListItem): boolean {
+  return item.summary.badge?.tone === 'running';
+}
+
 function anyDrafting(items: IntentListItem[] | undefined): boolean {
-  return items?.some((item) => item.summary.badge?.tone === 'running') ?? false;
+  return items?.some(isDrafting) ?? false;
 }
 
 /**
@@ -217,6 +225,54 @@ export function useUndo(): UseMutationResult<CommitResponse, Error, string> {
       refreshLists(client);
     },
   });
+}
+
+const deleteKey = ['deleteIntent'] as const;
+
+/**
+ * Deletes a plan for good. Home hides its card while the delete is pending (`usePlanDeletes`),
+ * so a failure just shows it again; a plan that's already gone counts as deleted. Its changes go
+ * with it, so the change feeds refetch too.
+ */
+export function useDeleteIntent(): UseMutationResult<void, Error, string> {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationKey: deleteKey,
+    mutationFn: async (id) => {
+      try {
+        await deleteIntent(id);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+      }
+    },
+    onSuccess: (_result, id) => {
+      client.setQueryData<IntentListItem[]>(queryKeys.intents, (items) =>
+        items?.filter((item) => item.id !== id),
+      );
+      client.removeQueries({ queryKey: queryKeys.intent(id) });
+    },
+    onSettled: () => refreshLists(client),
+  });
+}
+
+/**
+ * The plans being deleted right now and those whose delete failed, from every delete still in
+ * the mutation cache (a failure is dropped with its mutation, after 5 minutes).
+ */
+export function usePlanDeletes(): PlanDeletes {
+  const attempts = useMutationState({
+    filters: { mutationKey: deleteKey },
+    select: (mutation): DeleteAttempt => ({
+      id: String(mutation.state.variables),
+      status: mutation.state.status,
+      submittedAt: mutation.state.submittedAt,
+    }),
+  });
+
+  return planDeletes(attempts);
 }
 
 export function useCreateIntent(): UseMutationResult<CreateIntentResponse, Error, string> {

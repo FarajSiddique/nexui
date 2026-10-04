@@ -117,6 +117,7 @@ const textPairs = [
   ['success', 'soft'],
   ['danger', 'card'],
   ['danger', 'soft'],
+  ['card', 'danger'],
   ['ink', 'line'],
   ['card', 'userMark'],
 ];

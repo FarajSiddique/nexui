@@ -99,6 +99,14 @@ export function getIntent(id: string, signal?: AbortSignal): Promise<GraphSnapsh
   return callApi(`/api/intents/${id}`, graphSnapshotSchema, { signal });
 }
 
+// A 204 answer has no body to parse.
+const noContent: Parser<void> = { parse: () => undefined };
+
+/** Deletes a plan for good, with its whole graph and change history. */
+export function deleteIntent(id: string): Promise<void> {
+  return callApi(`/api/intents/${id}`, noContent, { method: 'DELETE' });
+}
+
 /** Starts a plan from a goal; a trip also starts the run that fills it in. */
 export function createIntent(goal: string): Promise<CreateIntentResponse> {
   return callApi('/api/intents', createIntentResponseSchema, postJson({ goal }));
