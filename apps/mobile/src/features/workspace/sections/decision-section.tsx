@@ -9,6 +9,7 @@ import {
   type Section,
 } from '@nexui/types';
 
+import type { PhotoState } from '#data';
 import { cardText, formatField, formatMoney, humanizeKey } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, NexuiTag, Button } from '#ui';
@@ -20,6 +21,16 @@ import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 
 type FieldSpec = Extract<Section, { type: 'decision' }>['fields'][number];
+
+// A candidate's photo slot (spec section 5): its 500px copy, a soft tile while it may still
+// come, or none.
+function candidatePhoto(state: PhotoState | undefined): string | null | undefined {
+  if (state === 'pending') {
+    return null;
+  }
+
+  return state ? state.thumbUrl : undefined;
+}
 
 // The section's fields, then every metric any option reports, then the candidate place's daily
 // cost. Rows where no option has a value are left out.
@@ -60,6 +71,7 @@ export function DecisionSection({
   data,
   onAction,
   busy,
+  photos,
 }: SectionProps<'decision'>): ReactElement | null {
   const styles = useStyles();
   const { decision, options } = data;
@@ -76,6 +88,7 @@ export function DecisionSection({
     title: cardText(entry.option).title,
     highlight: aiMarkFor(entry.option).highlight,
     tentative: true,
+    photo: candidatePhoto(entry.place ? photos[entry.place.id] : undefined),
   }));
   const mark = aiMarkFor(decision);
 

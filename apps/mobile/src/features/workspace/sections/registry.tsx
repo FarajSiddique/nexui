@@ -2,6 +2,8 @@ import type { ComponentType, ReactElement } from 'react';
 
 import type { GraphSnapshot, Section } from '@nexui/types';
 
+import type { PhotoState } from '#data';
+
 import type { WorkspaceAction } from '../workspace-actions';
 import type { SectionDataOf, SectionEntry } from '../workspace-layout';
 import { AllocationSection } from './allocation-section';
@@ -32,11 +34,13 @@ export function SectionView({
   snapshot,
   onAction,
   busy,
+  photos,
 }: {
   entry: SectionEntry;
   snapshot: GraphSnapshot;
   onAction: (action: WorkspaceAction) => void;
   busy: boolean;
+  photos: Readonly<Record<string, PhotoState>>;
 }): ReactElement {
   // `layoutWorkspace` builds each entry's data from its own section, so they share a type;
   // TypeScript can't follow that through the lookup.
@@ -51,6 +55,7 @@ export function SectionView({
       snapshot={snapshot}
       onAction={onAction}
       busy={busy}
+      photos={photos}
     />
   );
 }

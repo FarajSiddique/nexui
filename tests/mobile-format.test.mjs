@@ -15,6 +15,7 @@ import {
   humanizeKey,
   legFigures,
   ordinalWord,
+  photoCredit,
   travelTo,
   tripMeta,
 } from '../apps/mobile/src/lib/format.ts';
@@ -156,4 +157,15 @@ test('a leg reads as its mode, time and cost', () => {
   assert.equal(legFigures(train), '4h 15m, ≈ $40');
   assert.equal(legFigures({ mode: 'other' }), '');
   assert.equal(capitalize('region'), 'Region');
+});
+
+test('a photo credit names the author and licence, via Wikimedia Commons', () => {
+  assert.equal(
+    photoCredit({ author: 'Kasa Fue', license: 'CC BY-SA 4.0' }),
+    'Photo: Kasa Fue, CC BY-SA 4.0, via Wikimedia Commons',
+  );
+  assert.equal(
+    photoCredit({ author: '', license: 'Public domain' }),
+    'Photo: Public domain, via Wikimedia Commons',
+  );
 });

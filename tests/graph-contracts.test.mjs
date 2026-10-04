@@ -6,6 +6,8 @@ import {
   fromUserOps,
   graphQuerySchema,
   insightDataSchema,
+  intentListItemSchema,
+  intentSummarySchema,
   optionDataSchema,
   parseKindData,
   placeDataSchema,
@@ -13,7 +15,7 @@ import {
   userOpSchema,
   workspaceDocSchema,
 } from '../packages/types/src/index.ts';
-import { kyotoData, TOKYO_ID, tokyoData, TRIP_ID, tripData } from './support/graph.mjs';
+import { intentRow, kyotoData, TOKYO_ID, tokyoData, TRIP_ID, tripData } from './support/graph.mjs';
 
 test('the fixture trip and places are valid kind data', () => {
   assert.deepEqual(tripDataSchema.parse(tripData), tripData);
@@ -182,4 +184,28 @@ test('fromUserOps marks ops direct and user-sourced with the kind version', () =
   assert.deepEqual(fromUserOps([{ op: 'delete_object', id: TOKYO_ID }]), [
     { op: 'delete_object', id: TOKYO_ID, origin: 'direct' },
   ]);
+});
+
+test('a Home strip stop may carry its media key; a list item carries up to three bucket photos', () => {
+  const summary = (strip) => intentSummarySchema.safeParse({ line: 'x', strip });
+  const item = (photos) =>
+    intentListItemSchema.safeParse({
+      id: intentRow.id,
+      goal: intentRow.goal,
+      template: 'travel',
+      status: 'exploring',
+      summary: { line: 'x' },
+      lastActivityAt: intentRow.last_activity_at,
+      photos,
+    });
+  const photo = 'https://x.supabase.co/storage/v1/object/public/place-photos/a/b-500.jpg';
+
+  assert.equal(summary([{ label: 'Tokyo', ai: false, key: 'tokyo|JP|35.7|139.7' }]).success, true);
+  assert.equal(summary([{ label: 'Tokyo', ai: false }]).success, true);
+  assert.equal(summary([{ label: 'Tokyo', ai: false, key: 'x'.repeat(201) }]).success, false);
+  assert.equal(item([photo]).success, true);
+  assert.equal(item([]).success, true);
+  assert.equal(item(undefined).success, false);
+  assert.equal(item(['https://upload.wikimedia.org/x.jpg']).success, false);
+  assert.equal(item([photo, photo, photo, photo]).success, false);
 });

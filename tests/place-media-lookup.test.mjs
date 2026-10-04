@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
+import { readRows } from '../apps/api/src/lib/media/cache.ts';
 import { mediaPlaces, resolvePlaceMedia } from '../apps/api/src/lib/media/lookup.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { placeMediaKey } from '../packages/types/src/media.ts';
@@ -19,6 +21,8 @@ import {
   article,
   cacheRow,
   CONTACT,
+  fileInfoBody,
+  JPEG,
   mediaUpstream,
   NOW,
   searchBody,
@@ -263,4 +267,215 @@ test('the search and the match depend only on the key, not the raw name', async 
   await resolvePlaceMedia(deps, places);
 
   assert.equal(upstream.state.searches[0].url.searchParams.get('gsrsearch'), 'kyoto');
+});
+
+const BUCKET = 'https://nexui-test.supabase.co/storage/v1/object/public/place-photos';
+const hex = (data) => createHash('sha256').update(data).digest('hex');
+
+// A search answer whose one article has a lead image.
+const withImage = (name, lng, image) =>
+  Response.json(searchBody([{ ...article(name, 0, lng), pageimage: image }]));
+
+test('a usable lead image is copied into the bucket in two sizes and answered with its photo', async (t) => {
+  const place = spot(1, 'Kyoto');
+  const upstream = mediaUpstream({
+    wikipedia: () => withImage('Kyoto', 1, 'Kyoto_Skyline.jpg'),
+    commons: () => Response.json(fileInfoBody('Kyoto_Skyline.jpg')),
+  });
+  const { deps } = setup(t, upstream);
+
+  const answers = await resolvePlaceMedia(deps, [place]);
+  const [info] = upstream.state.infos;
+  const [saved] = upstream.state.saved;
+  const folder = hex(place.key).slice(0, 16);
+  const name = hex(JPEG).slice(0, 12);
+  const photo = {
+    path: `${folder}/${name}-960.jpg`,
+    thumbPath: `${folder}/${name}-500.jpg`,
+    width: 960,
+    height: 640,
+  };
+  const credit = {
+    author: 'Kasa Fue',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Kyoto_Skyline.jpg',
+  };
+
+  assert.equal(info.url.searchParams.get('titles'), 'File:Kyoto_Skyline.jpg');
+  assert.equal(info.headers.get('User-Agent'), `Nexui/1.0 (${CONTACT})`);
+  assert.deepEqual(
+    upstream.state.downloads.map((download) => download.url.pathname.split('/').at(-1)).sort(),
+    ['500px-Kyoto_Skyline.jpg', '960px-Kyoto_Skyline.jpg'],
+  );
+  assert.ok(upstream.state.downloads.every((download) => download.redirect === 'error'));
+  assert.deepEqual(upstream.state.uploads.map((upload) => upload.path).sort(), [
+    photo.thumbPath,
+    photo.path,
+  ]);
+
+  for (const upload of upstream.state.uploads) {
+    assert.equal(upload.headers.get('content-type'), 'image/jpeg');
+    assert.equal(upload.headers.get('cache-control'), 'max-age=31536000');
+    assert.equal(upload.headers.get('x-upsert'), 'true');
+  }
+
+  assert.equal(saved.status, 'found');
+  assert.deepEqual(saved.photo, photo);
+  assert.deepEqual(saved.credit, credit);
+  assert.deepEqual(answers[place.id].photo, {
+    url: `${BUCKET}/${photo.path}`,
+    thumbUrl: `${BUCKET}/${photo.thumbPath}`,
+    width: 960,
+    height: 640,
+    credit,
+  });
+});
+
+test('a lead image that fails the photo rules keeps the article with no photo', async (t) => {
+  const oversized = new Uint8Array(2 * 1024 * 1024 + 1);
+
+  oversized.set(JPEG);
+
+  const images = {
+    Flagland: 'Flag_of_Kenya.svg',
+    Nonfree: 'Nonfree_view.jpg',
+    Webpage: 'Webpage_view.jpg',
+    Huge: 'Huge_view.jpg',
+  };
+  const names = Object.keys(images);
+  const nonFree = {
+    extmetadata: { LicenseShortName: { value: 'Fair use' }, NonFree: { value: 'true' } },
+  };
+  const upstream = mediaUpstream({
+    wikipedia: (url) => {
+      const name = url.searchParams.get('gsrsearch');
+
+      return withImage(name, names.indexOf(name) + 1, images[name]);
+    },
+    commons: (url) => {
+      const file = url.searchParams.get('titles').slice('File:'.length);
+
+      return Response.json(fileInfoBody(file, file === 'Nonfree_view.jpg' ? nonFree : {}));
+    },
+    images: (url) =>
+      url.pathname.includes('Webpage')
+        ? new Response('<html></html>', { headers: { 'Content-Type': 'image/jpeg' } })
+        : new Response(oversized, { headers: { 'Content-Type': 'image/jpeg' } }),
+  });
+  const { deps } = setup(t, upstream);
+  const places = names.map((name, index) => spot(index + 1, name));
+
+  const answers = await resolvePlaceMedia(deps, places);
+
+  assert.deepEqual(
+    upstream.state.infos.map((info) => info.url.searchParams.get('titles')).sort(),
+    ['File:Huge_view.jpg', 'File:Nonfree_view.jpg', 'File:Webpage_view.jpg'],
+    'an SVG never reaches request 2',
+  );
+  assert.equal(upstream.state.downloads.length, 4, 'a non-free file is never downloaded');
+  assert.equal(upstream.state.uploads.length, 0);
+
+  for (const place of places) {
+    assert.equal(answers[place.id].about.title, place.name);
+    assert.equal(answers[place.id].photo, null);
+  }
+
+  assert.ok(
+    upstream.state.saved.every(
+      (row) => row.status === 'found' && row.photo === null && row.credit === null,
+    ),
+  );
+});
+
+test('a failed upload caches the place as failed, so no photo points at a missing file', async (t) => {
+  const place = spot(1, 'Kyoto');
+  const upstream = mediaUpstream({
+    wikipedia: () => withImage('Kyoto', 1, 'Kyoto_Skyline.jpg'),
+    commons: () => Response.json(fileInfoBody('Kyoto_Skyline.jpg')),
+    failUpload: (path) => path.endsWith('-500.jpg'),
+  });
+  const { deps, errors } = setup(t, upstream);
+
+  const answers = await resolvePlaceMedia(deps, [place]);
+  const [saved] = upstream.state.saved;
+
+  assert.equal(saved.status, 'failed');
+  assert.equal(saved.photo, null);
+  assert.equal(Date.parse(saved.expires_at) - NOW.getTime(), 15 * 60_000);
+  assert.deepEqual(answers[place.id], { status: 'ready', about: null, photo: null });
+  assert.ok(
+    errors.mock.calls.some(
+      (call) => call.arguments.join(' ') === '[media] Could not store a photo (500).',
+    ),
+  );
+  assert.ok(errors.mock.calls.every((call) => !call.arguments.join(' ').includes('Kyoto')));
+});
+
+test('a throttled image download holds back the rest of the request like a throttled search', async (t) => {
+  const upstream = mediaUpstream({
+    wikipedia: (url) => {
+      const name = url.searchParams.get('gsrsearch');
+
+      return withImage(name, Number(name.replace('Place ', '')), 'View.jpg');
+    },
+    commons: () => Response.json(fileInfoBody('View.jpg')),
+    images: () => new Response(null, { status: 429, headers: { 'Retry-After': '3600' } }),
+  });
+  const { deps } = setup(t, upstream);
+  const places = Array.from({ length: 6 }, (_, index) => spot(index + 1));
+
+  await resolvePlaceMedia(deps, places);
+
+  assert.equal(upstream.state.searches.length, 4);
+  assert.equal(upstream.state.saved.length, 6);
+
+  for (const row of upstream.state.saved) {
+    assert.equal(row.status, 'failed');
+    assert.equal(row.expires_at, new Date(NOW.getTime() + 3_600_000).toISOString());
+  }
+});
+
+test('a throttled refresh keeps what a found row already had, started or held back', async (t) => {
+  const places = Array.from({ length: 6 }, (_, index) => spot(index + 1));
+  const old = (place) =>
+    cacheRow(place.key, {
+      lookup_version: 1,
+      page_title: place.name,
+      page_url: `https://en.wikipedia.org/wiki/${place.name.replace(' ', '_')}`,
+      extract: `${place.name} is a place.`,
+    });
+  const [first, , , , , last] = places;
+  const upstream = mediaUpstream({
+    rows: [old(first), old(last)],
+    wikipedia: () => new Response(null, { status: 429, headers: { 'Retry-After': '3600' } }),
+  });
+  const { deps } = setup(t, upstream);
+
+  const answers = await resolvePlaceMedia(deps, places);
+  const saved = (place) => upstream.state.saved.find((row) => row.key === place.key);
+
+  for (const place of [first, last]) {
+    assert.equal(saved(place).status, 'found');
+    assert.equal(saved(place).page_title, place.name);
+    assert.equal(saved(place).lookup_version, 2);
+    assert.equal(saved(place).expires_at, new Date(NOW.getTime() + 3_600_000).toISOString());
+    assert.equal(answers[place.id].about.title, place.name);
+  }
+
+  assert.equal(saved(places[1]).status, 'failed', 'a place with nothing cached is still failed');
+});
+
+test('the cache is read at most 100 keys per query', async (t) => {
+  const upstream = mediaUpstream({ rows: [cacheRow('k 150')] });
+
+  t.mock.method(globalThis, 'fetch', upstream.handler);
+
+  const rows = await readRows(
+    adminDb(),
+    Array.from({ length: 250 }, (_, index) => `k ${index}`),
+  );
+
+  assert.equal(upstream.state.reads, 3);
+  assert.deepEqual([...rows.keys()], ['k 150']);
 });

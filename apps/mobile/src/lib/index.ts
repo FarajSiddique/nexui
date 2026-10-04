@@ -12,6 +12,7 @@ export {
   humanizeKey,
   legFigures,
   ordinalWord,
+  photoCredit,
   placeName,
   travelTo,
   tripMeta,

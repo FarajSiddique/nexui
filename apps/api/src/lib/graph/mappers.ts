@@ -123,5 +123,7 @@ export function mapIntentListRow(row: unknown): IntentListItem {
     status: intent.status,
     summary: intent.summary,
     lastActivityAt: intent.last_activity_at,
+    // Filled from the media cache by the list route (`withHomePhotos`).
+    photos: [],
   });
 }

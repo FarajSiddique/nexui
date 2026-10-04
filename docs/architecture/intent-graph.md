@@ -16,7 +16,7 @@ model; this doc cites the code that implements it.
 
 ## Tables and writers
 
-Six tables (the shared `place_media` cache of Wikipedia lookups is outside the graph; see
+Six tables (the shared `place_media` cache of Wikipedia and Commons lookups, and its `place-photos` bucket, are outside the graph; see
 [`place-media.md`](./place-media.md)), defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are
 in `20260929000000_runs.sql`, redefined by `20260930000000_run_cutoff.sql`,
 `20261003000000_run_stopping.sql` and `20261004130000_run_queue.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
@@ -36,6 +36,9 @@ Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s tho
   one route serves both.
 - `get_intent_snapshot(id)` / `changes_page(limit, before_seq, intent_id)`: read helpers used by
   the API's list/query code.
+- `GET /api/intents` also fills each card's `photos` (`intentListItemSchema`, at most three 500px
+  bucket URLs) with `withHomePhotos`, which reads the `place_media` cache with the secret-key client;
+  see [`place-media.md`](./place-media.md).
 - `discard_intent(id)` (`20261003000000_run_stopping.sql`): deletes one of the caller's intents
   that no run was ever created on, with its graph (the rows cascade). Anything else, including
   another user's intent or one with a run, is `NXU04`. `startIntent` uses it so a trip whose
@@ -148,7 +151,7 @@ an `update_object` on the trip storing the recalculated `data.derived` figures, 
 `insert_object`/`insert_relationship` pair for a new "You have 1 day unallocated" insight (with
 an `ask` action and a `capability` action offering to give the day back to Tokyo), and an
 `update_intent` refreshing `summary` (`line: 'Dec 12 – 20, 8 days, 2 stops'`, an attention badge,
-and the stop strip). All of it commits as one changeset, so undoing the user's edit undoes the
+and the stop strip, each stop carrying its place key for Home's photos). All of it commits as one changeset, so undoing the user's edit undoes the
 derived state with it.
 
 ## Undo and Redo
@@ -332,6 +335,8 @@ anything but `'dark'` as light; the status bar follows it too. `tests/theme-toke
 is the guard: it asserts both palettes declare the same keys, scans `apps/mobile/src` for hex/
 `rgb(`/`rgba(` literals outside `theme.ts`, and checks AA contrast (≥ 4.5:1) for the token pairs
 text is actually drawn with.
+`photoScrim` and `photoInk` are the same in both palettes: the dark scrim and white text that sit on a
+place photo.
 
 The Account screen's Appearance card picks Light or Dark with a day-and-night sky switch (the
 `sky*` tokens), or "Match my phone" (the default) to follow the phone. The choice is saved on the

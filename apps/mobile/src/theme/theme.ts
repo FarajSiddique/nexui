@@ -35,6 +35,8 @@ const light = {
   providerFill: '#FFFFFF',
   providerLine: '#747775',
   providerInk: '#000000',
+  photoScrim: 'rgba(30, 26, 43, 0.72)', // behind text and buttons drawn on a photo, both schemes
+  photoInk: '#FFFFFF', // text on photoScrim
 } as const;
 
 export type TokenName = keyof typeof light;
@@ -72,6 +74,8 @@ const dark: Palette = {
   providerFill: '#131314',
   providerLine: '#8E918F',
   providerInk: '#FFFFFF',
+  photoScrim: 'rgba(30, 26, 43, 0.72)',
+  photoInk: '#FFFFFF',
 };
 
 export const palettes: Record<Scheme, Palette> = { light, dark };

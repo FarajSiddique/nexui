@@ -38,7 +38,15 @@ export const intentSummarySchema = z.strictObject({
     })
     .optional(),
   strip: z
-    .array(z.strictObject({ label: z.string().min(1).max(100), ai: z.boolean() }))
+    .array(
+      z.strictObject({
+        label: z.string().min(1).max(100),
+        ai: z.boolean(),
+        // The stop's media key (`placeMediaKey`), for Home's photos. A summary saved before
+        // photos has none until its plan's next change.
+        key: z.string().min(1).max(200).optional(),
+      }),
+    )
     .max(12)
     .optional(),
 });

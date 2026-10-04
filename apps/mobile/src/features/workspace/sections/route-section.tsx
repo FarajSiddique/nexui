@@ -3,9 +3,10 @@ import { Pressable, Text, View } from 'react-native';
 
 import type { GraphObject, LegData, PlaceData } from '@nexui/types';
 
+import type { PhotoState } from '#data';
 import { capitalize, formatDays, legFigures, placeName } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
-import { AiText } from '#ui';
+import { AiText, PlacePhoto } from '#ui';
 
 import { aiMarkFor } from '../ai-mark';
 import { DayStepper, SmallButton } from '../day-stepper';
@@ -17,11 +18,14 @@ import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 
 /**
- * One stop: its name, type and `why` are one button that opens the stop's details, with the
- * order and day controls on a line below.
+ * One stop. With a photo, or while one may still come, it's a card: the photo full width with
+ * the stop's number on it, then the name, type and `why`. Without one it's the compact row.
+ * Either way the text is one button that opens the stop's details, with the order and day
+ * controls on a line below.
  */
 function StopRow({
   stop,
+  photo,
   was,
   canDays,
   canOrder,
@@ -32,6 +36,7 @@ function StopRow({
   onOpen,
 }: {
   stop: RouteStop;
+  photo: PhotoState;
   was: number | undefined;
   canDays: boolean;
   canOrder: boolean;
@@ -44,6 +49,7 @@ function StopRow({
   const styles = useStyles();
   const data = stop.place.data as PlaceData;
   const name = placeName(stop.place);
+  const card = photo !== null;
 
   return (
     <View style={styles.stop}>
@@ -51,12 +57,21 @@ function StopRow({
         accessibilityRole="button"
         accessibilityLabel={stopButtonLabel(name, stop.order, data.days)}
         onPress={onOpen}
-        style={({ pressed }) => [styles.open, pressed && styles.pressed]}
+        style={({ pressed }) => [card ? styles.card : styles.open, pressed && styles.pressed]}
       >
-        <View style={styles.number}>
-          <Text style={styles.numberText}>{stop.order}</Text>
-        </View>
-        <View style={styles.body}>
+        {photo === null ? (
+          <View style={styles.number}>
+            <Text style={styles.numberText}>{stop.order}</Text>
+          </View>
+        ) : (
+          <View>
+            <PlacePhoto uri={photo === 'pending' ? null : photo.url} height={148} radius={16} />
+            <View style={[styles.number, styles.photoNumber]}>
+              <Text style={styles.numberText}>{stop.order}</Text>
+            </View>
+          </View>
+        )}
+        <View style={card ? styles.cardBody : styles.body}>
           <View style={styles.nameRow}>
             <View style={styles.nameText}>
               <AiText text={name} highlight={aiMarkFor(stop.place).highlight} style={styles.name} />
@@ -71,7 +86,7 @@ function StopRow({
           ) : null}
         </View>
       </Pressable>
-      <View style={styles.controls}>
+      <View style={[styles.controls, card && styles.cardControls]}>
         {canOrder ? (
           <View style={styles.moves}>
             <SmallButton
@@ -139,10 +154,15 @@ function UnallocatedRow({ data }: { data: SectionDataOf<'route'> }): ReactElemen
 }
 
 /**
- * The stops in order, with legs between them; days and order are editable when allowed, and
- * each stop opens its details.
+ * The stops in order, with legs between them; a stop with a photo is a photo card. Days and
+ * order are editable when allowed, and each stop opens its details.
  */
-export function RouteSection({ section, data, onAction }: SectionProps<'route'>): ReactElement {
+export function RouteSection({
+  section,
+  data,
+  onAction,
+  photos,
+}: SectionProps<'route'>): ReactElement {
   const styles = useStyles();
   const wasDays = useEditMemoryStore((state) => state.wasDays);
   const canDays = section.editable.includes('days');
@@ -170,6 +190,7 @@ export function RouteSection({ section, data, onAction }: SectionProps<'route'>)
         <View key={stop.place.id}>
           <StopRow
             stop={stop}
+            photo={photos[stop.place.id] ?? null}
             was={wasDays[stop.place.id]}
             canDays={canDays}
             canOrder={canOrder && data.stops.length > 1}
@@ -191,6 +212,19 @@ const useStyles = createThemedStyles((colors) => ({
   empty: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   stop: { gap: 6, paddingVertical: 8 },
   open: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 44 },
+  card: { gap: 10, minHeight: 44 },
+  // The number on a photo: the route's stop number, ringed so it reads on any photo.
+  photoNumber: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginTop: 0,
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
   number: {
     width: 26,
     height: 26,
@@ -202,6 +236,7 @@ const useStyles = createThemedStyles((colors) => ({
   },
   numberText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.card },
   body: { flex: 1, gap: 2 },
+  cardBody: { gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nameText: { flexShrink: 1 },
   name: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22, color: colors.ink },
@@ -214,6 +249,7 @@ const useStyles = createThemedStyles((colors) => ({
     justifyContent: 'space-between',
     paddingLeft: 38,
   },
+  cardControls: { paddingLeft: 0, paddingTop: 4 },
   moves: { flexDirection: 'row', gap: 6 },
   days: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
   pressed: { opacity: 0.7 },

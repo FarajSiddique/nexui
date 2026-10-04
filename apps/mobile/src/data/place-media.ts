@@ -1,4 +1,4 @@
-import type { GraphSnapshot, IntentMedia, PlaceAbout } from '@nexui/types';
+import type { GraphSnapshot, IntentMedia, PlaceAbout, PlaceMedia, PlacePhoto } from '@nexui/types';
 
 /** How many times the app asks again while a lookup is still pending (spec section 5). */
 export const MEDIA_POLLS = 10;
@@ -36,6 +36,39 @@ export function mediaStaleTime(media: IntentMedia | undefined): number {
   return hasPendingMedia(media) ? 0 : FRESH_MS;
 }
 
+/** How far the media query has got: still loading, and how many answers it has had. */
+export interface MediaQueryState {
+  loading: boolean;
+  answers: number;
+}
+
+/** What a photo slot shows: the photo, `'pending'` while it may still come, or null. */
+export type PhotoState = PlacePhoto | 'pending' | null;
+
+type ReadyMedia = Extract<PlaceMedia, { status: 'ready' }>;
+
+// One place's answer through `pick`. A ready answer shows. A pending lookup shows as pending
+// while the app is still polling, and nothing once the polls run out. With no answer yet, it's
+// pending while the request loads.
+function placeEntry<T>(
+  media: IntentMedia | undefined,
+  placeId: string,
+  query: MediaQueryState,
+  pick: (entry: ReadyMedia) => T,
+): T | 'pending' | null {
+  const entry = media?.places[placeId];
+
+  if (entry?.status === 'ready') {
+    return pick(entry);
+  }
+
+  if (entry?.status === 'pending') {
+    return mediaPollInterval(media, query.answers) === false ? null : 'pending';
+  }
+
+  return query.loading ? 'pending' : null;
+}
+
 /**
  * What the stop sheet's About shows for one place: its introduction, `'pending'` while the
  * answer loads or the lookup runs and the app is still polling, or null (no article, a failed
@@ -44,17 +77,25 @@ export function mediaStaleTime(media: IntentMedia | undefined): number {
 export function placeAbout(
   media: IntentMedia | undefined,
   placeId: string,
-  query: { loading: boolean; answers: number },
+  query: MediaQueryState,
 ): PlaceAbout | 'pending' | null {
-  const entry = media?.places[placeId];
+  return placeEntry(media, placeId, query, (entry) => entry.about);
+}
 
-  if (entry?.status === 'ready') {
-    return entry.about;
-  }
+/** One place's photo slot, by the same rules as `placeAbout`. */
+export function placePhoto(
+  media: IntentMedia | undefined,
+  placeId: string,
+  query: MediaQueryState,
+): PhotoState {
+  return placeEntry(media, placeId, query, (entry) => entry.photo);
+}
 
-  if (entry?.status === 'pending') {
-    return mediaPollInterval(media, query.answers) === false ? null : 'pending';
-  }
-
-  return query.loading ? 'pending' : null;
+/** Every place's photo slot by id, for the workspace's sections and the stop sheet. */
+export function placePhotos(
+  media: IntentMedia | undefined,
+  placeIds: readonly string[],
+  query: MediaQueryState,
+): Record<string, PhotoState> {
+  return Object.fromEntries(placeIds.map((id) => [id, placePhoto(media, id, query)]));
 }

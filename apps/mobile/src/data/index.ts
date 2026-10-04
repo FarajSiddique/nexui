@@ -13,6 +13,7 @@ export {
   useIntents,
   usePlaceAbout,
   usePlaceMedia,
+  usePlacePhotos,
   usePlanDeletes,
   useRecentChanges,
   useRun,
@@ -20,6 +21,7 @@ export {
   useWorkspaceEdit,
 } from './queries';
 export { mediaPlaceIds } from './place-media';
+export type { PhotoState } from './place-media';
 export { QueryProvider, queryClient } from './query-provider';
 export { supabase } from './supabase';
 export { useHealth } from './use-health';

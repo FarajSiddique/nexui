@@ -6,6 +6,7 @@ import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { captureRuns, useMockAi } from './support/ai.mjs';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import { INTENT_ID, intentRow, RUN_ID, runRow, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import { cacheRow } from './support/media.mjs';
 import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
 const url = 'http://localhost/api/intents';
@@ -31,6 +32,7 @@ test('Home lists intents, most recent first', async (t) => {
         return [intentRow];
       },
       'table:runs': () => [],
+      'table:place_media': () => [],
     }),
   );
 
@@ -46,6 +48,7 @@ test('Home lists intents, most recent first', async (t) => {
         status: 'exploring',
         summary: intentRow.summary,
         lastActivityAt: intentRow.last_activity_at,
+        photos: [],
       },
     ],
   });
@@ -65,6 +68,7 @@ test('Home shows "Drafting" while a run works on an intent', async (t) => {
 
         return [{ intent_id: INTENT_ID }];
       },
+      'table:place_media': () => [],
     }),
   );
 
@@ -74,6 +78,96 @@ test('Home shows "Drafting" while a run works on an intent', async (t) => {
   assert.deepEqual(item.summary.strip, intentRow.summary.strip);
   assert.equal(asked.searchParams.get('status'), 'in.(queued,running,stopping)');
   assert.match(asked.searchParams.get('created_at'), /^gte\./);
+});
+
+const BUCKET = 'https://nexui-test.supabase.co/storage/v1/object/public/place-photos';
+const OLDER_ID = 'a1b2c3d4-0000-4000-8000-000000000301';
+
+test('Home fills each card with its first stops’ cached photos and never looks anything up', async (t) => {
+  const [tokyo, kyoto] = intentRow.summary.strip.map((stop) => stop.key);
+  const older = {
+    ...intentRow,
+    id: OLDER_ID,
+    summary: { line: '1 stop', strip: [{ label: 'Paris', ai: false }] },
+  };
+  let asked;
+  const upstream = mockSupabaseAuth(
+    t,
+    postgrest({
+      'table:intents': () => [intentRow, older],
+      'table:runs': () => [],
+      'table:place_media': (query) => {
+        asked = query;
+
+        return [
+          cacheRow(tokyo, {
+            photo: { path: 'a/b-960.jpg', thumbPath: 'a/b-500.jpg', width: 960, height: 640 },
+            credit: {
+              author: 'Kasa Fue',
+              license: 'CC BY-SA 4.0',
+              sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tokyo.jpg',
+            },
+          }),
+          cacheRow(kyoto, { status: 'none', page_title: null, page_url: null, extract: null }),
+        ];
+      },
+    }),
+  );
+
+  const { items } = await (await GET(authed(url))).json();
+  const hosts = upstream.mock.calls.map((call) => {
+    const [input] = call.arguments;
+
+    return new URL(input instanceof Request ? input.url : String(input)).hostname;
+  });
+
+  assert.deepEqual(
+    items.map((item) => item.photos),
+    [[`${BUCKET}/a/b-500.jpg`], []],
+  );
+  assert.ok(asked.searchParams.get('key').includes(tokyo));
+  assert.ok(
+    hosts.every((host) => host === 'nexui-test.supabase.co'),
+    'nothing is looked up',
+  );
+});
+
+test('without the secret key Home still lists the plans, without photos', async (t) => {
+  const errors = t.mock.method(console, 'error', () => {});
+
+  mockSupabaseAuth(t, postgrest({ 'table:intents': () => [intentRow], 'table:runs': () => [] }));
+  delete process.env.SUPABASE_SECRET_KEY;
+
+  const response = await GET(authed(url));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).items[0].photos, []);
+  assert.deepEqual(errors.mock.calls[0].arguments, [
+    '[media]',
+    'SUPABASE_SECRET_KEY is required for runs, account deletion and place details.',
+  ]);
+});
+
+test('a failed photo read still lists the plans, without photos', async (t) => {
+  const errors = t.mock.method(console, 'error', () => {});
+
+  mockSupabaseAuth(
+    t,
+    postgrest({
+      'table:intents': () => [intentRow],
+      'table:runs': () => [],
+      'table:place_media': () => pgError('XX000', 500),
+    }),
+  );
+
+  const response = await GET(authed(url));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).items[0].photos, []);
+  assert.deepEqual(errors.mock.calls[0].arguments, [
+    '[media]',
+    'Could not load Home photos (XX000).',
+  ]);
 });
 
 test('creating a plan requires a token', async (t) => {

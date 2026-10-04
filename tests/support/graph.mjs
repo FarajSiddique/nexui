@@ -92,8 +92,8 @@ export const intentRow = {
     line: 'Dec 12 – 20, 8 days, 2 stops',
     badge: { text: 'Every day planned', tone: 'ok' },
     strip: [
-      { label: 'Tokyo', ai: false },
-      { label: 'Kyoto', ai: false },
+      { label: 'Tokyo', ai: false, key: 'tokyo|JP|35.7|139.7' },
+      { label: 'Kyoto', ai: false, key: 'kyoto|JP|35.0|135.8' },
     ],
   },
   created_at: STAMP,

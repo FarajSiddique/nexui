@@ -1,5 +1,7 @@
 import type { GraphSnapshot, Section } from '@nexui/types';
 
+import type { PhotoState } from '#data';
+
 import type { WorkspaceAction } from '../workspace-actions';
 import type { SectionDataOf } from '../workspace-layout';
 
@@ -14,4 +16,6 @@ export interface SectionProps<T extends Section['type']> {
   onAction: (action: WorkspaceAction) => void;
   /** A button's request is in flight: disable buttons that would race it. */
   busy: boolean;
+  /** Each place's photo slot by id; a place missing from it has none. */
+  photos: Readonly<Record<string, PhotoState>>;
 }

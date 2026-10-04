@@ -39,6 +39,8 @@ const expected = {
     providerFill: '#FFFFFF',
     providerLine: '#747775',
     providerInk: '#000000',
+    photoScrim: 'rgba(30, 26, 43, 0.72)',
+    photoInk: '#FFFFFF',
   },
   dark: {
     paper: '#15131B',
@@ -71,6 +73,8 @@ const expected = {
     providerFill: '#131314',
     providerLine: '#8E918F',
     providerInk: '#FFFFFF',
+    photoScrim: 'rgba(30, 26, 43, 0.72)',
+    photoInk: '#FFFFFF',
   },
 };
 
@@ -127,6 +131,7 @@ const textPairs = [
   ['ink', 'line'],
   ['card', 'userMark'],
   ['providerInk', 'providerFill'],
+  ['photoInk', 'photoScrim'],
 ];
 
 for (const scheme of ['light', 'dark']) {
