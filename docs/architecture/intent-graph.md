@@ -17,7 +17,8 @@ model; this doc cites the code that implements it.
 ## Tables and writers
 
 Six tables, defined in `supabase/migrations/20260927000000_intent_graph.sql` (the run functions are
-in `20260929000000_runs.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
+in `20260929000000_runs.sql`, redefined by `20260930000000_run_cutoff.sql` and
+`20261003000000_run_stopping.sql`): `intents`, `objects`, `relationships`, `events` (append-only),
 `workspaces`, and `runs` (one per AI request; see "AI runs"). Every table is owner-scoped by RLS.
 Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s those and only `grant`s
 `select` to `authenticated`. All writes go through `security definer` functions:
@@ -34,6 +35,10 @@ Clients get no direct `insert`/`update`/`delete` — the migration `revoke`s tho
   one route serves both.
 - `get_intent_snapshot(id)` / `changes_page(limit, before_seq, intent_id)`: read helpers used by
   the API's list/query code.
+- `discard_intent(id)` (`20261003000000_run_stopping.sql`): deletes one of the caller's intents
+  that no run was ever created on, with its graph (the rows cascade). Anything else, including
+  another user's intent or one with a run, is `NXU04`. `startIntent` uses it so a trip whose
+  first run can't be created doesn't stay on Home with nothing to fill it in (see "AI runs").
 
 `private.apply_ops` is the one place rows actually change. It rejects an op whose `origin` isn't
 `direct` or `derived`, a `source.type` outside `user`/`ai`/`derived`/`external`, more than one op
@@ -175,24 +180,77 @@ with the user's token, so RLS applies to everything it writes.
   answers one choice question within 5 seconds. A goal is `travel` or `none`; an ask is `edit`,
   `fast` or `reasoning`. If Jev fails, the goal is a trip and the ask gets `reasoning`. A
   `none` goal gets an intent with no template, no workspace and no run.
-- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`, `20260930000000_run_cutoff.sql`): `create_run` refuses while another run on
-  the intent is queued or running (NXU12, 409). `record_run_step` appends each step's calls to
-  `runs.progress` (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries
-  would take `progress` past 100 is not recorded, so it holds at most 100 entries. It also
-  appends the step's tokens to `runs.model_usage`, and returns the status, so `cancel_run` stops
-  a run after its current step. `finish_run` never overwrites a cancel. A run still queued or
-  running 6 minutes after it was created (a function instance stops after 300 s) reads as failed ("This run stopped unexpectedly.").
+- **Starting a trip** (`startIntent`): if `create_run` fails after the intent was seeded, the
+  intent is deleted with `discard_intent` before the error is rethrown. A failed discard is
+  logged under `[intents]` with only its error code, and the original error is still the one
+  rethrown.
+- **Runs** (`src/lib/runs`, `20260929000000_runs.sql`, `20260930000000_run_cutoff.sql`,
+  `20261003000000_run_stopping.sql`): a run is `queued`, `running`, `stopping`,
+  `awaiting_approval` (unused in slice 1), `succeeded`, `failed` or `cancelled`.
+  `ACTIVE_RUN_STATUSES` / `isActiveRunStatus` (`packages/types/src/runs.ts`) are the first three.
+  - `create_run` refuses while another run on the intent is queued, running or stopping (NXU12,
+    409), so a stopped run's last commit can never land under a newer run.
+  - `record_run_step` appends each step's calls to `runs.progress`
+    (`{ step, capability, label, ok, ms, input, error? }`): a step whose entries would take
+    `progress` past 100 is not recorded, so it holds at most 100 entries. It also appends the
+    step's tokens to `runs.model_usage`, and returns the status. A stopping run keeps that last
+    step's entries and usage and stays `stopping`; the executor treats any status but `running`
+    as a stop.
+  - **Stop** (`cancel_run`) lets a running run finish the step it is taking: the run moves to
+    `stopping`, the executor commits and records that step, then finishes the run `cancelled`.
+    A queued or awaiting-approval run is cancelled at once. A run that already finished, or is
+    already stopping, comes back unchanged.
+  - `finish_run` turns a stopping run into `cancelled`, or `failed` with the error if its last
+    step failed, and never changes a finished run.
+  - A run still queued, running or stopping 6 minutes after it was created (a function instance
+    stops after 300 s) reads as failed ("This run stopped unexpectedly."), and stops blocking
+    `create_run`.
+
   Home shows "Drafting" on intents with a working run.
+
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
   correction; `reasoning` and the create run use `NEXUI_MODEL_REASONING` for up to 8 steps.
   Each step's ops commit as one changeset with actor `ai` and the run id, so a step can be
   undone from Changes. Two failing steps in a row fail the run; committed steps stay.
+  - **Refused calls show in progress.** A call whose input breaks the tool's schema never reaches
+    the stager: the AI SDK refuses it as a `tool-error`. `runModel` collects those into
+    `StepReport.refused`, and `commitStep` records each with `recordRefused` as an `ok: false`
+    entry whose `error` is the schema's first issue (`days: Too small …`), after the step's own
+    calls. The model still gets the error and can correct itself.
+  - **A forced step that fails, then answers in text, is `invalid`.** For `edit` and `fast`, a
+    text answer after a step with errors means the model gave up on the change, so the run fails
+    with "Nexui couldn't make a valid change.". A first forced step that answers in text still
+    finishes: the model found nothing to change.
 - **Capabilities** (`src/lib/capabilities`): named, Zod-typed functions that turn input into ops
   against a staged copy of the intent; the stager validates each call's ops before keeping
   them. Models name objects by ref (`trip`, `o1` … oldest first, or the ref they gave a new
   object), never by id. `trip.setPlaceDays`, `trip.reorderPlaces` and `decision.resolve` are
-  also the app's buttons, through `POST /api/intents/[id]/capabilities` (actor `user`).
+  also the app's buttons, through `POST /api/intents/[id]/capabilities` (actor `user`). The data
+  help the model reads (`DATA_HELP` in `graph.ts`) states the schema's limits, such as place
+  `days` "whole days, 0 to 365" and leg `estHours` "0 to 200", and a test keeps them in step.
+- **Decisions** (`src/lib/capabilities/decisions.ts`, spec addendum 2026-10-03 section 2):
+  - `decision.propose` pins a question with 2 to 4 options to the Open band. An option that adds
+    a place carries it, and the place is created with `days: 0` and no `part_of` link (a
+    candidate). The option may suggest days there (`place.days`, stored as
+    `OptionData.suggestedDays`, 1 to 365) and a leg hint (`leg`, stored with `fromPlaceId`, the
+    trip's last stop when proposed; dropped when the trip has no stops or the option no place).
+    An option with no place may instead name a stop already on the route in `extend` (stored as
+    `extendPlaceId`), such as "Extra day in Tokyo"; a ref that names no stop on the route is
+    dropped, and an option can't do both. When the AI proposes during a run, the decision keeps
+    what the user asked as
+    `DecisionData.asked` (the run's request, cut to 300 characters without splitting an emoji),
+    which the card shows as _You asked "…"_.
+  - `decision.resolve` settles a decision in one changeset, so one Undo restores all of it. A
+    pick sets `chosenOptionId`; leaving `optionId` out dismisses. On a pick, the days handed out
+    are the trip's free days if above 0, else the option's `suggestedDays`, else 1. A chosen place
+    goes last on the route with those days and a leg from the stop before it, which uses the
+    hint's mode, hours and cost only while `fromPlaceId` is still the last stop (otherwise
+    `{ mode: 'other' }`); a place the user already put on the route stays as it is. An `extend`
+    option adds those days to its stop, while that stop is still on the route. Then every other
+    option's candidate place (all of them on a dismiss) is deleted with its links, unless the user
+    put it on the route by hand. The decision and its options stay as a record, and the
+    decision's section is removed.
 - **Step replay** (`src/lib/capabilities/stage.ts`): if the intent's `lastActivityAt` moved while
   a step was running — the user edited it too — `commitChangeset`'s `restage` replays the step's
   calls over the fresh snapshot with the same ids and refs, rather than committing against a
@@ -205,8 +263,10 @@ with the user's token, so RLS applies to everything it writes.
   live runs. A fixture matches when all its phrases are in the text. With no match, perception
   answers `travel` and `reasoning` and the run changes nothing. `japan-ask-free-days` matches
   "i have free" and answers the unallocated insight's own prompt ("How should I use the N days
-  I have free?"). Its proposal names no existing objects, so it replays on any trip with a
-  free day.
+  I have free?") with a decision: Nara and Hiroshima as candidates, and "Extra day in Tokyo",
+  whose `extend: 'o4'` was added by hand. It replays on any trip with a free day: `o4` is Tokyo
+  on the trip that `try-run.mjs goal "Plan two weeks in Japan in December"` and then `free-day`
+  make, and elsewhere it names another stop or none (and is dropped).
 - **Recording:** run the API with `AI_PROVIDER=live`, start a run with
   `node scripts/try-run.mjs goal "<goal>"` (or `ask`), then
   `node scripts/record-fixture.mjs <runId> <name> <phrase,phrase>` and add the export to
@@ -229,8 +289,28 @@ text is actually drawn with.
   `psql`) against a scratch database. Creates two throwaway users, exercises create, change,
   undo, redo and cross-user isolation through the RPCs, and rolls everything back in one
   transaction — nothing it does persists.
-- `supabase/tests/runs-smoke.sql`: the run functions, as two throwaway users, rolled back.
+- `supabase/tests/runs-smoke.sql`: the run functions and `discard_intent`, as two throwaway users,
+  rolled back: Stop on a running run (stopping, its last step kept, `NXU12` meanwhile, then
+  cancelled, or failed with its error), a queued run cancelled at once, and `discard_intent`
+  refusing an intent with a run or another user's. With the project linked, it also runs as
+  `pnpm exec supabase db query --linked -f supabase/tests/runs-smoke.sql`.
 - `scripts/smoke-intent-graph.mjs [.qa/session.json] [apiUrl]`: a live end-to-end check against
   a running API. Needs a QA session (`node scripts/qa-session.mjs > .qa/session.json`) and the
-  API running (`pnpm dev:api`). It needs AI_PROVIDER=mock, waits for each run, and ends with an
-  ask, its run, and a cancel of the finished run.
+  API running (`pnpm dev:api`). It needs AI_PROVIDER=mock and waits for each run. After an ask
+  and its run, it asks the unallocated insight's own question (replaying
+  `japan-ask-free-days`), picks a place (the free day is used, a leg reaches it, the other
+  candidates are deleted), undoes the pick (every candidate is back and the decision open), and
+  ends with a cancel of a finished run.
+- `pnpm eval:travel` (`scripts/eval-travel.mjs`, cases in `scripts/eval-travel-cases.mjs`, pure
+  checks in `scripts/lib/eval-checks.mjs`): the manual live gate for spec section H's eight trip
+  prompts. Each case creates a plan, tags it in `intents.context.eval`, checks it (valid kind
+  data, stops and legs, each place in the case's countries and box, the trip's length), asks the
+  unallocated insight's question if days are free, and checks the proposal. It prints ✓/✗ per
+  check and exits 1 on any ✗; a person judges the plans in Expo as the QA user.
+  `--case <name>` runs one case and `--clean` deletes every tagged plan. Needs the API (live for
+  a real eval), `.qa/session.json`, and `SUPABASE_SECRET_KEY` with `QA_SUPABASE_REF` in
+  `apps/api/.env.local`.
+- `scripts/lib/qa-api.mjs` is what the scripts share: `readSession`, `qaApi` (`call`,
+  `waitForRun`), `qaAdmin` (the secret-key client, refused for any project but
+  `QA_SUPABASE_REF`), `printRun` and `printPlan`. `NEXUI_SESSION` and `NEXUI_API` override
+  `.qa/session.json` and `http://localhost:3000`.
