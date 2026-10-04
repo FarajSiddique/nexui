@@ -20,6 +20,8 @@
     "eval:travel": "node --experimental-strip-types scripts/eval-travel.mjs",
     "db:new": "supabase migration new",
     "db:push": "supabase db push",
+    "db:push:dev": "node scripts/db-push.mjs dev",
+    "db:push:prod": "node scripts/db-push.mjs prod",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

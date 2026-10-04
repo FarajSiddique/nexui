@@ -33,6 +33,9 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `pnpm fix`: apply ESLint fixes, then Prettier formatting.
 - `pnpm format` / `pnpm format:check`: apply or verify formatting.
 - `pnpm db:new <name>` / `pnpm db:push`: create a migration / apply migrations to the linked Supabase project (`supabase link` once first).
+- `pnpm db:push:dev` / `pnpm db:push:prod`: apply this checkout's migrations to the dev or prod project through a temporary linked copy, so the checkout's own link never changes. Supabase lists the migrations and asks Y/n; `--dry-run` only lists them.
+  - Prod also requires a clean `main` that matches `origin/main`, and you type `prod` to confirm.
+  - These are the user's to run: agents can't push migrations.
 
 ## Coding Style & Naming Conventions
 
