@@ -1,3 +1,4 @@
+export { AppleAccessNotice } from './apple-access-notice';
 export { AuthActionError } from './auth-actions';
 export { AuthScreen, useAuthStyles } from './auth-screen';
 export {
@@ -10,4 +11,9 @@ export {
   verifyEmailCode,
 } from './auth';
 export { startSessionLifecycle } from './session-lifecycle';
+export {
+  dismissAppleAccessNotice,
+  showAppleAccessNotice,
+  useAuthNoticeStore,
+} from './use-auth-notice-store';
 export { updateSession, useSessionStore } from './use-session-store';

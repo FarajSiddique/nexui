@@ -1,24 +1,40 @@
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
+import {
+  AppleAuthenticationButton,
+  AppleAuthenticationButtonStyle,
+  AppleAuthenticationButtonType,
+} from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { useState, type ReactElement } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
 
-import { fonts, createThemedStyles, useColors } from '#theme';
+import { fonts, createThemedStyles, useColors, useScheme } from '#theme';
 import { Button, FormError } from '#ui';
 import {
+  AppleAccessNotice,
   AuthActionError,
+  dismissAppleAccessNotice,
   sendEmailCode,
+  signInWithApple,
   signInWithGoogle,
   AuthScreen,
   useAuthStyles,
 } from '#features/auth';
 
-type Pending = 'email' | 'google' | null;
+type Pending = 'email' | 'google' | 'apple' | null;
+
+// Web shows only email codes; Apple sign-in is iOS only.
+const SUBTITLE = Platform.select({
+  ios: 'Use Apple or Google, or get a one-time code by email.',
+  web: 'Get a one-time code by email.',
+  default: 'Use Google, or get a one-time code by email.',
+});
 
 export default function SignInScreen(): ReactElement {
   const styles = useStyles();
   const authStyles = useAuthStyles();
   const colors = useColors();
+  const scheme = useScheme();
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +44,7 @@ export default function SignInScreen(): ReactElement {
       return;
     }
 
+    dismissAppleAccessNotice();
     setPending('email');
     setError(null);
     try {
@@ -47,6 +64,7 @@ export default function SignInScreen(): ReactElement {
       return;
     }
 
+    dismissAppleAccessNotice();
     setPending('google');
     setError(null);
     try {
@@ -58,10 +76,44 @@ export default function SignInScreen(): ReactElement {
     }
   }
 
+  async function continueWithApple() {
+    if (pending !== null) {
+      return;
+    }
+
+    dismissAppleAccessNotice();
+    setPending('apple');
+    setError(null);
+    try {
+      await signInWithApple();
+    } catch (caught) {
+      setError(caught instanceof AuthActionError ? caught.message : 'Something went wrong.');
+    } finally {
+      setPending(null);
+    }
+  }
+
   return (
-    <AuthScreen title="Sign in" subtitle="Use Google, or get a one-time code by email.">
+    <AuthScreen title="Sign in" subtitle={SUBTITLE}>
+      <AppleAccessNotice />
+
       {Platform.OS !== 'web' ? (
         <View style={styles.providers}>
+          {Platform.OS === 'ios' ? (
+            // The Apple button has no disabled state, so its wrapper dims it and takes no touches.
+            <View style={pending !== null && styles.inactive}>
+              <AppleAuthenticationButton
+                buttonType={AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={
+                  scheme === 'dark'
+                    ? AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthenticationButtonStyle.BLACK
+                }
+                style={styles.providerButton}
+                onPress={() => void continueWithApple()}
+              />
+            </View>
+          ) : null}
           <GoogleSigninButton
             style={styles.providerButton}
             size={GoogleSigninButton.Size.Wide}
@@ -116,6 +168,7 @@ export default function SignInScreen(): ReactElement {
 const useStyles = createThemedStyles((colors) => ({
   providers: { gap: 12 },
   providerButton: { width: '100%', height: 52 },
+  inactive: { opacity: 0.6, pointerEvents: 'none' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
   rule: { flex: 1, height: 1, backgroundColor: colors.line },
   dividerText: { fontFamily: fonts.body, fontSize: 14, color: colors.faint },
