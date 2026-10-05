@@ -1,3 +1,5 @@
+import type { z } from 'zod';
+
 import type {
   AnchorKind,
   ChangesetOp,
@@ -59,6 +61,11 @@ export interface TemplateDefinition {
   kinds: readonly KindName[];
   /** The sentence Jev reads when it picks a template for a new goal. */
   perception: string;
+  /**
+   * The template's own keys in `intents.context`, such as job search's `jobs`. Checked, with
+   * the eval tag, on every `update_intent` (`contextSchemaFor`).
+   */
+  context: Record<string, z.ZodType>;
   /** The ops that start a plan from its goal: the anchor and the workspace. */
   seed: (goal: string, newId: () => string) => ChangesetOp[];
   /** Ops derived from a staged changeset, committed with it. Deterministic; no model call. */
