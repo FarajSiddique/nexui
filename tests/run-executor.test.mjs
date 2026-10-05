@@ -143,6 +143,10 @@ test('each model step commits one changeset as the run, and the run succeeds', a
     p_status: 'succeeded',
     p_error: null,
   });
+  assert.deepEqual(
+    state.applied.map((args) => args.p_payload.label),
+    ['Updated A test trip and 2 more', 'Added Tokyo → Kyoto'],
+  );
 });
 
 test('Stop lets the current step commit and record, then the run ends cancelled', async (t) => {
@@ -391,6 +395,8 @@ test('a step call that would undo the field the user just changed is dropped', a
   assert.equal(entries[0].ok, false);
   assert.equal(entries[0].error, SKIPPED_STEP_ERROR);
   assert.equal(entries[1].ok, true);
+  // The step's event names only the call that committed.
+  assert.equal(fake.state.applied.at(-1).p_payload.label, 'Set Kyoto to 5 days');
 });
 
 test('a step whose every call was superseded commits nothing and the run goes on', async (t) => {

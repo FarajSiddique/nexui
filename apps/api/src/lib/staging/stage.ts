@@ -66,6 +66,8 @@ export interface Stager {
   restage(current: GraphSnapshot): ChangesetOp[] | null;
   /** The entry indexes of calls `restage` dropped since the last take, for the run's progress. */
   takeSkipped(): number[];
+  /** The entry indexes `restage` has dropped since the last take, without taking them. */
+  peekSkipped(): readonly number[];
 }
 
 // Progress keeps each call's input, so a run can be recorded as a fixture, up to this size.
@@ -449,6 +451,9 @@ export function createStager(options: StagerOptions): Stager {
       skipped = [];
 
       return taken;
+    },
+    peekSkipped() {
+      return [...skipped];
     },
   };
 }

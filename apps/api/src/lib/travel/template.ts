@@ -15,6 +15,10 @@ export const TRAVEL_TEMPLATE: TemplateDefinition = {
     'A trip: going somewhere, visiting places, a holiday, a weekend away, a road trip, or ' +
     'travel around an event.',
   context: {},
+  figures: [
+    { key: 'unallocatedDays', label: 'unallocated days' },
+    { key: 'totalDays', label: 'total days' },
+  ],
   seed: seedTravelOps,
   derive: ({ before, staged, ops, anchorId, newId }) =>
     deriveTrip(staged, anchorId, findShortenedPlace(before, ops), newId),

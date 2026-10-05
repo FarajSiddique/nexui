@@ -146,3 +146,24 @@ export const eventRecordSchema = z.object({
 });
 
 export type EventRecord = z.infer<typeof eventRecordSchema>;
+
+/** A figure a changeset's derivation moved, as the Changes feed shows it: "total days 8 → 9". */
+export const changeFigureSchema = z.strictObject({
+  label: z.string().min(1).max(60),
+  before: z.string().max(60).nullable(),
+  after: z.string().max(60).nullable(),
+});
+
+export type ChangeFigure = z.infer<typeof changeFigureSchema>;
+
+/**
+ * What a changeset's event carries beside its ops (`events.payload`): the change's label ("Set
+ * Kyoto to 3 days") and the anchor figures it moved. Either may be missing: events from before
+ * labels, Undo events and a plan's first changeset have neither.
+ */
+export const changesetPayloadSchema = z.strictObject({
+  label: z.string().min(1).max(200).optional(),
+  figures: z.array(changeFigureSchema).max(12).optional(),
+});
+
+export type ChangesetPayload = z.infer<typeof changesetPayloadSchema>;

@@ -15,6 +15,7 @@ import {
   toModelTools,
 } from '#lib/cognition';
 import {
+  changesetLabel,
   commitChangeset,
   NothingToCommitError,
   ChangesetConflictError,
@@ -112,6 +113,18 @@ function markSkipped(entries: RunProgressEntry[], indexes: readonly number[]): v
   });
 }
 
+// The step's label: the calls that ran and still apply after any replay.
+function stepLabel(
+  entries: readonly RunProgressEntry[],
+  skipped: readonly number[],
+): string | undefined {
+  return changesetLabel(
+    entries
+      .filter((entry, index) => entry.ok && !skipped.includes(index))
+      .map((entry) => entry.label),
+  );
+}
+
 // Commits the step's ops as one changeset, then records the step. If the user changed the intent
 // meanwhile, the step is replayed over their changes first. A commit error is recorded first and
 // then thrown, which fails the run with its steps so far kept.
@@ -138,6 +151,7 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
           run: { id: step.runId, lease: step.leaseId },
           ops,
           restage: (current) => step.stager.restage(current),
+          label: () => stepLabel(entries, step.stager.peekSkipped()),
         },
         step.clock(),
         step.newId,

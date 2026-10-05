@@ -88,6 +88,10 @@ test('"Give it back" commits as the user, with its derived changes', async (t) =
     origin: 'direct',
   });
   assert.equal(applied[0].p_ops.at(-1).op, 'update_intent');
+  assert.deepEqual(applied[0].p_payload, {
+    label: 'Set Tokyo to 5 days',
+    figures: [{ label: 'unallocated days', before: '0', after: '-1' }],
+  });
 });
 
 test('only the button capabilities can be called', async (t) => {

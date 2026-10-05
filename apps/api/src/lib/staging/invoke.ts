@@ -21,7 +21,7 @@ function stageUserCall(
   input: unknown,
   clock: Date,
   newId: () => string,
-): ChangesetOp[] {
+): { ops: ChangesetOp[]; label: string | undefined } {
   try {
     const stager = createStager({
       capabilities: [capability],
@@ -34,7 +34,7 @@ function stageUserCall(
 
     stager.call(capability.name, input);
 
-    return stager.takeOps();
+    return { ops: stager.takeOps(), label: stager.takeEntries()[0]?.label };
   } catch (error) {
     if (error instanceof CapabilityError) {
       throw new ChangesetInvalidError(error.message);
@@ -65,7 +65,7 @@ export async function invokeCapability(
     throw new ChangesetInvalidError("That action isn't available.");
   }
 
-  const ops = stageUserCall(capability, snapshot, request.input, clock, newId);
+  const { ops, label } = stageUserCall(capability, snapshot, request.input, clock, newId);
 
-  return commitChangeset(db, { intentId, actor: 'user', ops }, clock, newId);
+  return commitChangeset(db, { intentId, actor: 'user', ops, label: () => label }, clock, newId);
 }

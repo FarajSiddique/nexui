@@ -8,6 +8,7 @@ import { templateFor } from '#lib/templates';
 
 import { GraphNotFoundError, mapRpcError } from './errors.ts';
 import { mapEventRow } from './mappers.ts';
+import { changesetPayload, figureChanges } from './payload.ts';
 import { prepareChangeset } from './prepare.ts';
 import { loadSnapshot } from './snapshot.ts';
 
@@ -25,6 +26,11 @@ export interface CommitInput {
    * since they were staged (a run's step). Null keeps `ops`.
    */
   restage?: (current: GraphSnapshot) => ChangesetOp[] | null;
+  /**
+   * The change's label for the Changes feed, such as "Set Kyoto to 3 days". It is read after
+   * `restage`, so a run's step is named only by the calls that still apply.
+   */
+  label?: () => string | undefined;
 }
 
 export interface CommitResult {
@@ -51,6 +57,7 @@ async function applyFromSnapshot(
   }
 
   const ops = prepareChangeset(before, staged, input.actor, now, newId);
+  const payload = changesetPayload(input.label?.(), figureChanges(before, ops, now));
 
   if (input.run) {
     return db.rpc('run_apply_changeset', {
@@ -58,6 +65,7 @@ async function applyFromSnapshot(
       p_lease_id: input.run.lease,
       p_ops: ops,
       p_expected_activity_at: before.intent.lastActivityAt,
+      p_payload: payload,
     });
   }
 
@@ -67,6 +75,7 @@ async function applyFromSnapshot(
     p_run_id: null,
     p_ops: ops,
     p_expected_activity_at: before.intent.lastActivityAt,
+    p_payload: payload,
   });
 }
 
