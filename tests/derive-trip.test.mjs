@@ -5,7 +5,7 @@ import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { deriveTrip, findShortenedPlace } from '../apps/api/src/lib/kinds/trip.ts';
-import { formatDateRange } from '../packages/types/src/kinds/trip-figures.ts';
+import { formatDateRange } from '../packages/types/src/kinds/travel/figures.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import { applyOps } from '../packages/types/src/index.ts';
 import {

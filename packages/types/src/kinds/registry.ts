@@ -3,13 +3,15 @@ import { z } from 'zod';
 import {
   decisionDataSchema,
   insightDataSchema,
-  legDataSchema,
   optionDataSchema,
+  thingDataSchema,
+} from './common.ts';
+import {
+  legDataSchema,
   placeDataSchema,
   stayDataSchema,
-  thingDataSchema,
   tripDataSchema,
-} from './travel.ts';
+} from './travel/schemas.ts';
 
 /** A registered object kind: its current version, schema, and how to upgrade older data. */
 export interface KindDefinition {
@@ -20,7 +22,9 @@ export interface KindDefinition {
 
 const unchanged = (data: unknown): unknown => data;
 
-// Adding a kind means adding it here; the database needs no migration (spec section C).
+// Adding a kind means adding it here; the database needs no migration (spec section C). Each
+// template's kinds live in its folder (`kinds/travel/`); kinds every template uses live in
+// `common.ts`.
 export const KIND_REGISTRY = {
   trip: { version: 1, schema: tripDataSchema, upgrade: unchanged },
   place: { version: 1, schema: placeDataSchema, upgrade: unchanged },
