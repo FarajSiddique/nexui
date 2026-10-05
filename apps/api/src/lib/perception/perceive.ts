@@ -40,8 +40,9 @@ function templateCriteria(): Record<TemplateChoice, string> {
 }
 
 /**
- * Jev's template question for a new goal (spec section F). If Jev can't answer, the goal is
- * treated as a trip, because travel is the only template in slice 1.
+ * Jev's template question for a new goal (spec section F). The choices come from `TEMPLATES`:
+ * each template's `perception` sentence, then the `none` sentence. If Jev can't answer, the goal
+ * is treated as a trip, the default template.
  */
 export async function chooseTemplate(
   model: Experimental_EvaluationModel,

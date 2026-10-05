@@ -177,10 +177,12 @@ and a file in a subfolder couldn't import `TemplateDefinition` from beside it. `
 keeps the interface, the map and the code that dispatches on it.
 
 **Load order.** `TRAVEL_CAPABILITIES` and `TEMPLATES` are built at module load from other
-domains' exports, so the domains load along one acyclic chain: `lib/kinds` imports no other
-domain, `lib/capabilities` only `lib/kinds`, `lib/travel` only `lib/capabilities`, and
-`lib/templates` never `lib/graph`, `lib/staging`, `lib/runs` or `lib/orchestrator`. That is why
-the stager and `invokeCapability` are in `lib/staging`, which imports `lib/graph`, and not beside
+domains' exports, so the domains load along one acyclic chain. Its import rules are about
+runtime imports (`import type` doesn't count, and `travel/template.ts` and `travel/prompt.ts`
+use it for `TemplateDefinition` and `TemplatePrompt`): `lib/kinds` imports no other domain,
+`lib/capabilities` only `lib/kinds`, `lib/travel` only `lib/capabilities`, and `lib/templates`
+only the domains below it (`lib/kinds`, `lib/capabilities` and `lib/travel`). That is why the
+stager and `invokeCapability` are in `lib/staging`, which imports `lib/graph`, and not beside
 the capability definitions. `tests/api-load-order.test.mjs` enforces the chain (see "Checking
 it").
 
@@ -268,9 +270,9 @@ route.ts → fromUserOps → prepareChangeset → apply_changeset (RPC) → { ev
   with 413 "That change is too large.". In the contracts, link `metadata` and a capability
   action's `input` serialize to at most 2 000 characters, and an option has at most 12 `metrics`.
 
-**Example** (`tests/derive-trip.test.mjs`): shortening Tokyo from 4 days to 3 stages an
-`update_object` on Tokyo, then `deriveTrip` sees the trip now has 1 unallocated day and adds:
-an `update_object` on the trip storing the recalculated `data.derived` figures, an
+**Example** (`tests/derive-trip.test.mjs`, and `tests/changeset-payload.test.mjs` for the
+payload): shortening Tokyo from 4 days to 3 stages an `update_object` on Tokyo, then
+`deriveTrip` sees the trip now has 1 unallocated day and adds: an `update_object` on the trip storing the recalculated `data.derived` figures, an
 `insert_object`/`insert_relationship` pair for a new "You have 1 day unallocated" insight (with
 an `ask` action and a `capability` action offering to give the day back to Tokyo), and an
 `update_intent` refreshing `summary` (`line: 'Dec 12 – 20, 8 days, 2 stops'`, an attention badge,

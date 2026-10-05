@@ -66,7 +66,10 @@ export interface TemplateDefinition {
    * the eval tag, on every `update_intent` (`contextSchemaFor`).
    */
   context: Record<string, z.ZodType>;
-  /** The anchor's `data.derived` figures the Changes feed reports when a change moves them. */
+  /**
+   * The anchor's `data.derived` figures that a changeset event's payload reports when a change
+   * moves them.
+   */
   figures: readonly { key: string; label: string }[];
   /** The ops that start a plan from its goal: the anchor and the workspace. */
   seed: (goal: string, newId: () => string) => ChangesetOp[];

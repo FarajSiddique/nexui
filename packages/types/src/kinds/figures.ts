@@ -41,6 +41,12 @@ export interface AnchorFigures {
   values: Figures;
 }
 
+/**
+ * The anchor's kind and its figures, recomputed from the snapshot.
+ *
+ * @example
+ * anchorFigures(snapshot) // { kind: 'trip', values: { totalDays: 8, … } }
+ */
 export function anchorFigures(snapshot: GraphSnapshot): AnchorFigures {
   const anchorId = snapshot.workspace?.doc.anchorId;
   const anchor = snapshot.objects.find((object) => object.id === anchorId);

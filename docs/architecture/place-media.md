@@ -27,7 +27,7 @@ placeMediaKey({ name: 'Washington, D.C.', country: 'US', lat: 38.9072, lng: -77.
 
 Folding punctuation keeps commas, quotes and parentheses out of keys. That matters because the cache is read with a PostgREST `in.(…)` filter, which supabase-js doesn't escape.
 
-The same place in any plan shares one key, so Wikipedia is asked about Berlin once for everyone. `derive.trip` also stores each stop's key on the plan's Home summary (see Home below).
+The same place in any plan shares one key, so Wikipedia is asked about Berlin once for everyone. `deriveTrip` also stores each stop's key on the plan's Home summary (see Home below).
 
 ## The lookup
 
@@ -173,7 +173,7 @@ A stored photo whose URL the contract rejects, such as one on a local `http` Sup
 
 The Home list never looks anything up, so it stays fast:
 
-1. `derive.trip` writes each summary stop's `key` (`intentSummarySchema.strip[].key`).
+1. `deriveTrip` writes each summary stop's `key` (`intentSummarySchema.strip[].key`).
 2. `GET /api/intents` lists the plans with the user's client.
 3. `withHomePhotos` reads the cache rows for each card's first three keys with the secret-key client, at most 100 keys per query.
 4. It fills `photos` (`intentListItemSchema`, at most three) with the 500px URLs of the stops that have one. Expired rows still count, since stored files never move.

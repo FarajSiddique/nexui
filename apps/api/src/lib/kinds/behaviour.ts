@@ -14,8 +14,9 @@ export interface KindLink {
 
 /**
  * How the generic `object.*`, `relationship.*` and `workspace.addSection` capabilities treat one
- * kind (readiness doc, section 3.2). A template lists its kinds; the capabilities read the rest
- * here, so a new kind declares its behaviour beside its schema and needs no capability code.
+ * kind (readiness doc, section 3.2). A template's capability scope lists its kinds
+ * (`CapabilityScope.kinds`); the capabilities read the rest here, so a new kind declares its
+ * behaviour beside its schema and needs no capability code.
  */
 export interface KindBehaviour {
   /** `object.create` may make one, and `object.delete` may remove one. */
@@ -42,6 +43,8 @@ export interface KindBehaviour {
   linkNote?: string;
 }
 
+// Duplicates `capabilities/helpers.ts`'s `nameOf` on purpose: `lib/kinds` imports no other
+// domain, and importing it would make a cycle.
 const nameOf = (object: GraphObject): string => object.title ?? object.kind;
 
 // A place's legs, at either end, and the stays in it.
@@ -62,6 +65,7 @@ function placeDependents(graph: GraphSnapshot, place: GraphObject): GraphObject[
   );
 }
 
+/** How the generic capabilities treat each kind, beside its schema in `KIND_REGISTRY`. */
 export const KIND_BEHAVIOUR: Record<KindName, KindBehaviour> = {
   trip: {
     creatable: false,
