@@ -1,6 +1,9 @@
 # Job search: slice 2
 
 **Status:** approved in conversation on 2026-10-04; awaiting review of this written spec.
+Amended the same day: sections 0, 3.2, 5.5 and 10 fold in
+[`2026-10-04-architecture-readiness.md`](./2026-10-04-architecture-readiness.md), the review of
+what the code needs before a second template, so the plan schedules that work by PR.
 **Adds to:** `2026-09-27-intent-graph-design.md`, section H "Slice 2: job search", and its lines on
 `pipeline`, `timeline`, `web.search`, `jobs.*` and `ExternalEvent`. That spec's tests still hold:
 no new tables, no new screens, no tasks or checkboxes.
@@ -14,24 +17,25 @@ of Feb 1). The build runs Oct 12 → Nov 20, beside the web app work, and its ev
 
 ## 0. Decisions made while brainstorming
 
-| Topic                 | Decision                                                                                                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Who it's for          | **The employed professional looking quietly.** Strict matching, at most 3 new roles a day, and discretion: Nexui never surfaces the current employer. Active high-volume seekers still work, capped.         |
-| Routing               | Jev picks `travel`, `job_search` or `unsupported`. If Jev fails, the create route answers 503 "try again" instead of guessing.                                                                               |
-| Unsupported goals     | This spec covers routing, the "can't plan this yet" reply and saving the request. Notify-later and the goal-first welcome screen are separate.                                                               |
-| Resume                | **Classify first, then ask.** A job search pauses before its build run for an optional resume PDF. The PDF is read once through Gateway; Nexui never stores the file.                                        |
-| Where roles come from | **Employer job boards are the source of truth** (Greenhouse, Lever, Ashby: public, free). One date-filtered web search per scan finds new roles and companies. Every role is confirmed live on its board.    |
-| New roles             | ≥ 0.85 → the pipeline's **New** stage, top 3 a day, AI-marked with a dashed outline, **Interested** or **Pass** (one-tap reason). 0.6–0.85 → at most one partial-fit insight. Below 0.6 → dropped.           |
-| Role details          | `/place` becomes **`/object`**, one details sheet with a body per kind. A deliberate judgment call against "no new screens": a new body in an existing sheet.                                                |
-| Background work       | A daily **check-in** (code only, free) and a daily **scan** (new roles). One migration adds the run kinds.                                                                                                   |
-| Free vs paid          | After launch, free gets the build and first matches, the daily check-in and on-request runs. Daily scans and automatic application kits are paid. Everything is on in the beta. (A flag for Cost & Pricing.) |
-| Application kit       | Marking a role Interested prepares a tailored cover letter and an application brief.                                                                                                                         |
-| Nothing leaves Nexui  | Drafts only. **Open in Mail** fills in a `mailto:` message the user sends. No `approval` policy in v1.                                                                                                       |
-| Connectors            | **Forward to Nexui** is a v1 **Should**: a personal address for recruiter emails and invites. Calendar and inbox connections come after launch.                                                              |
-| Ending                | Hired completes the plan and keeps it as a record. Pause is the user's. New-role checks pause on their own after **7 days** with no change by the user.                                                      |
-| One search            | At most one active job search per user.                                                                                                                                                                      |
-| Eval                  | `pnpm eval:jobs`: 24 routing goals, 8 live cases (build → scan → kit), zero dead links, a human rubric. Two live passes on different days by Nov 13.                                                         |
-| Packaging             | This spec and its plan in one docs PR. The build in five PRs, routing first.                                                                                                                                 |
+| Topic                 | Decision                                                                                                                                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who it's for          | **The employed professional looking quietly.** Strict matching, at most 3 new roles a day, and discretion: Nexui never surfaces the current employer. Active high-volume seekers still work, capped.                    |
+| Routing               | Jev picks `travel`, `job_search` or `unsupported`. If Jev fails, the create route answers 503 "try again" instead of guessing.                                                                                          |
+| Unsupported goals     | This spec covers routing, the "can't plan this yet" reply and saving the request. Notify-later and the goal-first welcome screen are separate.                                                                          |
+| Resume                | **Classify first, then ask.** A job search pauses before its build run for an optional resume PDF. The PDF is read once through Gateway; Nexui never stores the file.                                                   |
+| Where roles come from | **Employer job boards are the source of truth** (Greenhouse, Lever, Ashby: public, free). One date-filtered web search per scan finds new roles and companies. Every role is confirmed live on its board.               |
+| New roles             | ≥ 0.85 → the pipeline's **New** stage, top 3 a day, AI-marked with a dashed outline, **Interested** or **Pass** (one-tap reason). 0.6–0.85 → at most one partial-fit insight. Below 0.6 → dropped.                      |
+| Role details          | `/place` becomes **`/object`**, one details sheet with a body per kind. A deliberate judgment call against "no new screens": a new body in an existing sheet.                                                           |
+| Background work       | A daily **check-in** (code only, free) and a daily **scan** (new roles). One migration adds the run kinds.                                                                                                              |
+| Free vs paid          | After launch, free gets the build and first matches, the daily check-in and on-request runs. Daily scans and automatic application kits are paid. Everything is on in the beta. (A flag for Cost & Pricing.)            |
+| Application kit       | Marking a role Interested prepares a tailored cover letter and an application brief.                                                                                                                                    |
+| Nothing leaves Nexui  | Drafts only. **Open in Mail** fills in a `mailto:` message the user sends. No `approval` policy in v1.                                                                                                                  |
+| Connectors            | **Forward to Nexui** is a v1 **Should**: a personal address for recruiter emails and invites. Calendar and inbox connections come after launch.                                                                         |
+| Ending                | Hired completes the plan and keeps it as a record. Pause is the user's. New-role checks pause on their own after **7 days** with no change by the user.                                                                 |
+| One search            | At most one active job search per user.                                                                                                                                                                                 |
+| Eval                  | `pnpm eval:jobs`: 24 routing goals, 8 live cases (build → scan → kit), zero dead links, a human rubric. Two live passes on different days by Nov 13.                                                                    |
+| Architecture          | Trip-only seams are **replaced by registries, never branched**: no `if (template === 'job_search')` beside an existing `=== 'travel'`. The registries land in PR 1 before any `jobs.*` code (readiness doc, section 3). |
+| Packaging             | This spec and its plan in one docs PR. The build in five PRs, routing first.                                                                                                                                            |
 
 ## 1. Who it's for, and what success looks like
 
@@ -186,13 +190,31 @@ work I want. **Skip** passes with no reason. Every other card opens `/object`.
 
 **Other contract changes:**
 
-- `DerivedKey` gains `search.new`, `search.inPlay` and `search.interviewsThisWeek`, read from the
-  anchor's `data.derived` like the trip keys. `workspace-layout.ts` stops assuming trip figures.
+- `DerivedKey` stops being an enum: it is the pattern `<anchorKind>.<key>`, read from the
+  anchor's `data.derived`. The search's keys are `search.new`, `search.inPlay` and
+  `search.interviewsThisWeek`. Mobile recomputes figures through `KIND_FIGURES`, a
+  `Record<AnchorKind, …>` in `@nexui/types` that `tripFigures` joins as `KIND_FIGURES.trip`, so
+  `workspace-layout.ts` stops assuming trip figures (readiness doc, section 3.3).
 - `InsightAction` gains `{ type: 'upload'; label; docType: 'resume' }`, which opens the document
   picker, and `{ type: 'copy'; label; text }`, which copies text to the clipboard.
 - `IntentSummary` gains `stripStyle?: 'route' | 'chips'`. Home draws a job search's strip as
   company chips, AI-marked for roles still in New.
-- The capability whitelists in `capabilities/graph.ts` and `workspace.ts` become per template.
+- The kind lists in `capabilities/graph.ts` and `workspace.ts` (`CREATABLE`, `isEditable`,
+  `LINK_TYPES`, `DATA_HELP`, the `leg` and `place` special cases, `dependents`) move onto the
+  kinds as `KIND_BEHAVIOUR` (`apps/api/src/lib/kinds/behaviour.ts`), and `object.*` and
+  `relationship.*` read it. Job search declares `company`, `opportunity`, `document`,
+  `interview` and `person` there and adds no graph code (readiness doc, section 3.2).
+- `events.payload` gains `label` (the capability's label, or a generic one for a raw changeset)
+  and `figures` (what the derive changed). The change feed shows them instead of narrating ops
+  by kind (readiness doc, section 3.4).
+- `WorkspaceAction` becomes `ask`, `open` and `{ type: 'capability'; request; optimistic }`:
+  the primitive that knows its capability builds the request. `pipeline`'s card actions use the
+  same shape. A `KIND_META` registry, `Record<AnchorKind, …>`, replaces the `tripMeta` or
+  `searchMeta` branch in `intent/[id].tsx` (readiness doc, section 3.5).
+- Travel's primitives (`map`, `route`, `allocation`), stop details and the place body move to
+  `features/travel/`; job search's go in `features/jobs/`; `features/workspace/` keeps the
+  layout engine and the generic primitives. The import-direction lint keeps `features/workspace`
+  from importing either.
 
 ### 3.3 `derive.jobSearch`
 
@@ -369,10 +391,20 @@ are limited to a few at a time per host.
 search sheet's chips call as user changesets.
 
 **Each template gets its own capability set, prompt and anchor ref.** A template registry
-(`lib/templates`) holds, per template: the seed, the derivation, the capabilities, the lookups,
-the prompt's base and tasks, and the anchor's ref name (`trip` or `search`). `runs/execute.ts`
-picks from it instead of giving every run every capability. Trips don't see the jobs tools, and
-job searches don't see the trip tools.
+(`lib/templates`, `TEMPLATES: Record<Template, TemplateDefinition>`) holds, per template: the
+anchor kind and its ref name (`trip` or `search`), the perception line `chooseTemplate` shows
+Jev, the empty summary line, the `context` schema (`context.jobs` is validated here, in
+`validateOps`), the seed, the derivation, the capabilities, the lookups, the prompt's base and
+tasks, and optional per-route budgets. `derive.ts`, `commit.ts`, `orchestrate.ts`, `execute.ts`,
+`prompts.ts`, `refs.ts` and `perceive.ts` read from it instead of naming travel, and
+`runs/execute.ts` gives a run only its template's tools. Trips don't see the jobs tools, and job
+searches don't see the trip tools. Fixtures move to `lib/ai/fixtures/<template>/`. The full
+field list is in the readiness doc, section 3.1.
+
+**Heavy fields stay out of prompts.** A kind can name `promptFields`: `renderGraph` shows a
+`document`'s `body` as its length and a ref, and a `document.read` lookup returns the text on
+request, so a resume and a few drafts don't ride along on every step of every run (readiness
+doc, section 3.6).
 
 **Prompts** fence everything from users, boards and email as data: `<goal>`, `<graph>`,
 `<request>`, `<resume>`, `<posting>`, `<focus>` and `<email>`, each as escaped JSON, with the
@@ -604,7 +636,7 @@ Exa's and Parallel's storage and display terms, to pick one; live fetches from t
 
 | Week          | Work                                                                                                                                                                                                           |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 · Oct 12–16 | **Routing and saved requests, merged first** (the welcome screen waits on it). Contracts. The migration. The template registry. Trip copy.                                                                     |
+| 1 · Oct 12–16 | **Routing and saved requests, merged first** (the welcome screen waits on it). Contracts. The migration. The registries (below). Trip copy.                                                                    |
 | 2 · Oct 19–23 | The resume start flow. Board connectors, web search, lookup tools. `derive.jobSearch` and `jobs.*`. The build run. **The eval script, Parts A and B (build).**                                                 |
 | 3 · Oct 26–30 | Mobile: `pipeline`, `timeline`, `/object` (role, draft, search), the resume step and paperclip, pass reasons, Home chips, the meta line, `upload` and `copy`.                                                  |
 | 4 · Nov 2–6   | Check-in and scan, the cron enqueue, auto-pause, expiry. Kits, follow-up drafts, Add interview, Prep me. Hired and pause. Guards. **First full live eval by Nov 6.** Forward to Nexui if the core is on track. |
@@ -616,15 +648,37 @@ partial-fit insight; the Watching list and company body; the withdrawal-notes in
 drafts in place; desktop pipeline columns (web falls back to the phone layout). If the eval still
 fails on Nov 13, the beta starts with trips and job search joins midway.
 
-**Packaging.** This spec and its plan: one docs PR. The build: five PRs, (1) routing and saved
-requests, (2) job search core API, (3) mobile, (4) background work, legwork and eval, (5)
-forwarding. Each keeps `pnpm lint`, `pnpm typecheck` and `pnpm test` green, and the API, mobile
-and security reviewers and the docs keeper run before each handoff. The migration is the
-founder's to push (`pnpm db:push:dev`, then prod).
+**Packaging.** This spec and its plan: one docs PR. The build: five PRs, (1) routing, saved
+requests and the registries, (2) job search core API, (3) mobile, (4) background work, legwork
+and eval, (5) forwarding. Each keeps `pnpm lint`, `pnpm typecheck` and `pnpm test` green, and
+the API, mobile and security reviewers and the docs keeper run before each handoff. The
+migration is the founder's to push (`pnpm db:push:dev`, then prod).
+
+**Architecture work folded into the build.** From the readiness doc, by PR. PR 1 is
+travel-only on the outside (every trip test still passes) and template-driven on the inside, so
+PR 2 adds job search by declaring it.
+
+| PR    | Takes                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `TEMPLATES` and the thirteen seams it replaces (3.1); `KIND_BEHAVIOUR` behind `object.*` (3.2); `DerivedKey` as a pattern and `KIND_FIGURES` in types (3.3); `events.payload.label` and `figures` (3.4); `contextSchema` in `validateOps` (3.7); `upgradeWorkspace` as a no-op (3.8); the decision option payload behind the template (3.11); `kinds/travel/` and one `templateSchema` (3.12). |
+| 2     | Job search's kinds, behaviour, template entry and `jobs.*` by declaration; `promptFields` and `document.read` (3.6); `withUser` and `parseBody` for the new routes (3.10).                                                                                                                                                                                                                     |
+| 3     | Capability-shaped `WorkspaceAction`, `KIND_META`, `DETAIL_REGISTRY`, the `features/travel/` and `features/jobs/` split, the change feed reading labels (3.5, 3.4); `format.ts` split (3.12).                                                                                                                                                                                                   |
+| 4     | `enqueue_job_checks` spreads due times; `maxDuration` on every run-queuing route; the sweep cap written down in `docs/architecture/` (3.9); one eval runner for `eval:travel` and `eval:jobs` (3.12).                                                                                                                                                                                          |
+| Later | A worker outside the API function; the light snapshot and the changeset index (3.6, 3.9).                                                                                                                                                                                                                                                                                                      |
+
+**The measure.** After PR 3, adding use case #3 touches one folder per workspace and one line
+per registry (readiness doc, section 5). If a PR in this build changes `graph/`, `runs/`,
+`cognition/`, `orchestrator/`, `features/workspace/`, `features/changes/` or `data/` for a job
+search reason, a registry is missing a field; add the field, not the branch.
 
 **Tests**, at the external boundaries:
 
 - `chooseTemplate`'s three routes, and a Jev failure answering 503.
+- The registries: `TEMPLATES` covers every `Template` and names only kinds `KIND_BEHAVIOUR`
+  allows; `validateOps` refuses a `context` the template's schema rejects; `renderGraph` omits
+  `promptFields`-excluded values; the change feed renders `payload.label` without reading kinds;
+  `features/workspace` imports neither `features/travel` nor `features/jobs` (readiness doc,
+  section 6).
 - `startIntent`'s four outcomes, including the one-search rule.
 - `start` and `resume` routes: with and without a PDF, an unreadable PDF, too large, already
   started.
