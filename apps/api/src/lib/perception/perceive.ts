@@ -1,10 +1,12 @@
 import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
 
-import type { RunRoute } from '@nexui/types';
+import type { RunRoute, Template } from '@nexui/types';
 
 import type { GatewayOptions } from '#lib/ai';
+import { TEMPLATES } from '#lib/templates';
 
-export type TemplateChoice = 'travel' | 'none';
+/** A template, or `none` for a goal no template fits. */
+export type TemplateChoice = Template | 'none';
 
 /** A perception answer, and whether Jev gave it or the fallback did. */
 export interface Perceived<T> {
@@ -19,6 +21,23 @@ export interface PerceptionOptions {
 
 /** Perception runs before the response is sent, so it gets a short budget. */
 export const PERCEPTION_TIMEOUT_MS = 5_000;
+
+// The routing build (job search spec, section 2) replaces `none` with `unsupported`.
+const NO_TEMPLATE =
+  'Anything that is not a trip, such as a job search, a project, a purchase or a habit.';
+
+// Each template's own sentence, then `none`: a new template teaches routing by existing.
+function templateCriteria(): Record<TemplateChoice, string> {
+  const criteria = {} as Record<TemplateChoice, string>;
+
+  for (const template of Object.values(TEMPLATES)) {
+    criteria[template.name] = template.perception;
+  }
+
+  criteria.none = NO_TEMPLATE;
+
+  return criteria;
+}
 
 /**
  * Jev's template question for a new goal (spec section F). If Jev can't answer, the goal is
@@ -37,12 +56,7 @@ export async function chooseTemplate(
         template: {
           type: 'choice',
           instructions: 'Someone typed this goal to start a plan. Which template fits it?',
-          criteria: {
-            travel:
-              'A trip: going somewhere, visiting places, a holiday, a weekend away, a road ' +
-              'trip, or travel around an event.',
-            none: 'Anything that is not a trip, such as a job search, a project, a purchase or a habit.',
-          },
+          criteria: templateCriteria(),
         },
       },
       abortSignal: AbortSignal.timeout(options.timeoutMs ?? PERCEPTION_TIMEOUT_MS),

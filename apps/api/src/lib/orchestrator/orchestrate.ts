@@ -60,7 +60,7 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
     return { snapshot: await createIntent(deps.db, goal, null), runId: null };
   }
 
-  const snapshot = await createIntent(deps.db, goal, 'travel');
+  const snapshot = await createIntent(deps.db, goal, template.value);
   let run: RunRecord;
 
   try {
@@ -68,7 +68,12 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
       userId: deps.userId,
       intentId: snapshot.intent.id,
       kind: 'create_intent',
-      input: { text: goal, route: 'reasoning', template: 'travel', perception: template.source },
+      input: {
+        text: goal,
+        route: 'reasoning',
+        template: template.value,
+        perception: template.source,
+      },
     });
   } catch (error) {
     await discardTrip(deps.db, snapshot.intent.id);

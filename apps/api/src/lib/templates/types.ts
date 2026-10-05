@@ -57,6 +57,8 @@ export interface TemplateDefinition {
   anchorRef: string;
   /** Every kind the template's plans hold, the anchor's included. */
   kinds: readonly KindName[];
+  /** The sentence Jev reads when it picks a template for a new goal. */
+  perception: string;
   /** The ops that start a plan from its goal: the anchor and the workspace. */
   seed: (goal: string, newId: () => string) => ChangesetOp[];
   /** Ops derived from a staged changeset, committed with it. Deterministic; no model call. */

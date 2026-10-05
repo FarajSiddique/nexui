@@ -11,6 +11,9 @@ export const TRAVEL_TEMPLATE: TemplateDefinition = {
   anchorKind: 'trip',
   anchorRef: 'trip',
   kinds: TRAVEL_SCOPE.kinds,
+  perception:
+    'A trip: going somewhere, visiting places, a holiday, a weekend away, a road trip, or ' +
+    'travel around an event.',
   seed: seedTravelOps,
   derive: ({ before, staged, ops, anchorId, newId }) =>
     deriveTrip(staged, anchorId, findShortenedPlace(before, ops), newId),
