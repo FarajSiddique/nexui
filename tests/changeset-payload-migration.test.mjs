@@ -55,7 +55,20 @@ test('a payload is a small JSON object, set on the event just logged', () => {
   assert.match(body, /jsonb_typeof\(p_payload\) <> 'object' or length\(p_payload::text\) > 4000/);
   assert.match(body, /errcode = 'NXU22'/);
   assert.match(body, /where e\.id = \(p_event ->> 'id'\)::uuid/);
+  assert.match(body, /returning \* into strict logged/, 'a missing event raises, not a null row');
   assert.doesNotMatch(body, /security definer/);
+});
+
+test('a user commits only to their own intent, and only with their own run', () => {
+  const body = bodyOf('public', 'apply_changeset');
+
+  assert.match(body, /caller uuid := auth\.uid\(\)/);
+  assert.match(body, /if caller is null then\s+raise exception 'Sign in to continue'/);
+  assert.match(body, /where i\.id = p_intent_id and i\.user_id = caller\s+for update/);
+  assert.match(body, /r\.id = p_run_id and r\.user_id = caller/);
+  assert.match(body, /errcode = 'NXU04'/);
+  assert.match(body, /errcode = 'NXU08'/);
+  assert.match(body, /errcode = 'NXU22'/);
 });
 
 test('a run still commits as itself, holding its lease', () => {
@@ -67,5 +80,9 @@ test('a run still commits as itself, holding its lease', () => {
     /private\.apply_ops\(found_run\.user_id, found_run\.intent_id, 'ai', found_run\.id, p_ops\)/,
   );
   assert.match(body, /p_lease_id is null\s+or found_run\.lease_id is distinct from p_lease_id/);
+  assert.match(body, /found_run\.lease_expires_at <= now\(\)/);
+  assert.match(body, /status not in \('running', 'stopping'\)/);
   assert.match(body, /errcode = 'NXU13'/);
+  assert.match(body, /errcode = 'NXU08'/);
+  assert.doesNotMatch(body, /auth\.uid\(\)/, 'a run never trusts a caller id');
 });

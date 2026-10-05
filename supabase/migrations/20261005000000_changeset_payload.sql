@@ -28,7 +28,7 @@ begin
 
   update public.events e set payload = p_payload
   where e.id = (p_event ->> 'id')::uuid
-  returning * into logged;
+  returning * into strict logged;
 
   return to_jsonb(logged);
 end;
