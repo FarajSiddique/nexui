@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { CapabilityRequest, ChangesetOp, GraphSnapshot } from '@nexui/types';
 
+import { CapabilityError, findCapability, type Capability } from '#lib/capabilities';
 import {
   commitChangeset,
   type CommitResult,
@@ -11,9 +12,7 @@ import {
   loadSnapshot,
 } from '#lib/graph';
 
-import { findCapability } from './registry.ts';
 import { createStager } from './stage.ts';
-import { CapabilityError, type Capability } from './types.ts';
 
 function stageUserCall(
   capability: Capability,

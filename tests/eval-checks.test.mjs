@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { CAPABILITIES } from '../apps/api/src/lib/capabilities/registry.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
 import {

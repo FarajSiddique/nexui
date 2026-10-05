@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { CAPABILITIES } from '../apps/api/src/lib/capabilities/registry.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { instructionsFor, promptFor } from '../apps/api/src/lib/cognition/prompts.ts';
 import { runModel } from '../apps/api/src/lib/cognition/run-model.ts';
 import {

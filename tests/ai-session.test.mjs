@@ -6,7 +6,7 @@ import { FIXTURES } from '../apps/api/src/lib/ai/fixtures/index.ts';
 import { findFixture } from '../apps/api/src/lib/ai/mock.ts';
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
 import { CAPABILITIES, findCapability } from '../apps/api/src/lib/capabilities/registry.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { chooseTemplate, routeAsk } from '../apps/api/src/lib/perception/perceive.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';

@@ -4,13 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { RunProgressEntry, RunRecord, RunRoute } from '@nexui/types';
 
-import {
-  CAPABILITIES,
-  createStager,
-  type Stager,
-  CapabilityError,
-  type Capability,
-} from '#lib/capabilities';
+import { CAPABILITIES, CapabilityError, type Capability } from '#lib/capabilities';
 import {
   instructionsFor,
   promptFor,
@@ -31,6 +25,7 @@ import {
   loadSnapshot,
   RunLeaseLostError,
 } from '#lib/graph';
+import { createStager, type Stager } from '#lib/staging';
 import type { AiSession, ModelTier } from '#lib/ai';
 
 import { finishRun, recordRunStep } from './store.ts';

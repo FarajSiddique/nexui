@@ -9,15 +9,16 @@ import {
   type RunProgressEntry,
 } from '@nexui/types';
 
-import { ChangesetInvalidError, validateOps } from '#lib/graph';
-
-import { buildRefTable, claimRefs, type RefTable } from './refs.ts';
 import {
+  buildRefTable,
   CapabilityError,
+  claimRefs,
   type Capability,
   type CapabilityActor,
   type CapabilityResult,
-} from './types.ts';
+  type RefTable,
+} from '#lib/capabilities';
+import { ChangesetInvalidError, validateOps } from '#lib/graph';
 
 export interface StagerOptions {
   capabilities: readonly Capability[];

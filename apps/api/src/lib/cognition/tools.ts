@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from 'ai';
 
-import type { Stager, Capability } from '#lib/capabilities';
+import type { Capability } from '#lib/capabilities';
+import type { Stager } from '#lib/staging';
 
 /**
  * Model APIs allow only letters, digits, `_` and `-` in tool names.

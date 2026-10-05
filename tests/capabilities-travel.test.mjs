@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { capabilityNameSchema } from '../packages/types/src/index.ts';
 import { CAPABILITIES, findCapability } from '../apps/api/src/lib/capabilities/registry.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';

@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { GRAPH_CAPABILITIES } from '../apps/api/src/lib/capabilities/graph.ts';
 import { buildRefTable, resolveRef } from '../apps/api/src/lib/capabilities/refs.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
