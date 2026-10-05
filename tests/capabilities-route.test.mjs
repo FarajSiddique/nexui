@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { OPTIONS, POST } from '../apps/api/src/app/api/intents/[id]/capabilities/route.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { authed, postgrest } from './support/graph-api.mjs';
 import {
   eventRow,

@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { deriveTrip, findShortenedPlace } from '../apps/api/src/lib/kinds/trip.ts';
+import { deriveTrip, findShortenedPlace } from '../apps/api/src/lib/travel/derive.ts';
 import { formatDateRange } from '../packages/types/src/kinds/travel/figures.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { applyOps } from '../packages/types/src/index.ts';
 import {
   idSequence,

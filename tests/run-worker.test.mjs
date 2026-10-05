@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
 import { getAdminClient } from '../apps/api/src/lib/supabase/clients.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import {
   readRunMaxActive,
   runWorker,

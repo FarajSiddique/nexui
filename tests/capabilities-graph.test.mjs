@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { graphCapabilities } from '../apps/api/src/lib/capabilities/graph.ts';
-import { TRAVEL_SCOPE } from '../apps/api/src/lib/capabilities/registry.ts';
+import { TRAVEL_SCOPE } from '../apps/api/src/lib/travel/capabilities.ts';
 import { buildRefTable, resolveRef } from '../apps/api/src/lib/capabilities/refs.ts';
 import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { legDataSchema, placeDataSchema, stayDataSchema } from '../packages/types/src/index.ts';
 import {
   idSequence,

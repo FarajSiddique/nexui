@@ -3,7 +3,7 @@
  * a contract-shaped snapshot and run, so `tests/eval-checks.test.mjs` can pin them. A person
  * still judges the plans; these only catch what is plainly wrong.
  */
-import { LENGTH_KEY, UNALLOCATED_KEY } from '../../apps/api/src/lib/kinds/trip.ts';
+import { LENGTH_KEY, UNALLOCATED_KEY } from '../../apps/api/src/lib/travel/derive.ts';
 import { parseKindData, tripFigures, tripParts } from '../../packages/types/src/index.ts';
 
 const check = (label, ok, detail) => (ok ? { label, ok } : { label, ok, detail });

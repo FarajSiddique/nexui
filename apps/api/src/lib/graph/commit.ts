@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { Actor, ChangesetOp, EventRecord, GraphSnapshot } from '@nexui/types';
+import type { Actor, ChangesetOp, EventRecord, GraphSnapshot, Template } from '@nexui/types';
 
-import { seedTravelOps } from '#lib/templates';
+import { templateFor } from '#lib/templates';
 
 import { GraphNotFoundError, mapRpcError } from './errors.ts';
 import { mapEventRow } from './mappers.ts';
@@ -98,13 +98,14 @@ export async function commitChangeset(
 const NOT_A_TRIP_SUMMARY = 'Nexui can plan trips so far.';
 
 /**
- * Creates an intent in one transaction. A travel intent gets its seed trip, workspace and derived
- * state; an intent with no template (Jev said it isn't a trip) gets only a summary line.
+ * Creates an intent in one transaction. An intent with a template gets that template's seed (its
+ * anchor and workspace) and derived state; one without (Jev said no template fits) gets only a
+ * summary line.
  */
 export async function createIntent(
   db: SupabaseClient,
   goal: string,
-  template: 'travel' | null = 'travel',
+  template: Template | null,
   clock: Date = new Date(),
   newId: () => string = randomUUID,
 ): Promise<GraphSnapshot> {
@@ -126,16 +127,9 @@ export async function createIntent(
     objects: [],
     relationships: [],
   };
-  const seed: ChangesetOp[] =
-    template === 'travel'
-      ? seedTravelOps(goal, newId)
-      : [
-          {
-            op: 'update_intent',
-            patch: { summary: { line: NOT_A_TRIP_SUMMARY } },
-            origin: 'direct',
-          },
-        ];
+  const seed: ChangesetOp[] = templateFor(template)?.seed(goal, newId) ?? [
+    { op: 'update_intent', patch: { summary: { line: NOT_A_TRIP_SUMMARY } }, origin: 'direct' },
+  ];
   const ops = prepareChangeset(empty, seed, 'system', now, newId);
   const { error } = await db.rpc('create_intent', {
     p_intent_id: intentId,

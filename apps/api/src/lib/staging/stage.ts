@@ -19,6 +19,7 @@ import {
   type RefTable,
 } from '#lib/capabilities';
 import { ChangesetInvalidError, validateOps } from '#lib/graph';
+import { templateFor, type TemplateDefinition } from '#lib/templates';
 
 export interface StagerOptions {
   capabilities: readonly Capability[];
@@ -118,6 +119,20 @@ function requireAnchor(snapshot: GraphSnapshot): string {
   }
 
   return anchorId;
+}
+
+/**
+ * The template whose capabilities may change this intent. Refused for an intent Nexui can't plan
+ * yet, which has no template and no workspace.
+ */
+export function templateOf(snapshot: GraphSnapshot): TemplateDefinition {
+  const template = templateFor(snapshot.intent.template);
+
+  if (!template || !snapshot.workspace) {
+    throw new CapabilityError('Nexui can only change trips so far.');
+  }
+
+  return template;
 }
 
 interface StagedCall {
@@ -236,7 +251,8 @@ function touchesEdited(
 
 /**
  * @example
- * const stager = createStager({ capabilities: CAPABILITIES, snapshot, actor: 'ai', runId, newId });
+ * const { capabilities } = templateOf(snapshot);
+ * const stager = createStager({ capabilities, snapshot, actor: 'ai', runId, newId });
  * stager.call('trip.setPlaceDays', { placeId: 'o2', days: 3 });
  * await commitChangeset(db, { intentId, actor: 'ai', runId, ops: stager.takeOps() });
  */

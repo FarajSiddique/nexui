@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import {
   hasPendingMedia,
   MEDIA_POLLS,

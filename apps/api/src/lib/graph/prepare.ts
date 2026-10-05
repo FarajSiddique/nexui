@@ -247,7 +247,7 @@ export function prepareChangeset(
 ): ChangesetOp[] {
   const valid = validateOps(before, markReviewed(before, ops, actor, now), now);
   const staged = applyOps(before, valid, now);
-  const derived = deriveForTemplate(before, staged, valid, newId);
+  const derived = deriveForTemplate(before, staged, valid, now, newId);
 
   return validateOps(before, coalesceOps([...valid, ...derived]), now);
 }

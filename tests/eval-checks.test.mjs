@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { CAPABILITIES } from '../apps/api/src/lib/capabilities/registry.ts';
 import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import {
   askChecks,
   askPromptOf,
@@ -24,6 +24,7 @@ import {
   TRIP_ID,
 } from './support/graph.mjs';
 
+const CAPABILITIES = TEMPLATES.travel.capabilities;
 const LEG_ID = 'e0000000-0000-4000-8000-000000000001';
 const INSIGHT_ID = 'e0000000-0000-4000-8000-000000000002';
 const japan = {

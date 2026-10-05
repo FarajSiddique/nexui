@@ -14,7 +14,7 @@ import {
   prepareChangeset,
   validateOps,
 } from '../apps/api/src/lib/graph/prepare.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import {
   idSequence,
   kyotoRow,

@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { RunProgressEntry, RunRecord, RunRoute } from '@nexui/types';
 
-import { CAPABILITIES, CapabilityError, type Capability } from '#lib/capabilities';
+import { CapabilityError, type Capability } from '#lib/capabilities';
 import {
   instructionsFor,
   promptFor,
@@ -25,7 +25,7 @@ import {
   loadSnapshot,
   RunLeaseLostError,
 } from '#lib/graph';
-import { createStager, type Stager } from '#lib/staging';
+import { createStager, templateOf, type Stager } from '#lib/staging';
 import type { AiSession, ModelTier } from '#lib/ai';
 
 import { finishRun, recordRunStep } from './store.ts';
@@ -166,7 +166,6 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
   const { db, run, leaseId, session } = job;
   const clock = deps.clock ?? ((): Date => new Date());
   const newId = deps.newId ?? randomUUID;
-  const capabilities = deps.capabilities ?? CAPABILITIES;
 
   try {
     const intentId = run.intentId;
@@ -180,6 +179,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
     }
 
     const snapshot = await loadSnapshot(db, intentId);
+    const capabilities = deps.capabilities ?? templateOf(snapshot).capabilities;
     const stager = createStager({
       capabilities,
       snapshot,

@@ -5,7 +5,7 @@ import test from 'node:test';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { readRows } from '../apps/api/src/lib/media/cache.ts';
 import { mediaPlaces, resolvePlaceMedia } from '../apps/api/src/lib/media/lookup.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { placeMediaKey } from '../packages/types/src/media.ts';
 import {
   kyotoData,

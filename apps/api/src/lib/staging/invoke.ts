@@ -4,13 +4,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { CapabilityRequest, ChangesetOp, GraphSnapshot } from '@nexui/types';
 
-import { CapabilityError, findCapability, type Capability } from '#lib/capabilities';
+import { CapabilityError, type Capability } from '#lib/capabilities';
 import {
   commitChangeset,
   type CommitResult,
   ChangesetInvalidError,
   loadSnapshot,
 } from '#lib/graph';
+import { templateFor } from '#lib/templates';
 
 import { createStager } from './stage.ts';
 
@@ -45,7 +46,8 @@ function stageUserCall(
 
 /**
  * Runs one capability the app's buttons may call (an insight's "Give it back", a decision's
- * pick) as the user, and commits it like a direct edit. No model is involved.
+ * pick) as the user, and commits it like a direct edit. Only the plan's template's capabilities
+ * are offered. No model is involved.
  */
 export async function invokeCapability(
   db: SupabaseClient,
@@ -54,13 +56,15 @@ export async function invokeCapability(
   clock: Date = new Date(),
   newId: () => string = randomUUID,
 ): Promise<CommitResult> {
-  const capability = findCapability(request.name);
+  const snapshot = await loadSnapshot(db, intentId);
+  const capability = templateFor(snapshot.intent.template)?.capabilities.find(
+    (candidate) => candidate.name === request.name,
+  );
 
   if (!capability?.callableByUser) {
     throw new ChangesetInvalidError("That action isn't available.");
   }
 
-  const snapshot = await loadSnapshot(db, intentId);
   const ops = stageUserCall(capability, snapshot, request.input, clock, newId);
 
   return commitChangeset(db, { intentId, actor: 'user', ops }, clock, newId);

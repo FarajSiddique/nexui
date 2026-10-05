@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { CAPABILITIES } from '../apps/api/src/lib/capabilities/registry.ts';
 import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { instructionsFor, promptFor } from '../apps/api/src/lib/cognition/prompts.ts';
 import { runModel } from '../apps/api/src/lib/cognition/run-model.ts';
@@ -11,9 +10,12 @@ import {
   toolNameFor,
 } from '../apps/api/src/lib/cognition/tools.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { scriptedModel, textStep, toolStep } from './support/ai.mjs';
 import { idSequence, RUN_ID, snapshotRow, TOKYO_ID, TRIP_ID } from './support/graph.mjs';
+
+const CAPABILITIES = TEMPLATES.travel.capabilities;
 
 const snapshot = mapSnapshotRow(snapshotRow(travelWorkspace(TRIP_ID)));
 

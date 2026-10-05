@@ -5,7 +5,7 @@ import { graphCapabilities } from '../apps/api/src/lib/capabilities/graph.ts';
 import { workspaceCapabilities } from '../apps/api/src/lib/capabilities/workspace.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { KIND_BEHAVIOUR } from '../apps/api/src/lib/kinds/behaviour.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { KIND_REGISTRY } from '../packages/types/src/index.ts';
 import {
   KYOTO_ID,

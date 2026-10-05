@@ -1,10 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { CAPABILITIES } from '../../apps/api/src/lib/capabilities/registry.ts';
 import { instructionsFor } from '../../apps/api/src/lib/cognition/prompts.ts';
 import { chooseTemplate } from '../../apps/api/src/lib/perception/perceive.ts';
+import { TEMPLATES } from '../../apps/api/src/lib/templates/registry.ts';
 import { Experimental_EvaluationMockModelV4 } from './ai.mjs';
+
+const CAPABILITIES = TEMPLATES.travel.capabilities;
 
 /**
  * Everything a model sees for a trip: each tool's name, description, flags and input schema in

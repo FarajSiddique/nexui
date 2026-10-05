@@ -10,7 +10,7 @@ import {
 } from '../apps/api/src/lib/runs/execute.ts';
 import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { failingEvaluationModel, MockLanguageModelV4, toolStep } from './support/ai.mjs';
 import { editObject, graphDb, removeObject } from './support/graph-db.mjs';
 import {

@@ -17,7 +17,7 @@ export function toolNameFor(capability: string): string {
  * The capability a model tool name stands for, or null for a name no capability has.
  *
  * @example
- * capabilityForTool('trip_setPlaceDays', CAPABILITIES) // 'trip.setPlaceDays'
+ * capabilityForTool('trip_setPlaceDays', capabilities) // 'trip.setPlaceDays'
  */
 export function capabilityForTool(
   toolName: string,

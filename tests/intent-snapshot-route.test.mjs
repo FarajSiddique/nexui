@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { GET } from '../apps/api/src/app/api/intents/[id]/route.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import { INTENT_ID, snapshotRow, TRIP_ID } from './support/graph.mjs';
 import { mockSupabaseAuth } from './support/supabase-auth.mjs';

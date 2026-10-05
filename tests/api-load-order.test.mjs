@@ -56,9 +56,17 @@ test('each API domain loads first in a fresh process', async () => {
 });
 
 test('capability definitions load without the graph, so templates can build on them', () => {
-  for (const banned of ['graph', 'staging', 'runs', 'templates', 'orchestrator']) {
-    assert.ok(!runtimeImports('capabilities').includes(banned), `capabilities imports ${banned}`);
-  }
-
+  assert.deepEqual(
+    runtimeImports('capabilities').filter((name) => name !== 'kinds'),
+    [],
+  );
   assert.deepEqual(runtimeImports('kinds'), []);
+});
+
+test('a template builds on capabilities, never on the graph that runs it', () => {
+  assert.deepEqual(runtimeImports('travel'), ['capabilities']);
+
+  for (const banned of ['graph', 'staging', 'runs', 'orchestrator']) {
+    assert.ok(!runtimeImports('templates').includes(banned), `templates imports ${banned}`);
+  }
 });

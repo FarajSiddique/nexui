@@ -2,9 +2,33 @@ import { z } from 'zod';
 
 import type { ChangesetOp, PlaceData } from '@nexui/types';
 
-import { refInput } from './graph.ts';
-import { anchorParts, dayCount, nameOf, requireKind } from './helpers.ts';
-import { CapabilityError, defineCapability, type Capability } from './types.ts';
+import {
+  anchorParts,
+  CapabilityError,
+  dayCount,
+  DECISION_CAPABILITIES,
+  defineCapability,
+  graphCapabilities,
+  nameOf,
+  refInput,
+  requireKind,
+  workspaceCapabilities,
+  type Capability,
+  type CapabilityScope,
+} from '#lib/capabilities';
+
+/** A trip's kinds, for the generic capabilities, and the examples their descriptions use. */
+export const TRAVEL_SCOPE: CapabilityScope = {
+  anchorKind: 'trip',
+  kinds: ['trip', 'place', 'leg', 'stay', 'decision', 'option', 'insight', 'thing'],
+  examples: {
+    objectRef: 'kyoto or tokyo-kyoto',
+    decisionRef: 'rural-stop',
+    metric: '{"hoursFromKyoto": 1}',
+    sectionId: 'place-costs',
+    field: 'data.days',
+  },
+};
 
 const setPlaceDays = defineCapability({
   name: 'trip.setPlaceDays',
@@ -69,4 +93,15 @@ const reorderPlaces = defineCapability({
   },
 });
 
-export const TRAVEL_CAPABILITIES: readonly Capability[] = [setPlaceDays, reorderPlaces];
+/**
+ * Everything a trip's runs and buttons may call, in the order models see it: the graph
+ * capabilities, the trip's own, decisions, then the workspace layout. `derive.trip` isn't one:
+ * it runs inside every changeset, and nothing calls it by name.
+ */
+export const TRAVEL_CAPABILITIES: readonly Capability[] = [
+  ...graphCapabilities(TRAVEL_SCOPE),
+  setPlaceDays,
+  reorderPlaces,
+  ...DECISION_CAPABILITIES,
+  ...workspaceCapabilities(TRAVEL_SCOPE),
+];
