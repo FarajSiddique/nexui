@@ -98,9 +98,9 @@ test('the prompt quotes user text as data and names objects by ref', () => {
 });
 
 test('instructions depend on the kind and route and always fence the data', () => {
-  const create = instructionsFor('create_intent', 'reasoning');
-  const edit = instructionsFor('ask', 'edit');
-  const reasoning = instructionsFor('ask', 'reasoning');
+  const create = instructionsFor(TEMPLATES.travel, 'create_intent', 'reasoning');
+  const edit = instructionsFor(TEMPLATES.travel, 'ask', 'edit');
+  const reasoning = instructionsFor(TEMPLATES.travel, 'ask', 'reasoning');
 
   assert.match(create, /just started this plan/);
   assert.match(edit, /exactly the one change/);

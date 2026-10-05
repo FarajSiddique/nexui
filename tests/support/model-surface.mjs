@@ -35,10 +35,10 @@ export async function travelModelSurface() {
       input: capability.input.toJSONSchema(),
     })),
     instructions: {
-      create_intent: instructionsFor('create_intent', 'reasoning'),
-      edit: instructionsFor('ask', 'edit'),
-      fast: instructionsFor('ask', 'fast'),
-      reasoning: instructionsFor('ask', 'reasoning'),
+      create_intent: instructionsFor(TEMPLATES.travel, 'create_intent', 'reasoning'),
+      edit: instructionsFor(TEMPLATES.travel, 'ask', 'edit'),
+      fast: instructionsFor(TEMPLATES.travel, 'ask', 'fast'),
+      reasoning: instructionsFor(TEMPLATES.travel, 'ask', 'reasoning'),
     },
     chooseTemplate: seen[0].questions.template,
   };

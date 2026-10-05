@@ -154,7 +154,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 function copyRefs(table: RefTable): RefTable {
-  return { byRef: new Map(table.byRef), byId: new Map(table.byId) };
+  return { anchor: table.anchor, byRef: new Map(table.byRef), byId: new Map(table.byId) };
 }
 
 function restoreRefs(table: RefTable, saved: RefTable): void {
@@ -258,8 +258,9 @@ function touchesEdited(
  */
 export function createStager(options: StagerOptions): Stager {
   const clock = options.clock ?? ((): Date => new Date());
+  const template = templateOf(options.snapshot);
   const anchorId = requireAnchor(options.snapshot);
-  const refs = buildRefTable(options.snapshot, anchorId);
+  const refs = buildRefTable(options.snapshot, anchorId, template.anchorRef);
   const source: ObjectSource =
     options.actor === 'ai' && options.runId
       ? { type: 'ai', runId: options.runId }

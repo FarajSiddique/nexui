@@ -6,6 +6,7 @@ import {
   executeRun,
   FAILED_RUN_ERROR,
   INVALID_RUN_ERROR,
+  routeBudget,
   SKIPPED_STEP_ERROR,
 } from '../apps/api/src/lib/runs/execute.ts';
 import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
@@ -461,4 +462,16 @@ test('a double restage after NXU08 keeps the edit and reuses the same ids', asyn
     objectIdsOf(fake.state.attempts[1]),
     [TOKYO_ID, KYOTO_ID, osakaObjects[0].id].sort(),
   );
+});
+
+test('a template’s own route budget replaces the default', () => {
+  const longer = { tier: 'reasoning', mode: 'loop', maxSteps: 12 };
+
+  assert.deepEqual(routeBudget({}, 'edit'), { tier: 'fast', mode: 'single', maxSteps: 2 });
+  assert.deepEqual(routeBudget({ routes: { reasoning: longer } }, 'reasoning'), longer);
+  assert.deepEqual(routeBudget({ routes: { reasoning: longer } }, 'fast'), {
+    tier: 'fast',
+    mode: 'single',
+    maxSteps: 2,
+  });
 });

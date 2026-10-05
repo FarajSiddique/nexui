@@ -9,7 +9,6 @@ import {
   instructionsFor,
   promptFor,
   runModel,
-  type ModelMode,
   type StepDecision,
   type StepReport,
   capabilityForTool,
@@ -26,7 +25,8 @@ import {
   RunLeaseLostError,
 } from '#lib/graph';
 import { createStager, templateOf, type Stager } from '#lib/staging';
-import type { AiSession, ModelTier } from '#lib/ai';
+import type { RouteBudget, TemplateDefinition } from '#lib/templates';
+import type { AiSession } from '#lib/ai';
 
 import { finishRun, recordRunStep } from './store.ts';
 
@@ -45,12 +45,20 @@ export interface RunDeps {
 }
 
 // Spec section F: edit and fast take one fast-tier step (plus one correction); reasoning plans
-// with tools for up to 8 steps.
-const ROUTES: Record<RunRoute, { tier: ModelTier; mode: ModelMode; maxSteps: number }> = {
+// with tools for up to 8 steps. A template may set its own.
+const ROUTES: Record<RunRoute, RouteBudget> = {
   edit: { tier: 'fast', mode: 'single', maxSteps: 2 },
   fast: { tier: 'fast', mode: 'single', maxSteps: 2 },
   reasoning: { tier: 'reasoning', mode: 'loop', maxSteps: 8 },
 };
+
+/** A route's model budget: the template's own when it sets one, else the default. */
+export function routeBudget(
+  template: Pick<TemplateDefinition, 'routes'>,
+  route: RunRoute,
+): RouteBudget {
+  return template.routes?.[route] ?? ROUTES[route];
+}
 
 export const INVALID_RUN_ERROR = "Nexui couldn't make a valid change.";
 export const FAILED_RUN_ERROR = "Nexui couldn't finish this.";
@@ -179,7 +187,8 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
     }
 
     const snapshot = await loadSnapshot(db, intentId);
-    const capabilities = deps.capabilities ?? templateOf(snapshot).capabilities;
+    const template = templateOf(snapshot);
+    const capabilities = deps.capabilities ?? template.capabilities;
     const stager = createStager({
       capabilities,
       snapshot,
@@ -189,7 +198,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       newId,
       clock,
     });
-    const route = ROUTES[run.input.route];
+    const budget = routeBudget(template, run.input.route);
     const step: StepContext = {
       db,
       intentId,
@@ -201,13 +210,13 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       capabilities,
     };
     const outcome = await runModel({
-      model: session.languageModel(route.tier),
-      providerOptions: session.providerOptions(route.tier),
-      instructions: instructionsFor(run.kind, run.input.route),
+      model: session.languageModel(budget.tier),
+      providerOptions: session.providerOptions(budget.tier),
+      instructions: instructionsFor(template, run.kind, run.input.route),
       prompt: promptFor(snapshot, stager.refs, run.input.text),
       tools: toModelTools(capabilities, stager),
-      mode: route.mode,
-      maxSteps: route.maxSteps,
+      mode: budget.mode,
+      maxSteps: budget.maxSteps,
       onStep: (report) => commitStep(step, report),
     });
 

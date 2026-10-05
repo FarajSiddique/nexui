@@ -21,7 +21,7 @@ export interface CapabilityContext {
   request: string | null;
   /** The intent as it will be after the calls staged so far. */
   graph: GraphSnapshot;
-  /** The workspace anchor: the trip. */
+  /** The workspace anchor, such as the trip. */
   anchorId: string;
   refs: RefTable;
   /** The provenance new objects get: `{ type: 'ai', runId }` or `{ type: 'user' }`. */
