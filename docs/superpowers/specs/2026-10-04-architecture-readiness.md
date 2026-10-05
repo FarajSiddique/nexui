@@ -1,6 +1,15 @@
 # Architecture readiness for use case #2 and beyond
 
 **Status:** a review of `main` at `e628121` on 2026-10-04, written to feed the job search plan.
+The PR 1 items (3.1, 3.2, 3.3 types, 3.4 API, 3.7, 3.8, 3.11 and 3.12 types) are built by
+[the template registries plan](../plans/2026-10-04-template-registries.md), with these
+differences: a template is a domain, `lib/travel/`, not `lib/templates/travel/` (Decision 2);
+the stager and `invokeCapability` live in `lib/staging` (3); the generic capabilities keep
+travel's examples through `CapabilityScope.examples` (5); decision options are a
+`DecisionOptions` argument to `decisionCapabilities`, not `TemplateDefinition.decisions` (6); a
+template declares `context` keys, not a `contextSchema` (7); `emptySummary` and `lookups` wait
+until something uses them (8); figures come from `TemplateDefinition.figures`, not from
+`derive`'s return value (9); and fixtures stay in one flat folder (12).
 **Companion to:** `2026-10-04-job-search-design.md`. Its section 10 says which of the five build
 PRs picks up each item here; this doc holds the reasoning and the file-level detail, so the plan
 can cite it without repeating it.
