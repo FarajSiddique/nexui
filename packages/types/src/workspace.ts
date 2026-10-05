@@ -3,8 +3,15 @@ import { z } from 'zod';
 import { kindNameSchema } from './kinds/registry.ts';
 import { idSchema, relTypeSchema } from './primitives.ts';
 
-/** Figures a metric or allocation reads from the anchor object's `data.derived`. */
-export const derivedKeySchema = z.enum(['trip.totalDays', 'trip.unallocatedDays', 'trip.estCost']);
+/**
+ * A figure a metric or allocation shows: `<anchor kind>.<figure>`, such as `trip.totalDays`, read
+ * from the anchor's recomputed figures (`KIND_FIGURES`). A key for another anchor kind shows
+ * nothing.
+ */
+export const derivedKeySchema = z
+  .string()
+  .max(60)
+  .regex(/^[a-z]+\.[a-zA-Z]+$/);
 
 export type DerivedKey = z.infer<typeof derivedKeySchema>;
 

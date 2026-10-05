@@ -6,6 +6,7 @@ export * from './kinds/travel/schemas.ts';
 export * from './kinds/travel/figures.ts';
 export * from './kinds/registry.ts';
 export * from './kinds/cards.ts';
+export * from './kinds/figures.ts';
 export * from './workspace.ts';
 export * from './graph.ts';
 export * from './ops.ts';
