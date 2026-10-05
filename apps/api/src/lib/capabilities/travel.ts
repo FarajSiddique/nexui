@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ChangesetOp, PlaceData } from '@nexui/types';
 
 import { refInput } from './graph.ts';
-import { dayCount, nameOf, requirePlace, tripPlaces } from './helpers.ts';
+import { anchorParts, dayCount, nameOf, requireKind } from './helpers.ts';
 import { CapabilityError, defineCapability, type Capability } from './types.ts';
 
 const setPlaceDays = defineCapability({
@@ -14,7 +14,7 @@ const setPlaceDays = defineCapability({
   exposeToModel: true,
   callableByUser: true,
   execute(input, ctx) {
-    const place = requirePlace(ctx, input.placeId);
+    const place = requireKind(ctx, input.placeId, 'place');
 
     if ((place.data as PlaceData).days === input.days) {
       throw new CapabilityError(`${nameOf(place)} already has ${dayCount(input.days)}.`);
@@ -43,8 +43,8 @@ const reorderPlaces = defineCapability({
   exposeToModel: true,
   callableByUser: true,
   execute(input, ctx) {
-    const current = tripPlaces(ctx);
-    const ordered = input.placeIds.map((ref) => requirePlace(ctx, ref));
+    const current = anchorParts(ctx, 'place');
+    const ordered = input.placeIds.map((ref) => requireKind(ctx, ref, 'place'));
     const ids = new Set(ordered.map((place) => place.id));
 
     if (

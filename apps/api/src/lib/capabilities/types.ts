@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { ChangesetOp, GraphSnapshot, ObjectSource } from '@nexui/types';
+import type { ChangesetOp, GraphSnapshot, KindName, ObjectSource } from '@nexui/types';
 
 import type { RefTable } from './refs.ts';
 
@@ -63,4 +63,35 @@ export interface CapabilitySpec<I> extends Omit<Capability, 'input' | 'execute'>
  */
 export function defineCapability<I>(spec: CapabilitySpec<I>): Capability {
   return { ...spec, execute: (input, ctx) => spec.execute(input as I, ctx) };
+}
+
+/**
+ * The kinds a template's plans hold, which its generic capabilities are built for, and the
+ * examples their descriptions use, in that template's terms.
+ */
+export interface CapabilityScope {
+  /** The workspace anchor's kind, such as `trip`. */
+  anchorKind: KindName;
+  /** Every kind the template's plans hold, the anchor's included, in the order models read them. */
+  kinds: readonly KindName[];
+  examples: {
+    /** New objects' refs: "kyoto or tokyo-kyoto". */
+    objectRef: string;
+    /** A new decision's ref: "rural-stop". */
+    decisionRef: string;
+    /** A metric an option compares, as JSON: '{"hoursFromKyoto": 1}'. */
+    metric: string;
+    /** A new section's id: "place-costs". */
+    sectionId: string;
+    /** A data field a comparison shows: "data.days". */
+    field: string;
+  };
+}
+
+/**
+ * Names the parsed type of an input schema whose shape depends on the template, such as
+ * `object.create`'s link inputs. The schema still parses every call; this only types it.
+ */
+export function shapedInput<I>(schema: z.ZodType): z.ZodType<I> {
+  return schema as z.ZodType<I>;
 }

@@ -15,6 +15,7 @@ import {
 
 import { refInput } from './graph.ts';
 import {
+  anchorParts,
   insertObject,
   link,
   nameOf,
@@ -22,7 +23,6 @@ import {
   placeSection,
   requireDoc,
   setSections,
-  tripPlaces,
   unlinkOps,
   type SectionSlot,
 } from './helpers.ts';
@@ -66,7 +66,7 @@ const optionInput = z.strictObject({
 function stopNamed(ctx: CapabilityContext, ref: string): GraphObject | undefined {
   const id = ctx.refs.byRef.get(ref) ?? ref;
 
-  return tripPlaces(ctx).find((place) => place.id === id);
+  return anchorParts(ctx, 'place').find((place) => place.id === id);
 }
 
 const propose = defineCapability({
@@ -101,7 +101,7 @@ const propose = defineCapability({
       decision.asked = ctx.request.slice(0, 300).replace(/[\uD800-\uDBFF]$/, '');
     }
 
-    const last = tripPlaces(ctx).at(-1);
+    const last = anchorParts(ctx, 'place').at(-1);
     const ops: ChangesetOp[] = [
       insertObject(ctx, {
         id: decisionId,
@@ -271,14 +271,14 @@ function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetO
     return [];
   }
 
-  const last = tripPlaces(ctx).at(-1);
+  const last = anchorParts(ctx, 'place').at(-1);
   const ops: ChangesetOp[] = [
     {
       op: 'update_object',
       id: place.id,
       patch: {
         data: { ...place.data, days: chosenDays(ctx, data) },
-        position: nextPosition(ctx),
+        position: nextPosition(ctx, 'place'),
       },
       origin: 'direct',
     },
@@ -308,7 +308,7 @@ function addChosenPlace(ctx: CapabilityContext, option: GraphObject): ChangesetO
 // Adds `chosenDays` to the stop the chosen option extends, while that stop is still on the route.
 function extendChosenStop(ctx: CapabilityContext, option: GraphObject): ChangesetOp[] {
   const data = option.data as OptionData;
-  const stop = tripPlaces(ctx).find((place) => place.id === data.extendPlaceId);
+  const stop = anchorParts(ctx, 'place').find((place) => place.id === data.extendPlaceId);
 
   if (!stop) {
     return [];
@@ -333,7 +333,7 @@ function removeCandidates(
   decisionId: string,
   chosenOptionId: string | null,
 ): ChangesetOp[] {
-  const onRoute = new Set(tripPlaces(ctx).map((place) => place.id));
+  const onRoute = new Set(anchorParts(ctx, 'place').map((place) => place.id));
   const gone = ctx.graph.relationships
     .filter((edge) => edge.type === 'option_of' && edge.targetId === decisionId)
     .filter((edge) => edge.sourceId !== chosenOptionId)

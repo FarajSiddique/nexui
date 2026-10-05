@@ -1,6 +1,6 @@
 import {
+  evaluateQuery,
   KIND_REGISTRY,
-  tripParts,
   type ChangesetOp,
   type GraphObject,
   type KindName,
@@ -8,8 +8,10 @@ import {
   type WorkspaceDoc,
 } from '@nexui/types';
 
+import { KIND_BEHAVIOUR } from '#lib/kinds';
+
 import { resolveRef } from './refs.ts';
-import { CapabilityError, type CapabilityContext } from './types.ts';
+import { CapabilityError, type CapabilityContext, type CapabilityScope } from './types.ts';
 
 /** An object's name for labels and messages. */
 export function nameOf(object: GraphObject): string {
@@ -22,6 +24,25 @@ export function nameOf(object: GraphObject): string {
  */
 export function dayCount(days: number): string {
   return `${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
+/**
+ * Words joined for a sentence.
+ *
+ * @example
+ * listOf(['place', 'leg', 'stay'], 'or') // 'place, leg or stay'
+ */
+export function listOf(words: readonly string[], conjunction: 'and' | 'or'): string {
+  if (words.length < 2) {
+    return words.join('');
+  }
+
+  return `${words.slice(0, -1).join(', ')} ${conjunction} ${words.slice(-1).join('')}`;
+}
+
+/** The scope's kinds `object.create` may make, in the scope's order. */
+export function creatableKinds(scope: CapabilityScope): KindName[] {
+  return scope.kinds.filter((kind) => KIND_BEHAVIOUR[kind].creatable);
 }
 
 export interface NewObject {
@@ -77,21 +98,27 @@ export function unlinkOps(ctx: CapabilityContext, ids: readonly string[]): Chang
     .map((edge): ChangesetOp => ({ op: 'delete_relationship', id: edge.id, origin: 'direct' }));
 }
 
-/** The trip's places in route order. */
-export function tripPlaces(ctx: CapabilityContext): GraphObject[] {
-  return tripParts(ctx.graph, ctx.anchorId).places;
+/** The anchor's parts of one kind in position order, such as a trip's route. */
+export function anchorParts(ctx: CapabilityContext, kind: KindName): GraphObject[] {
+  return evaluateQuery(ctx.graph, {
+    from: 'objects',
+    kind,
+    related: { type: 'part_of', to: { objectId: ctx.anchorId }, direction: 'out' },
+    sort: 'position',
+  });
 }
 
-/** The route position after the last place. */
-export function nextPosition(ctx: CapabilityContext): number {
-  return (tripPlaces(ctx).at(-1)?.position ?? 0) + 1;
+/** The position after the anchor's last part of that kind. */
+export function nextPosition(ctx: CapabilityContext, kind: KindName): number {
+  return (anchorParts(ctx, kind).at(-1)?.position ?? 0) + 1;
 }
 
-export function requirePlace(ctx: CapabilityContext, ref: string): GraphObject {
+/** The object a ref names, refused unless it is of that kind. */
+export function requireKind(ctx: CapabilityContext, ref: string, kind: KindName): GraphObject {
   const object = resolveRef(ctx.refs, ctx.graph, ref);
 
-  if (object.kind !== 'place') {
-    throw new CapabilityError(`${nameOf(object)} is not a place.`);
+  if (object.kind !== kind) {
+    throw new CapabilityError(`${nameOf(object)} is not a ${kind}.`);
   }
 
   return object;

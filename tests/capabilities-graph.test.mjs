@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { GRAPH_CAPABILITIES } from '../apps/api/src/lib/capabilities/graph.ts';
+import { graphCapabilities } from '../apps/api/src/lib/capabilities/graph.ts';
+import { TRAVEL_SCOPE } from '../apps/api/src/lib/capabilities/registry.ts';
 import { buildRefTable, resolveRef } from '../apps/api/src/lib/capabilities/refs.ts';
 import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
@@ -20,6 +21,7 @@ import {
   TRIP_ID,
 } from './support/graph.mjs';
 
+const GRAPH_CAPABILITIES = graphCapabilities(TRAVEL_SCOPE);
 const snapshot = mapSnapshotRow(snapshotRow(travelWorkspace(TRIP_ID)));
 const clock = () => new Date('2026-09-29T10:00:00Z');
 const osaka = { name: 'Osaka', country: 'JP', placeType: 'city', lat: 34.69, lng: 135.5, days: 2 };
