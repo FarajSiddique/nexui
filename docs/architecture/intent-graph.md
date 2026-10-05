@@ -124,16 +124,18 @@ fails typecheck:
   from its inputs (a leg's `from` and `to` places, with `title` naming it from them);
   `dependents` is what `object.delete` takes with it (a place's legs and stays). `plural`,
   `modelHelp`, `createNote`, `deleteNote` and `linkNote` are the words capability descriptions
-  and the data help use. A template lists its kinds and the capabilities read the rest here, so
-  a new kind needs no capability code. `lib/kinds` imports no other domain.
+  and the data help use. A template's capability scope lists its kinds and the capabilities
+  read the rest here, so a new kind needs no capability code. `lib/kinds` imports no other domain.
 
 `KIND_FIGURES` (`packages/types/src/kinds/figures.ts`) is keyed by anchor kind instead
 (`ANCHOR_KINDS`: the kinds that anchor a workspace, `trip` so far). Each entry recomputes that
 anchor's figures from a snapshot with no model involved; the trip's are `totalDays`,
-`allocatedDays`, `unallocatedDays` and `estCost`. The app reads figures this way, not from
-`data.derived`, so an optimistic edit moves them at once, and the template's derivation writes
-the same numbers to the anchor's `data.derived` on the server. `anchorFigures(snapshot)` gets the
-workspace anchor's figures, and `figureValue(figures, key)` reads one by derived key.
+`allocatedDays`, `unallocatedDays` and `estCost`. The workspace's metric, allocation and route
+sections read figures this way, not from `data.derived`, so an optimistic edit moves them at
+once; the Changes feed still reads `data.derived` from an event's ops. The template's
+derivation writes the same numbers to the anchor's `data.derived` on the server.
+`anchorFigures(snapshot)` gets the workspace anchor's figures, and `figureValue(figures, key)`
+reads one by derived key.
 
 ## Templates
 
@@ -141,20 +143,20 @@ A template is one use case, declared in one object so no other code has to name 
 `TemplateDefinition` (`apps/api/src/lib/templates/types.ts`) has these fields, and these
 readers:
 
-| Field          | Holds                                                                            | Read by                                                                                     |
-| -------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `name`         | Its `templateSchema` value                                                       | `TEMPLATES` is keyed by it; Jev's answer and `startIntent` use it                           |
-| `anchorKind`   | The kind of the workspace anchor (`trip`)                                        | `tests/templates.test.mjs`, which checks it is one of `kinds`, editable and never creatable |
-| `anchorRef`    | What models call the anchor (`trip`)                                             | `createStager` builds the ref table with it; `instructionsFor` names it in the prompt       |
-| `kinds`        | Every kind its plans hold, the anchor's included                                 | The generic capabilities, through the `CapabilityScope` the template builds them with       |
-| `perception`   | The sentence Jev reads when it picks a template for a goal                       | `chooseTemplate` (`perception/perceive.ts`), as this template's criterion                   |
-| `context`      | Its own keys in `intents.context`, as Zod schemas                                | `contextSchemaFor`, which `validateOps` applies to an `update_intent` that sets `context`   |
-| `figures`      | The anchor's `data.derived` keys the Changes feed reports, with labels           | `figureChanges` (`graph/payload.ts`)                                                        |
-| `seed`         | The ops that start a plan from its goal: the anchor and the workspace            | `createIntent` (`graph/commit.ts`)                                                          |
-| `derive`       | Ops derived from a staged changeset (a `DeriveInput`), committed with it         | `deriveForTemplate`, from `prepareChangeset`                                                |
-| `capabilities` | What runs and the app's buttons may call, in the order models see them           | `executeRun` (the run's tools) and `invokeCapability`                                       |
-| `prompt`       | The role, the anchor's description, the rules, the create task and each ask task | `instructionsFor` (`cognition/prompts.ts`)                                                  |
-| `routes`       | Model budgets that replace the default for some routes (optional)                | `routeBudget` (`runs/execute.ts`)                                                           |
+| Field          | Holds                                                                                            | Read by                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `name`         | Its `templateSchema` value                                                                       | `TEMPLATES` is keyed by it; Jev's answer and `startIntent` use it                                                                  |
+| `anchorKind`   | The kind of the workspace anchor (`trip`)                                                        | No runtime reader (the capabilities read `TRAVEL_SCOPE.anchorKind`); a test checks it is one of `kinds`, editable, never creatable |
+| `anchorRef`    | What models call the anchor (`trip`)                                                             | `createStager` builds the ref table with it; `instructionsFor` names it in the prompt                                              |
+| `kinds`        | Every kind its plans hold, the anchor's included                                                 | No runtime reader: a copy of `TRAVEL_SCOPE.kinds`, which the capabilities read; a test checks they create only these kinds         |
+| `perception`   | The sentence Jev reads when it picks a template for a goal                                       | `chooseTemplate` (`perception/perceive.ts`), as this template's criterion                                                          |
+| `context`      | Its own keys in `intents.context`, as Zod schemas                                                | `contextSchemaFor`, which `validateOps` applies to an `update_intent` that sets `context`                                          |
+| `figures`      | The anchor's `data.derived` keys the event payload reports when a change moves them, with labels | `figureChanges` (`graph/payload.ts`)                                                                                               |
+| `seed`         | The ops that start a plan from its goal: the anchor and the workspace                            | `createIntent` (`graph/commit.ts`)                                                                                                 |
+| `derive`       | Ops derived from a staged changeset (a `DeriveInput`), committed with it                         | `deriveForTemplate`, from `prepareChangeset`                                                                                       |
+| `capabilities` | What runs and the app's buttons may call, in the order models see them                           | `executeRun` (the run's tools) and `invokeCapability`                                                                              |
+| `prompt`       | The role, the anchor's description, the rules, the create task and each ask task                 | `instructionsFor` (`cognition/prompts.ts`)                                                                                         |
+| `routes`       | Model budgets that replace the default for some routes (optional)                                | `routeBudget` (`runs/execute.ts`)                                                                                                  |
 
 `TEMPLATES` (`apps/api/src/lib/templates/registry.ts`) is a `Record<Template, TemplateDefinition>`,
 so a name `templateSchema` (`packages/types/src/graph.ts`) lists without a definition fails
@@ -189,8 +191,9 @@ it").
   `KIND_CARDS` entry for each new kind; `ANCHOR_KINDS` and `KIND_FIGURES` for its anchor kind;
   `templateSchema`; the exports in `index.ts`.
 - `apps/api`: a domain `src/lib/<template>/` with its `TemplateDefinition` (seed, derivation,
-  capabilities built from the generic builders, decision options, prompt), one line in
-  `TEMPLATES`, and a `KIND_BEHAVIOUR` entry for each new kind. Its mock fixtures sit beside
+  capabilities built from the generic builders for a `CapabilityScope` that lists its kinds,
+  decision options, prompt), one line in `TEMPLATES`, and a `KIND_BEHAVIOUR` entry for each new
+  kind. Its mock fixtures sit beside
   travel's in `lib/ai/fixtures/`, one flat folder (`RunFixture.perception.template` is typed from
   `Template`).
 - `tests/`: its derive, capability and template tests, and a line for its domain in
@@ -244,7 +247,7 @@ route.ts → fromUserOps → prepareChangeset → apply_changeset (RPC) → { ev
   `packages/types/src/graph.ts`): `commitChangeset` also sends `{ label?, figures? }` as the
   RPC's last argument, and `private.set_event_payload` stores it on the event
   `private.apply_ops` just logged, in the same transaction, so `apply_ops` is unchanged.
-  - `label` is the change's sentence for the Changes feed ("Set Kyoto to 3 days"). A button
+  - `label` is the change's sentence, for the Changes feed to show ("Set Kyoto to 3 days"). A button
     press (`invokeCapability`) uses its capability's label, a raw changeset (the changesets
     route) "Edited the plan", and a run's step its first call's label, or "<first label> and N
     more" for several (`changesetLabel`), counting only the calls that still applied after a

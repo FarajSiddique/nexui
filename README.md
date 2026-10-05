@@ -165,8 +165,8 @@ tests/                         # Node tests: contracts, graph queries/derivation
 - Add a kind by adding its Zod schema and a `KIND_REGISTRY` entry in
   `packages/types/src/kinds/`; no migration is needed. Add its `KIND_CARDS` entry and its
   `KIND_BEHAVIOUR` entry in `apps/api/src/lib/kinds/behaviour.ts`, and list it in the
-  `kinds` of the template that holds it (`apps/api/src/lib/travel/` for trips, registered in
-  `apps/api/src/lib/templates/registry.ts`). See
+  capability scope of the template that holds it (`TRAVEL_SCOPE.kinds` in
+  `apps/api/src/lib/travel/capabilities.ts` for trips, which the template copies). See
   [Intent graph](docs/architecture/intent-graph.md).
 - Protect a new API route with `verifyRequest()` from
   `apps/api/src/lib/supabase/verify-request.ts`, which returns the user or a ready
