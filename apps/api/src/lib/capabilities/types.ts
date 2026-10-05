@@ -1,6 +1,13 @@
 import type { z } from 'zod';
 
-import type { ChangesetOp, GraphSnapshot, KindName, ObjectSource } from '@nexui/types';
+import type {
+  ChangesetOp,
+  GraphObject,
+  GraphSnapshot,
+  KindName,
+  ObjectSource,
+  OptionData,
+} from '@nexui/types';
 
 import type { RefTable } from './refs.ts';
 
@@ -94,4 +101,46 @@ export interface CapabilityScope {
  */
 export function shapedInput<I>(schema: z.ZodType): z.ZodType<I> {
   return schema as z.ZodType<I>;
+}
+
+/** A proposed option as parsed: the fields every template shares, then the template's own. */
+export interface OptionInput {
+  label: string;
+  summary: string;
+  pros?: string[] | undefined;
+  cons?: string[] | undefined;
+  metrics?: Record<string, number> | undefined;
+  fit?: string | undefined;
+  [field: string]: unknown;
+}
+
+/**
+ * What a template's decision options carry beyond the shared fields, and what picking one does
+ * (readiness doc, section 3.11). A trip's carry a place to add or a stop to extend; a template
+ * that passes none gets plain options.
+ */
+export interface DecisionOptions {
+  /** The template's own option fields, by name, such as a trip's `place`. */
+  fields: Record<string, z.ZodType>;
+  /** Sentences `decision.propose`'s description adds about those fields. */
+  proposeHelp: string;
+  /** Sentences `decision.resolve`'s description adds about what a pick does. */
+  resolveHelp: string;
+  /**
+   * One proposed option's own fields, staged: what goes into the option's data, and the objects
+   * it carries, made before the option, with refs under `optionRef`.
+   */
+  propose: (
+    option: OptionInput,
+    ctx: CapabilityContext,
+    optionRef: string,
+  ) => { data: Partial<OptionData>; ops: ChangesetOp[]; refs: Record<string, string> };
+  /** Ops that carry out a chosen option. */
+  choose: (ctx: CapabilityContext, option: GraphObject) => ChangesetOp[];
+  /** Ops once a decision settles: what the options nobody chose carried goes. */
+  settle: (
+    ctx: CapabilityContext,
+    decisionId: string,
+    chosenOptionId: string | null,
+  ) => ChangesetOp[];
 }

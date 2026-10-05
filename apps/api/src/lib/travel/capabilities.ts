@@ -6,7 +6,7 @@ import {
   anchorParts,
   CapabilityError,
   dayCount,
-  DECISION_CAPABILITIES,
+  decisionCapabilities,
   defineCapability,
   graphCapabilities,
   nameOf,
@@ -16,6 +16,8 @@ import {
   type Capability,
   type CapabilityScope,
 } from '#lib/capabilities';
+
+import { TRAVEL_DECISIONS } from './decisions.ts';
 
 /** A trip's kinds, for the generic capabilities, and the examples their descriptions use. */
 export const TRAVEL_SCOPE: CapabilityScope = {
@@ -102,6 +104,6 @@ export const TRAVEL_CAPABILITIES: readonly Capability[] = [
   ...graphCapabilities(TRAVEL_SCOPE),
   setPlaceDays,
   reorderPlaces,
-  ...DECISION_CAPABILITIES,
+  ...decisionCapabilities(TRAVEL_SCOPE, TRAVEL_DECISIONS),
   ...workspaceCapabilities(TRAVEL_SCOPE),
 ];
