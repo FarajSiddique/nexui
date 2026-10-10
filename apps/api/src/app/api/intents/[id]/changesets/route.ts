@@ -1,6 +1,6 @@
 import { changesetRequestSchema, commitResponseSchema, fromUserOps, idSchema } from '@nexui/types';
 
-import { commitChangeset, graphErrorResponse } from '#lib/graph';
+import { commitChangeset, DIRECT_EDIT_LABEL, graphErrorResponse } from '#lib/graph';
 import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
 import { getUserClient, verifyRequest } from '#lib/supabase';
 
@@ -48,6 +48,7 @@ export async function POST(request: Request, { params }: ChangesetRouteContext):
       intentId: id,
       actor: 'user',
       ops: fromUserOps(parsed.data.ops),
+      label: () => DIRECT_EDIT_LABEL,
     });
 
     return Response.json(commitResponseSchema.parse(result), { headers });

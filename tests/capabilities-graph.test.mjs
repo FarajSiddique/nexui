@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { GRAPH_CAPABILITIES } from '../apps/api/src/lib/capabilities/graph.ts';
-import { buildRefTable, resolveRef } from '../apps/api/src/lib/capabilities/refs.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { graphCapabilities } from '../apps/api/src/lib/capabilities/graph.ts';
+import { TRAVEL_SCOPE } from '../apps/api/src/lib/travel/capabilities.ts';
+import { buildRefTable, checkNewRef, resolveRef } from '../apps/api/src/lib/capabilities/refs.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { legDataSchema, placeDataSchema, stayDataSchema } from '../packages/types/src/index.ts';
 import {
   idSequence,
@@ -20,6 +21,7 @@ import {
   TRIP_ID,
 } from './support/graph.mjs';
 
+const GRAPH_CAPABILITIES = graphCapabilities(TRAVEL_SCOPE);
 const snapshot = mapSnapshotRow(snapshotRow(travelWorkspace(TRIP_ID)));
 const clock = () => new Date('2026-09-29T10:00:00Z');
 const osaka = { name: 'Osaka', country: 'JP', placeType: 'city', lat: 34.69, lng: 135.5, days: 2 };
@@ -41,7 +43,7 @@ function refused(message) {
 }
 
 test('the model names objects by ref: trip, then o1, o2 … oldest first', () => {
-  const table = buildRefTable(snapshot, TRIP_ID);
+  const table = buildRefTable(snapshot, TRIP_ID, 'trip');
 
   // Tokyo and Kyoto share a creation time, so the title breaks the tie.
   assert.deepEqual(Object.fromEntries(table.byRef), { trip: TRIP_ID, o1: KYOTO_ID, o2: TOKYO_ID });
@@ -49,7 +51,7 @@ test('the model names objects by ref: trip, then o1, o2 … oldest first', () =>
 });
 
 test('a ref or an id in this intent resolves; anything else does not', () => {
-  const table = buildRefTable(snapshot, TRIP_ID);
+  const table = buildRefTable(snapshot, TRIP_ID, 'trip');
 
   assert.equal(resolveRef(table, snapshot, 'o2').id, TOKYO_ID);
   assert.equal(resolveRef(table, snapshot, TOKYO_ID).id, TOKYO_ID);
@@ -58,6 +60,15 @@ test('a ref or an id in this intent resolves; anything else does not', () => {
     () => resolveRef(table, snapshot, 'ffffffff-0000-4000-8000-000000000000'),
     refused(/^Nothing is called/),
   );
+});
+
+test('the anchor’s ref comes from its template and is reserved', () => {
+  const table = buildRefTable(snapshot, TRIP_ID, 'search');
+
+  assert.equal(resolveRef(table, snapshot, 'search').id, TRIP_ID);
+  assert.throws(() => resolveRef(table, snapshot, 'trip'), refused(/^Nothing is called "trip"\.$/));
+  assert.throws(() => checkNewRef(table, 'search'), refused(/can't be used as a ref/));
+  assert.doesNotThrow(() => checkNewRef(table, 'trip'));
 });
 
 test('object.create adds a place to the end of the route, as the run', () => {

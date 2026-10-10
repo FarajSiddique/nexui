@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { templateSchema } from './graph.ts';
 import { capabilityNameSchema, idSchema, timestampSchema } from './primitives.ts';
 
 export const runKindSchema = z.enum(['create_intent', 'ask']);
@@ -43,13 +44,13 @@ export const runRouteSchema = z.enum(['edit', 'fast', 'reasoning']);
 export type RunRoute = z.infer<typeof runRouteSchema>;
 
 /**
- * What started a run. `perception` says whether Jev answered or its fallback did; a recorded
- * fixture replays `template` and `route`.
+ * What started a run. `template` is the one Jev chose for a create run; `perception` says whether
+ * Jev answered or its fallback did. A recorded fixture replays `template` and `route`.
  */
 export const runInputSchema = z.object({
   text: z.string().min(1).max(1000),
   route: runRouteSchema,
-  template: z.enum(['travel', 'none']).optional(),
+  template: templateSchema.optional(),
   perception: z.enum(['model', 'fallback']),
 });
 

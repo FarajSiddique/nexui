@@ -9,15 +9,17 @@ import {
   type RunProgressEntry,
 } from '@nexui/types';
 
-import { ChangesetInvalidError, validateOps } from '#lib/graph';
-
-import { buildRefTable, claimRefs, type RefTable } from './refs.ts';
 import {
+  buildRefTable,
   CapabilityError,
+  claimRefs,
   type Capability,
   type CapabilityActor,
   type CapabilityResult,
-} from './types.ts';
+  type RefTable,
+} from '#lib/capabilities';
+import { ChangesetInvalidError, validateOps } from '#lib/graph';
+import { templateFor, type TemplateDefinition } from '#lib/templates';
 
 export interface StagerOptions {
   capabilities: readonly Capability[];
@@ -64,6 +66,8 @@ export interface Stager {
   restage(current: GraphSnapshot): ChangesetOp[] | null;
   /** The entry indexes of calls `restage` dropped since the last take, for the run's progress. */
   takeSkipped(): number[];
+  /** The entry indexes `restage` has dropped since the last take, without taking them. */
+  peekSkipped(): readonly number[];
 }
 
 // Progress keeps each call's input, so a run can be recorded as a fixture, up to this size.
@@ -119,6 +123,20 @@ function requireAnchor(snapshot: GraphSnapshot): string {
   return anchorId;
 }
 
+/**
+ * The template whose capabilities may change this intent. Refused for an intent Nexui can't plan
+ * yet, which has no template and no workspace.
+ */
+export function templateOf(snapshot: GraphSnapshot): TemplateDefinition {
+  const template = templateFor(snapshot.intent.template);
+
+  if (!template || !snapshot.workspace) {
+    throw new CapabilityError('Nexui can only change trips so far.');
+  }
+
+  return template;
+}
+
 interface StagedCall {
   name: string;
   input: unknown;
@@ -138,7 +156,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 function copyRefs(table: RefTable): RefTable {
-  return { byRef: new Map(table.byRef), byId: new Map(table.byId) };
+  return { anchor: table.anchor, byRef: new Map(table.byRef), byId: new Map(table.byId) };
 }
 
 function restoreRefs(table: RefTable, saved: RefTable): void {
@@ -235,14 +253,16 @@ function touchesEdited(
 
 /**
  * @example
- * const stager = createStager({ capabilities: CAPABILITIES, snapshot, actor: 'ai', runId, newId });
+ * const { capabilities } = templateOf(snapshot);
+ * const stager = createStager({ capabilities, snapshot, actor: 'ai', runId, newId });
  * stager.call('trip.setPlaceDays', { placeId: 'o2', days: 3 });
  * await commitChangeset(db, { intentId, actor: 'ai', runId, ops: stager.takeOps() });
  */
 export function createStager(options: StagerOptions): Stager {
   const clock = options.clock ?? ((): Date => new Date());
+  const template = templateOf(options.snapshot);
   const anchorId = requireAnchor(options.snapshot);
-  const refs = buildRefTable(options.snapshot, anchorId);
+  const refs = buildRefTable(options.snapshot, anchorId, template.anchorRef);
   const source: ObjectSource =
     options.actor === 'ai' && options.runId
       ? { type: 'ai', runId: options.runId }
@@ -431,6 +451,9 @@ export function createStager(options: StagerOptions): Stager {
       skipped = [];
 
       return taken;
+    },
+    peekSkipped() {
+      return [...skipped];
     },
   };
 }

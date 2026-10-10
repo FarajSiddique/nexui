@@ -1,16 +1,17 @@
 import {
+  anchorFigures,
   evaluateQuery,
+  figureValue,
   readField,
-  tripFigures,
+  type AnchorFigures,
   type DecisionData,
-  type DerivedKey,
+  type FigureValue,
   type GraphObject,
   type GraphSnapshot,
   type Money,
   type OptionData,
   type PlaceData,
   type Section,
-  type TripDerived,
   type WorkspaceDoc,
 } from '@nexui/types';
 
@@ -87,34 +88,9 @@ export interface SectionEntry {
 export type WorkspaceBlock =
   { kind: 'section'; entry: SectionEntry } | { kind: 'open'; entries: SectionEntry[] };
 
-const NO_FIGURES: TripDerived = {
-  totalDays: null,
-  allocatedDays: 0,
-  unallocatedDays: null,
-  estCost: null,
-  costIncomplete: false,
-};
-
-/**
- * The anchor trip's figures, recomputed from the snapshot rather than read from
- * `data.derived`. An optimistic edit changes them before the server answers; the server's
- * answer then carries the same numbers.
- */
-export function workspaceFigures(snapshot: GraphSnapshot): TripDerived {
-  const anchorId = snapshot.workspace?.doc.anchorId;
-
-  return anchorId ? tripFigures(snapshot, anchorId) : NO_FIGURES;
-}
-
-function derivedValue(figures: TripDerived, key: DerivedKey): number | Money | null {
-  switch (key) {
-    case 'trip.totalDays':
-      return figures.totalDays;
-    case 'trip.unallocatedDays':
-      return figures.unallocatedDays;
-    case 'trip.estCost':
-      return figures.estCost;
-  }
+// The route's and the day bar's counts. Any other figure counts as unknown.
+function countOf(value: FigureValue | undefined): number | null {
+  return typeof value === 'number' ? value : null;
 }
 
 /** The leg from one stop to another, if the graph has one. */
@@ -181,7 +157,11 @@ function decisionData(snapshot: GraphSnapshot, decisionId: string): SectionDataO
   return { type: 'decision', decision, options };
 }
 
-function sectionData(section: Section, snapshot: GraphSnapshot, figures: TripDerived): SectionData {
+function sectionData(
+  section: Section,
+  snapshot: GraphSnapshot,
+  figures: AnchorFigures,
+): SectionData {
   switch (section.type) {
     case 'map':
       return { type: 'map', pins: mapPins(evaluateQuery(snapshot, section.places)) };
@@ -200,9 +180,9 @@ function sectionData(section: Section, snapshot: GraphSnapshot, figures: TripDer
       return {
         type: 'route',
         stops,
-        totalDays: figures.totalDays,
-        allocatedDays: figures.allocatedDays,
-        unallocatedDays: figures.unallocatedDays,
+        totalDays: countOf(figures.values.totalDays),
+        allocatedDays: countOf(figures.values.allocatedDays) ?? 0,
+        unallocatedDays: countOf(figures.values.unallocatedDays),
       };
     }
 
@@ -210,7 +190,7 @@ function sectionData(section: Section, snapshot: GraphSnapshot, figures: TripDer
       return {
         type: 'metric',
         metrics: section.metrics.map((metric) => {
-          const value = derivedValue(figures, metric.derived);
+          const value = figureValue(figures, metric.derived);
 
           return {
             label: metric.label,
@@ -232,7 +212,7 @@ function sectionData(section: Section, snapshot: GraphSnapshot, figures: TripDer
           ai: aiMarkFor(object).highlight,
         };
       });
-      const totalValue = derivedValue(figures, section.total);
+      const totalValue = figureValue(figures, section.total);
       const total = typeof totalValue === 'number' ? totalValue : null;
       const used = parts.reduce((sum, part) => sum + part.value, 0);
 
@@ -274,7 +254,9 @@ function isUnresolved(data: SectionData): boolean {
  * the top without one), and once resolved they are hidden.
  */
 export function layoutWorkspace(doc: WorkspaceDoc, snapshot: GraphSnapshot): WorkspaceBlock[] {
-  const figures = workspaceFigures(snapshot);
+  // Recomputed from the snapshot (`KIND_FIGURES`), so an optimistic edit moves the figures
+  // before the server answers.
+  const figures = anchorFigures(snapshot);
   const blocks: WorkspaceBlock[] = [];
   const open: SectionEntry[] = [];
 

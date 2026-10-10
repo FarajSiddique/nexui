@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { OPTIONS, POST } from '../apps/api/src/app/api/intents/[id]/ask/route.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, useMockAi } from './support/ai.mjs';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import { INTENT_ID, RUN_ID, runRow, snapshotRow, TRIP_ID, USER_ID } from './support/graph.mjs';

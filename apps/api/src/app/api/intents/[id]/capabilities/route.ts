@@ -1,8 +1,8 @@
 import { capabilityRequestSchema, commitResponseSchema, idSchema } from '@nexui/types';
 
-import { invokeCapability } from '#lib/capabilities';
 import { graphErrorResponse } from '#lib/graph';
 import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
+import { invokeCapability } from '#lib/staging';
 import { getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['POST'], ['Authorization', 'Content-Type']);

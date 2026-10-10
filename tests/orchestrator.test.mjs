@@ -5,7 +5,7 @@ import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
 import { ChangesetInvalidError } from '../apps/api/src/lib/graph/errors.ts';
 import { startAsk, startIntent } from '../apps/api/src/lib/orchestrator/orchestrate.ts';
 import { getAdminClient, getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, failingEvaluationModel } from './support/ai.mjs';
 import { graphDb } from './support/graph-db.mjs';
 import {

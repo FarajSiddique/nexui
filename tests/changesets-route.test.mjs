@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { POST } from '../apps/api/src/app/api/intents/[id]/changesets/route.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import {
   eventRow,
@@ -69,6 +69,10 @@ test('an edit commits with its derived ops and returns the event and snapshot', 
   assert.equal(applied.p_expected_activity_at, STAMP);
   assert.deepEqual(applied.p_ops[0], { ...shorten, origin: 'direct' });
   assert.equal(applied.p_ops.at(-1).op, 'update_intent');
+  assert.deepEqual(applied.p_payload, {
+    label: 'Edited the plan',
+    figures: [{ label: 'unallocated days', before: '0', after: '1' }],
+  });
 });
 
 test('invalid domain data is a 400 that names the field, and nothing is written', async (t) => {

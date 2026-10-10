@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { GET } from '../apps/api/src/app/api/intents/[id]/media/route.ts';
 import { setMediaScheduler } from '../apps/api/src/lib/media/schedule.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { intentMediaSchema, placeMediaKey } from '../packages/types/src/media.ts';
 import { authed } from './support/graph-api.mjs';
 import {

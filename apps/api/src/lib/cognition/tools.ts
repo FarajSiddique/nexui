@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from 'ai';
 
-import type { Stager, Capability } from '#lib/capabilities';
+import type { Capability } from '#lib/capabilities';
+import type { Stager } from '#lib/staging';
 
 /**
  * Model APIs allow only letters, digits, `_` and `-` in tool names.
@@ -16,7 +17,7 @@ export function toolNameFor(capability: string): string {
  * The capability a model tool name stands for, or null for a name no capability has.
  *
  * @example
- * capabilityForTool('trip_setPlaceDays', CAPABILITIES) // 'trip.setPlaceDays'
+ * capabilityForTool('trip_setPlaceDays', capabilities) // 'trip.setPlaceDays'
  */
 export function capabilityForTool(
   toolName: string,

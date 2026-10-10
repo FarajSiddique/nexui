@@ -3,6 +3,7 @@ import {
   eventRecordSchema,
   graphSnapshotSchema,
   intentListItemSchema,
+  upgradeWorkspace,
   type ChangeItem,
   type EventRecord,
   type GraphSnapshot,
@@ -72,7 +73,7 @@ export function mapSnapshotRow(row: unknown): GraphSnapshot {
       ? {
           intentId: workspace.intent_id,
           version: workspace.version,
-          doc: workspace.doc,
+          doc: upgradeWorkspace(workspace.doc),
           updatedAt: workspace.updated_at,
         }
       : null,

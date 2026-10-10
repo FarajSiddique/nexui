@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { seedTravelOps, travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { seedTravelOps, travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { workspaceDocSchema } from '../packages/types/src/index.ts';
 import { idSequence } from './support/graph.mjs';
 

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
-import { workspaceFigures } from '../apps/mobile/src/features/workspace/workspace-layout.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
+import { anchorFigures } from '../packages/types/src/index.ts';
 import {
   capabilityFor,
   daysAction,
@@ -49,7 +49,7 @@ test('three quick taps stack: each call is absolute and the shown days keep up',
 
   assert.deepEqual(requests, [5, 6, 7]);
   assert.equal(days(graph, TOKYO_ID), 7);
-  assert.equal(workspaceFigures(graph).unallocatedDays, -3);
+  assert.equal(anchorFigures(graph).values.unallocatedDays, -3);
 });
 
 test('moving a stop reorders the whole route; the ends cannot move past the edge', () => {

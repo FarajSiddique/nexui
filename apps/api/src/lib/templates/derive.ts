@@ -1,20 +1,30 @@
 import type { ChangesetOp, GraphSnapshot } from '@nexui/types';
 
-import { deriveTrip, findShortenedPlace } from '#lib/kinds';
+import { templateFor } from './registry.ts';
 
 /**
- * Runs the intent's template derivations over a staged changeset. Only travel exists in
- * slice 1; an intent with no template derives nothing.
+ * Runs the intent's template derivation over a staged changeset. An intent with no template, or
+ * no workspace yet, derives nothing.
  */
 export function deriveForTemplate(
   before: GraphSnapshot,
   staged: GraphSnapshot,
   ops: readonly ChangesetOp[],
+  now: string,
   newId: () => string,
 ): ChangesetOp[] {
-  if (staged.intent.template !== 'travel' || !staged.workspace) {
+  const template = templateFor(staged.intent.template);
+
+  if (!template || !staged.workspace) {
     return [];
   }
 
-  return deriveTrip(staged, staged.workspace.doc.anchorId, findShortenedPlace(before, ops), newId);
+  return template.derive({
+    before,
+    staged,
+    ops,
+    anchorId: staged.workspace.doc.anchorId,
+    now,
+    newId,
+  });
 }

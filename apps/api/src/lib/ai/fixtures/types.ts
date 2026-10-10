@@ -1,4 +1,4 @@
-import type { RunKind, RunRoute } from '@nexui/types';
+import type { RunKind, RunRoute, Template } from '@nexui/types';
 
 /** One tool call the model made, with the input it sent (refs, not ids). */
 export interface FixtureToolCall {
@@ -16,7 +16,7 @@ export interface RunFixture {
   /** Every phrase, in lowercase, must appear in the goal or the request. */
   match: readonly string[];
   /** What Jev answered. */
-  perception: { template?: 'travel' | 'none'; route?: RunRoute };
+  perception: { template?: Template | 'none'; route?: RunRoute };
   /** Each model step's tool calls, in order. */
   steps: readonly (readonly FixtureToolCall[])[];
 }

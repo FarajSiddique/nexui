@@ -7,7 +7,7 @@ import {
   type GraphSnapshot,
 } from '@nexui/types';
 
-import { deriveForTemplate } from '#lib/templates';
+import { contextSchemaFor, deriveForTemplate } from '#lib/templates';
 
 import { ChangesetInvalidError } from './errors.ts';
 
@@ -76,6 +76,23 @@ function checkData(kind: string, data: unknown): Record<string, unknown> {
   return parsed.data;
 }
 
+// `intents.context` holds only its template's keys and the eval tag (readiness doc, 3.7).
+function checkContext(snapshot: GraphSnapshot, context: Record<string, unknown>): void {
+  const parsed = contextSchemaFor(snapshot.intent.template).safeParse(context);
+
+  if (parsed.success) {
+    return;
+  }
+
+  const issue = parsed.error.issues[0];
+  const where = issue?.path.join('.') ?? '';
+  const reason = issue?.message ?? 'is invalid';
+
+  throw new ChangesetInvalidError(
+    where ? `Invalid context: ${where} ${reason}` : `Invalid context: ${reason}`,
+  );
+}
+
 // A workspace doc may name objects inserted later in the same changeset, so its references
 // are checked against the fully staged snapshot.
 function checkWorkspace(snapshot: GraphSnapshot): void {
@@ -131,6 +148,12 @@ export function validateOps(
         checkEndpoint(running, op.sourceType, op.sourceId);
         checkEndpoint(running, op.targetType, op.targetId);
         checkNewLink(running, op);
+        break;
+      case 'update_intent':
+        if (op.patch.context) {
+          checkContext(running, op.patch.context);
+        }
+
         break;
       default:
         break;
@@ -247,7 +270,7 @@ export function prepareChangeset(
 ): ChangesetOp[] {
   const valid = validateOps(before, markReviewed(before, ops, actor, now), now);
   const staged = applyOps(before, valid, now);
-  const derived = deriveForTemplate(before, staged, valid, newId);
+  const derived = deriveForTemplate(before, staged, valid, now, newId);
 
   return validateOps(before, coalesceOps([...valid, ...derived]), now);
 }

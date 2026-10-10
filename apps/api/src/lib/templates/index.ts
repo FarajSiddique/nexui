@@ -1,2 +1,4 @@
+export { contextSchemaFor } from './context.ts';
 export { deriveForTemplate } from './derive.ts';
-export { seedTravelOps } from './travel.ts';
+export { TEMPLATES, templateFor } from './registry.ts';
+export type { DeriveInput, RouteBudget, TemplateDefinition, TemplatePrompt } from './types.ts';

@@ -6,11 +6,12 @@ import {
   executeRun,
   FAILED_RUN_ERROR,
   INVALID_RUN_ERROR,
+  routeBudget,
   SKIPPED_STEP_ERROR,
 } from '../apps/api/src/lib/runs/execute.ts';
 import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { failingEvaluationModel, MockLanguageModelV4, toolStep } from './support/ai.mjs';
 import { editObject, graphDb, removeObject } from './support/graph-db.mjs';
 import {
@@ -142,6 +143,10 @@ test('each model step commits one changeset as the run, and the run succeeds', a
     p_status: 'succeeded',
     p_error: null,
   });
+  assert.deepEqual(
+    state.applied.map((args) => args.p_payload.label),
+    ['Updated A test trip and 2 more', 'Added Tokyo → Kyoto'],
+  );
 });
 
 test('Stop lets the current step commit and record, then the run ends cancelled', async (t) => {
@@ -390,6 +395,8 @@ test('a step call that would undo the field the user just changed is dropped', a
   assert.equal(entries[0].ok, false);
   assert.equal(entries[0].error, SKIPPED_STEP_ERROR);
   assert.equal(entries[1].ok, true);
+  // The step's event names only the call that committed.
+  assert.equal(fake.state.applied.at(-1).p_payload.label, 'Set Kyoto to 5 days');
 });
 
 test('a step whose every call was superseded commits nothing and the run goes on', async (t) => {
@@ -461,4 +468,16 @@ test('a double restage after NXU08 keeps the edit and reuses the same ids', asyn
     objectIdsOf(fake.state.attempts[1]),
     [TOKYO_ID, KYOTO_ID, osakaObjects[0].id].sort(),
   );
+});
+
+test('a template’s own route budget replaces the default', () => {
+  const longer = { tier: 'reasoning', mode: 'loop', maxSteps: 12 };
+
+  assert.deepEqual(routeBudget({}, 'edit'), { tier: 'fast', mode: 'single', maxSteps: 2 });
+  assert.deepEqual(routeBudget({ routes: { reasoning: longer } }, 'reasoning'), longer);
+  assert.deepEqual(routeBudget({ routes: { reasoning: longer } }, 'fast'), {
+    tier: 'fast',
+    mode: 'single',
+    maxSteps: 2,
+  });
 });

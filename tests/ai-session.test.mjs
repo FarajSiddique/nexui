@@ -5,12 +5,15 @@ import { AiConfigurationError } from '../apps/api/src/lib/ai/config.ts';
 import { FIXTURES } from '../apps/api/src/lib/ai/fixtures/index.ts';
 import { findFixture } from '../apps/api/src/lib/ai/mock.ts';
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
-import { CAPABILITIES, findCapability } from '../apps/api/src/lib/capabilities/registry.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { chooseTemplate, routeAsk } from '../apps/api/src/lib/perception/perceive.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { idSequence, RUN_ID, seedRow, TRIP_ID } from './support/graph.mjs';
+
+const CAPABILITIES = TEMPLATES.travel.capabilities;
+const findCapability = (name) => CAPABILITIES.find((capability) => capability.name === name);
 
 const fixture = {
   name: 'test-job',

@@ -3,8 +3,15 @@ import { z } from 'zod';
 import { kindNameSchema } from './kinds/registry.ts';
 import { idSchema, relTypeSchema } from './primitives.ts';
 
-/** Figures a metric or allocation reads from the anchor object's `data.derived`. */
-export const derivedKeySchema = z.enum(['trip.totalDays', 'trip.unallocatedDays', 'trip.estCost']);
+/**
+ * A figure a metric or allocation shows: `<anchor kind>.<figure>`, such as `trip.totalDays`, read
+ * from the anchor's recomputed figures (`KIND_FIGURES`). A key for another anchor kind shows
+ * nothing.
+ */
+export const derivedKeySchema = z
+  .string()
+  .max(60)
+  .regex(/^[a-z]+\.[a-zA-Z]+$/);
 
 export type DerivedKey = z.infer<typeof derivedKeySchema>;
 
@@ -116,10 +123,22 @@ export const sectionSchema = z.discriminatedUnion('type', [
 
 export type Section = z.infer<typeof sectionSchema>;
 
+/** The workspace doc format this code writes and reads. */
+export const WORKSPACE_DOC_VERSION = 1;
+
+/**
+ * Brings a stored workspace doc up to `WORKSPACE_DOC_VERSION` before it is parsed, as a kind's
+ * `upgrade` does for object data. Format 1 is the only one so far, so a doc comes back as it was;
+ * the first change to a section's shape adds its step here.
+ */
+export function upgradeWorkspace(doc: unknown): unknown {
+  return doc;
+}
+
 // `version` is the doc format (1); the `workspaces.version` column counts revisions.
 export const workspaceDocSchema = z
   .strictObject({
-    version: z.literal(1),
+    version: z.literal(WORKSPACE_DOC_VERSION),
     anchorId: idSchema,
     sections: z.array(sectionSchema).max(30),
   })

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { chooseTemplate, routeAsk } from '../apps/api/src/lib/perception/perceive.ts';
+import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
 import { Experimental_EvaluationMockModelV4, failingEvaluationModel } from './support/ai.mjs';
 
 function answering(answers, seen = []) {
@@ -117,4 +118,21 @@ test('a slow Jev is abandoned after the timeout when routing an ask', async (t) 
   assert.equal(logged.mock.callCount(), 1);
   assert.equal(logged.mock.calls[0].arguments[0], '[perception]');
   assert.equal(logged.mock.calls[0].arguments[1], 'Ask routing failed; using the reasoning tier.');
+});
+
+test("Jev reads each template's own sentence, then the one for no template", async () => {
+  const seen = [];
+
+  await chooseTemplate(
+    answering({ template: { type: 'choice', choice: 'travel' } }, seen),
+    'Plan Japan',
+  );
+
+  const { criteria } = seen[0].questions.template;
+
+  assert.deepEqual(Object.keys(criteria), [...Object.keys(TEMPLATES), 'none']);
+
+  for (const template of Object.values(TEMPLATES)) {
+    assert.equal(criteria[template.name], template.perception);
+  }
 });

@@ -4,24 +4,18 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { RunProgressEntry, RunRecord, RunRoute } from '@nexui/types';
 
-import {
-  CAPABILITIES,
-  createStager,
-  type Stager,
-  CapabilityError,
-  type Capability,
-} from '#lib/capabilities';
+import { CapabilityError, type Capability } from '#lib/capabilities';
 import {
   instructionsFor,
   promptFor,
   runModel,
-  type ModelMode,
   type StepDecision,
   type StepReport,
   capabilityForTool,
   toModelTools,
 } from '#lib/cognition';
 import {
+  changesetLabel,
   commitChangeset,
   NothingToCommitError,
   ChangesetConflictError,
@@ -31,7 +25,9 @@ import {
   loadSnapshot,
   RunLeaseLostError,
 } from '#lib/graph';
-import type { AiSession, ModelTier } from '#lib/ai';
+import { createStager, templateOf, type Stager } from '#lib/staging';
+import type { RouteBudget, TemplateDefinition } from '#lib/templates';
+import type { AiSession } from '#lib/ai';
 
 import { finishRun, recordRunStep } from './store.ts';
 
@@ -50,12 +46,20 @@ export interface RunDeps {
 }
 
 // Spec section F: edit and fast take one fast-tier step (plus one correction); reasoning plans
-// with tools for up to 8 steps.
-const ROUTES: Record<RunRoute, { tier: ModelTier; mode: ModelMode; maxSteps: number }> = {
+// with tools for up to 8 steps. A template may set its own.
+const ROUTES: Record<RunRoute, RouteBudget> = {
   edit: { tier: 'fast', mode: 'single', maxSteps: 2 },
   fast: { tier: 'fast', mode: 'single', maxSteps: 2 },
   reasoning: { tier: 'reasoning', mode: 'loop', maxSteps: 8 },
 };
+
+/** A route's model budget: the template's own when it sets one, else the default. */
+export function routeBudget(
+  template: Pick<TemplateDefinition, 'routes'>,
+  route: RunRoute,
+): RouteBudget {
+  return template.routes?.[route] ?? ROUTES[route];
+}
 
 export const INVALID_RUN_ERROR = "Nexui couldn't make a valid change.";
 export const FAILED_RUN_ERROR = "Nexui couldn't finish this.";
@@ -109,6 +113,18 @@ function markSkipped(entries: RunProgressEntry[], indexes: readonly number[]): v
   });
 }
 
+// The step's label: the calls that ran and still apply after any replay.
+function stepLabel(
+  entries: readonly RunProgressEntry[],
+  skipped: readonly number[],
+): string | undefined {
+  return changesetLabel(
+    entries
+      .filter((entry, index) => entry.ok && !skipped.includes(index))
+      .map((entry) => entry.label),
+  );
+}
+
 // Commits the step's ops as one changeset, then records the step. If the user changed the intent
 // meanwhile, the step is replayed over their changes first. A commit error is recorded first and
 // then thrown, which fails the run with its steps so far kept.
@@ -135,6 +151,7 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
           run: { id: step.runId, lease: step.leaseId },
           ops,
           restage: (current) => step.stager.restage(current),
+          label: () => stepLabel(entries, step.stager.peekSkipped()),
         },
         step.clock(),
         step.newId,
@@ -171,7 +188,6 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
   const { db, run, leaseId, session } = job;
   const clock = deps.clock ?? ((): Date => new Date());
   const newId = deps.newId ?? randomUUID;
-  const capabilities = deps.capabilities ?? CAPABILITIES;
 
   try {
     const intentId = run.intentId;
@@ -185,6 +201,8 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
     }
 
     const snapshot = await loadSnapshot(db, intentId);
+    const template = templateOf(snapshot);
+    const capabilities = deps.capabilities ?? template.capabilities;
     const stager = createStager({
       capabilities,
       snapshot,
@@ -194,7 +212,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       newId,
       clock,
     });
-    const route = ROUTES[run.input.route];
+    const budget = routeBudget(template, run.input.route);
     const step: StepContext = {
       db,
       intentId,
@@ -206,13 +224,13 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       capabilities,
     };
     const outcome = await runModel({
-      model: session.languageModel(route.tier),
-      providerOptions: session.providerOptions(route.tier),
-      instructions: instructionsFor(run.kind, run.input.route),
+      model: session.languageModel(budget.tier),
+      providerOptions: session.providerOptions(budget.tier),
+      instructions: instructionsFor(template, run.kind, run.input.route),
       prompt: promptFor(snapshot, stager.refs, run.input.text),
       tools: toModelTools(capabilities, stager),
-      mode: route.mode,
-      maxSteps: route.maxSteps,
+      mode: budget.mode,
+      maxSteps: budget.maxSteps,
       onStep: (report) => commitStep(step, report),
     });
 

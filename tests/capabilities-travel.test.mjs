@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { capabilityNameSchema } from '../packages/types/src/index.ts';
-import { CAPABILITIES, findCapability } from '../apps/api/src/lib/capabilities/registry.ts';
-import { createStager } from '../apps/api/src/lib/capabilities/stage.ts';
+import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
-import { travelWorkspace } from '../apps/api/src/lib/templates/travel.ts';
+import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
+import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import {
   idSequence,
   KYOTO_ID,
@@ -21,6 +21,8 @@ import {
   tripData,
 } from './support/graph.mjs';
 
+const CAPABILITIES = TEMPLATES.travel.capabilities;
+const findCapability = (name) => CAPABILITIES.find((capability) => capability.name === name);
 const clock = () => new Date('2026-09-29T10:00:00Z');
 const LENGTH_DECISION_ID = 'd0000000-0000-4000-8000-000000000001';
 

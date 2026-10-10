@@ -3,11 +3,14 @@ import { idSchema, type GraphObject, type GraphSnapshot } from '@nexui/types';
 import { CapabilityError } from './types.ts';
 
 /**
- * The names models use instead of ids. `trip` is the workspace anchor; `o1`, `o2` … are the
- * objects that existed when the run started, oldest first; an object the model creates gets the
- * ref it chose. Stable names keep prompts short and let a recorded run replay against new ids.
+ * The names models use instead of ids. The anchor has its template's ref (`trip`); `o1`, `o2` …
+ * are the objects that existed when the run started, oldest first; an object the model creates
+ * gets the ref it chose. Stable names keep prompts short and let a recorded run replay against
+ * new ids.
  */
 export interface RefTable {
+  /** The anchor's ref, its template's `anchorRef`. */
+  anchor: string;
   byRef: Map<string, string>;
   byId: Map<string, string>;
 }
@@ -15,7 +18,7 @@ export interface RefTable {
 /** A ref the model may pick for a new object, such as `kyoto` or `tokyo-kyoto`. */
 export const NEW_REF_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 
-const RESERVED_REF = /^(trip|intent|o\d+)$/;
+const RESERVED_REF = /^(intent|o\d+)$/;
 
 function compareText(a: string, b: string): number {
   if (a < b) {
@@ -47,12 +50,16 @@ function addRef(table: RefTable, ref: string, id: string): void {
   }
 }
 
-/** The refs for a snapshot: `trip` for the anchor, then `o1` … for everything else. */
-export function buildRefTable(snapshot: GraphSnapshot, anchorId: string): RefTable {
-  const table: RefTable = { byRef: new Map(), byId: new Map() };
+/** The refs for a snapshot: `anchorRef` for the anchor, then `o1` … for everything else. */
+export function buildRefTable(
+  snapshot: GraphSnapshot,
+  anchorId: string,
+  anchorRef: string,
+): RefTable {
+  const table: RefTable = { anchor: anchorRef, byRef: new Map(), byId: new Map() };
   const others = snapshot.objects.filter((object) => object.id !== anchorId).sort(compareObjects);
 
-  addRef(table, 'trip', anchorId);
+  addRef(table, anchorRef, anchorId);
   others.forEach((object, index) => addRef(table, `o${index + 1}`, object.id));
 
   return table;
@@ -75,7 +82,7 @@ export function resolveRef(table: RefTable, graph: GraphSnapshot, ref: string): 
 
 /** Checks a ref the model picked for a new object: well formed, not reserved, not in use. */
 export function checkNewRef(table: RefTable, ref: string): void {
-  if (!NEW_REF_PATTERN.test(ref) || RESERVED_REF.test(ref)) {
+  if (!NEW_REF_PATTERN.test(ref) || RESERVED_REF.test(ref) || ref === table.anchor) {
     throw new CapabilityError(
       `"${ref.slice(0, 40)}" can't be used as a ref. Use lowercase letters, digits, - or _.`,
     );

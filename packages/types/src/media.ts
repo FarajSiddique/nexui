@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { PlaceData } from './kinds/travel.ts';
+import type { PlaceData } from './kinds/travel/schemas.ts';
 import { idSchema } from './primitives.ts';
 
 /** Every place photo lives under this path in our Supabase Storage (spec section 4). */

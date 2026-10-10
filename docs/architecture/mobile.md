@@ -127,7 +127,9 @@ React Native and breaks the tests.
 - **`ai-mark.ts`**: `aiMarkFor`, the one place that decides what's marked as Nexui's work.
 - **`workspace-layout.ts`**: `layoutWorkspace` and `sectionData`, which turn a `WorkspaceDoc` and a
   `GraphSnapshot` into `WorkspaceBlock[]` — each section's data, evaluated with `evaluateQuery`
-  from `@nexui/types`, and the Open band placement.
+  from `@nexui/types`, and the Open band placement. `metric` and `allocation` read the anchor's
+  figures by derived key (`anchorFigures` and `figureValue`, from `KIND_FIGURES`), recomputed from
+  the snapshot so an optimistic edit moves them at once.
 - **`workspace-actions.ts`**: `capabilityFor` turns a `ServerAction` (any `WorkspaceAction` except `ask` and
   `openPlace`) into a `CapabilityRequest` (or `null` when there's nothing to send), `daysAction`
   builds the `setDays` action the route's and the sheet's steppers share, and `optimisticOps`

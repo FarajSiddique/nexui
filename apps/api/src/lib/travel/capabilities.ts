@@ -2,9 +2,35 @@ import { z } from 'zod';
 
 import type { ChangesetOp, PlaceData } from '@nexui/types';
 
-import { refInput } from './graph.ts';
-import { dayCount, nameOf, requirePlace, tripPlaces } from './helpers.ts';
-import { CapabilityError, defineCapability, type Capability } from './types.ts';
+import {
+  anchorParts,
+  CapabilityError,
+  dayCount,
+  decisionCapabilities,
+  defineCapability,
+  graphCapabilities,
+  nameOf,
+  refInput,
+  requireKind,
+  workspaceCapabilities,
+  type Capability,
+  type CapabilityScope,
+} from '#lib/capabilities';
+
+import { TRAVEL_DECISIONS } from './decisions.ts';
+
+/** A trip's kinds, for the generic capabilities, and the examples their descriptions use. */
+export const TRAVEL_SCOPE: CapabilityScope = {
+  anchorKind: 'trip',
+  kinds: ['trip', 'place', 'leg', 'stay', 'decision', 'option', 'insight', 'thing'],
+  examples: {
+    objectRef: 'kyoto or tokyo-kyoto',
+    decisionRef: 'rural-stop',
+    metric: '{"hoursFromKyoto": 1}',
+    sectionId: 'place-costs',
+    field: 'data.days',
+  },
+};
 
 const setPlaceDays = defineCapability({
   name: 'trip.setPlaceDays',
@@ -14,7 +40,7 @@ const setPlaceDays = defineCapability({
   exposeToModel: true,
   callableByUser: true,
   execute(input, ctx) {
-    const place = requirePlace(ctx, input.placeId);
+    const place = requireKind(ctx, input.placeId, 'place');
 
     if ((place.data as PlaceData).days === input.days) {
       throw new CapabilityError(`${nameOf(place)} already has ${dayCount(input.days)}.`);
@@ -43,8 +69,8 @@ const reorderPlaces = defineCapability({
   exposeToModel: true,
   callableByUser: true,
   execute(input, ctx) {
-    const current = tripPlaces(ctx);
-    const ordered = input.placeIds.map((ref) => requirePlace(ctx, ref));
+    const current = anchorParts(ctx, 'place');
+    const ordered = input.placeIds.map((ref) => requireKind(ctx, ref, 'place'));
     const ids = new Set(ordered.map((place) => place.id));
 
     if (
@@ -69,4 +95,15 @@ const reorderPlaces = defineCapability({
   },
 });
 
-export const TRAVEL_CAPABILITIES: readonly Capability[] = [setPlaceDays, reorderPlaces];
+/**
+ * Everything a trip's runs and buttons may call, in the order models see it: the graph
+ * capabilities, the trip's own, decisions, then the workspace layout. `derive.trip` isn't one:
+ * it runs inside every changeset, and nothing calls it by name.
+ */
+export const TRAVEL_CAPABILITIES: readonly Capability[] = [
+  ...graphCapabilities(TRAVEL_SCOPE),
+  setPlaceDays,
+  reorderPlaces,
+  ...decisionCapabilities(TRAVEL_SCOPE, TRAVEL_DECISIONS),
+  ...workspaceCapabilities(TRAVEL_SCOPE),
+];

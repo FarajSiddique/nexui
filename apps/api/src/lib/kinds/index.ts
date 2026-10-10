@@ -1,1 +1,2 @@
-export { deriveTrip, findShortenedPlace } from './trip.ts';
+export { KIND_BEHAVIOUR } from './behaviour.ts';
+export type { KindBehaviour, KindLink } from './behaviour.ts';
