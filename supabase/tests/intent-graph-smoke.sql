@@ -229,6 +229,31 @@ begin
 end;
 $$;
 
+-- A changeset's payload is stored on its event; one that isn't an object is refused.
+do $$
+declare
+  labelled jsonb;
+begin
+  labelled := public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+    jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+      'patch', jsonb_build_object('summary', '{"line":"d"}'::jsonb))),
+    p_payload => '{"label":"Renamed the plan"}'::jsonb);
+  assert labelled #>> '{payload,label}' = 'Renamed the plan', 'the event comes back with it';
+  assert (select payload ->> 'label' from public.events where id = (labelled ->> 'id')::uuid)
+    = 'Renamed the plan', 'the payload is stored';
+
+  begin
+    perform public.apply_changeset('10000000-0000-4000-8000-000000000001', 'user', null,
+      jsonb_build_array(jsonb_build_object('op', 'update_intent', 'origin', 'direct',
+        'patch', jsonb_build_object('summary', '{"line":"e"}'::jsonb))),
+      p_payload => '["not an object"]'::jsonb);
+    assert false, 'a payload that is not an object must fail';
+  exception when sqlstate 'NXU22' then
+    null;
+  end;
+end;
+$$;
+
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-00000000000b","role":"authenticated"}', true);
 
