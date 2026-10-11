@@ -30,7 +30,7 @@ export function exampleGoal(examples: readonly TemplateExample[], turn: number):
   return examples[turn % examples.length]?.goal ?? '';
 }
 
-// How many new-plan placeholders this app session has shown.
+// How many new-plan placeholders this app session has taken (the sheet on a plan takes none).
 let shown = 0;
 
 /** The placeholder for the next new plan; each call takes the next template's turn. */

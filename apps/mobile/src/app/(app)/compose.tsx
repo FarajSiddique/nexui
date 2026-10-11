@@ -41,7 +41,7 @@ export default function ComposeSheet(): ReactElement {
   const [target, setTarget] = useState<string | null>(params.intentId ?? null);
   const [text, setText] = useState(params.prompt ?? '');
   const [sent, setSent] = useState<Sent | null>(null);
-  const [goalPlaceholder] = useState(nextGoalPlaceholder);
+  const [goalPlaceholder] = useState(() => (params.intentId ? '' : nextGoalPlaceholder()));
   const context = useIntent(target);
   const run = useRun(sent?.runId ?? null);
   const create = useCreateIntent();

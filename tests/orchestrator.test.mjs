@@ -140,7 +140,7 @@ test('a trip whose run cannot start is discarded, and the error stands', async (
   assert.equal(tasks.length, 0);
 });
 
-test('a goal no template fits is saved with no workspace, no run and no model call beyond Jev', async (t) => {
+test('a goal no template fits is saved: no workspace, no run, no model call but Jev', async (t) => {
   const { fake, tasks, deps } = setup(t);
 
   assert.deepEqual(await startIntent(deps, 'Plan my wedding next June'), {
