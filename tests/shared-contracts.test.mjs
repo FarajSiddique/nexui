@@ -51,8 +51,9 @@ test('the barrel exports every kind schema and helper after the per-template gro
 test('templates are one enum, shared by intents and run inputs', () => {
   const input = { text: 'Plan Japan', route: 'reasoning', perception: 'model' };
 
-  assert.deepEqual(types.templateSchema.options, ['travel']);
+  assert.deepEqual(types.templateSchema.options, ['travel', 'job_search']);
   assert.equal(types.runInputSchema.safeParse({ ...input, template: 'travel' }).success, true);
+  assert.equal(types.runInputSchema.safeParse({ ...input, template: 'job_search' }).success, true);
   assert.equal(types.runInputSchema.safeParse(input).success, true);
   assert.equal(types.runInputSchema.safeParse({ ...input, template: 'none' }).success, false);
 });
@@ -65,10 +66,16 @@ test('a stored workspace doc passes through the upgrade step unchanged', () => {
   assert.deepEqual(mapSnapshotRow(snapshotRow(doc)).workspace.doc, doc);
 });
 
-test('every template offers an example goal the create route accepts', () => {
+test('every template has an example entry, and each example is a goal the create route accepts', () => {
   assert.deepEqual(Object.keys(types.TEMPLATE_EXAMPLES), types.templateSchema.options);
+  // Job search's mobile side ships in PR 3; until then the + sheet doesn't offer it.
+  assert.equal(types.TEMPLATE_EXAMPLES.job_search, null);
 
   for (const [name, example] of Object.entries(types.TEMPLATE_EXAMPLES)) {
+    if (example === null) {
+      continue;
+    }
+
     assert.equal(
       types.createIntentRequestSchema.safeParse({ goal: example.goal }).success,
       true,

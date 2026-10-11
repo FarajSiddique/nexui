@@ -53,7 +53,11 @@ async function discardTrip(db: SupabaseClient, intentId: string): Promise<void> 
  * read the goal, its `PerceptionFailedError` stands and nothing is created. If the run can't be
  * created, the seeded plan is deleted and the error is rethrown.
  */
-export async function startIntent(deps: Orchestrator, goal: string): Promise<StartedIntent> {
+export async function startIntent(
+  deps: Orchestrator,
+  goal: string,
+  timezone = 'UTC',
+): Promise<StartedIntent> {
   const session = deps.openSession('create_intent', goal);
   const template = await chooseTemplate(session.evaluationModel, goal, {
     providerOptions: session.providerOptions('perception'),
@@ -61,12 +65,12 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
 
   // Saved, not planned: no workspace, no run and no model call beyond Jev.
   if (template === 'unsupported') {
-    await createIntent(deps.db, goal, null);
+    await createIntent(deps.db, { goal, template: null, timezone });
 
     return { outcome: 'unsupported' };
   }
 
-  const snapshot = await createIntent(deps.db, goal, template);
+  const snapshot = await createIntent(deps.db, { goal, template, timezone });
   let run: RunRecord;
 
   try {

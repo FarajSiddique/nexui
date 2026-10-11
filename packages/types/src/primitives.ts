@@ -3,6 +3,24 @@ import { z } from 'zod';
 export const idSchema = z.uuid();
 export const timestampSchema = z.iso.datetime({ offset: true });
 
+/**
+ * True for an IANA time zone this runtime knows.
+ *
+ * @example
+ * isTimeZone('Europe/London') // true
+ */
+export function isTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const timeZoneSchema = z.string().min(1).max(64).refine(isTimeZone, 'Unknown time zone.');
+
 /** The most characters a free-form JSON field (link metadata, action input) may serialize to. */
 export const MAX_FREE_JSON_LENGTH = 2_000;
 

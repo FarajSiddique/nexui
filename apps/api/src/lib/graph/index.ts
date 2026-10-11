@@ -6,7 +6,7 @@ export {
   NothingToCommitError,
   revertEvent,
 } from './commit.ts';
-export type { CommitResult } from './commit.ts';
+export type { CommitResult, NewIntent } from './commit.ts';
 export {
   ChangesetConflictError,
   ChangesetInvalidError,

@@ -14,9 +14,8 @@ export const intentStatusSchema = z.enum([
   'completed',
   'archived',
 ]);
-// The templates the API defines (`TEMPLATES`). The database also allows `job_search`, which the
-// job search build adds here together with its definition.
-export const templateSchema = z.enum(['travel']);
+// The templates the API defines (`TEMPLATES`), matching the database's check.
+export const templateSchema = z.enum(['travel', 'job_search']);
 
 export type Template = z.infer<typeof templateSchema>;
 

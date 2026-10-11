@@ -19,7 +19,7 @@ export const TRAVEL_TEMPLATE: TemplateDefinition = {
     { key: 'unallocatedDays', label: 'unallocated days' },
     { key: 'totalDays', label: 'total days' },
   ],
-  seed: seedTravelOps,
+  seed: ({ goal }, newId) => seedTravelOps(goal, newId),
   derive: ({ before, staged, ops, anchorId, newId }) =>
     deriveTrip(staged, anchorId, findShortenedPlace(before, ops), newId),
   capabilities: TRAVEL_CAPABILITIES,

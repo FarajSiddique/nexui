@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 import { idSchema, insightActionSchema } from '../primitives.ts';
+import { searchCriteriaSchema } from './jobs/schemas.ts';
 import { legDataSchema } from './travel/schemas.ts';
 
 // Kinds every template uses. An option's `placeId`, `suggestedDays`, `leg` and `extendPlaceId`
 // are what the travel template's decision options carry (a pick adds a place to the route);
-// other templates leave them out.
+// other templates leave them out. A job search's option carries the criteria picking it sets.
 
 export const decisionDataSchema = z.strictObject({
   question: z.string().trim().min(1).max(200),
@@ -33,6 +34,8 @@ export const optionDataSchema = z.strictObject({
   leg: legDataSchema.extend({ fromPlaceId: idSchema }).optional(),
   /** A stop already on the route that gets the days instead, for an option with no place. */
   extendPlaceId: idSchema.optional(),
+  /** The search criteria picking this option sets (`JOB_DECISIONS`). */
+  criteria: searchCriteriaSchema.optional(),
 });
 
 export const insightDataSchema = z.strictObject({

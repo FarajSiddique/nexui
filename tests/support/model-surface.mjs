@@ -6,14 +6,14 @@ import { chooseTemplate } from '../../apps/api/src/lib/perception/perceive.ts';
 import { TEMPLATES } from '../../apps/api/src/lib/templates/registry.ts';
 import { Experimental_EvaluationMockModelV4 } from './ai.mjs';
 
-const CAPABILITIES = TEMPLATES.travel.capabilities;
-
 /**
- * Everything a model sees for a trip: each tool's name, description, flags and input schema in
- * order, the run instructions for every kind and route, and Jev's template question. JSON round
- * trip, so it compares with the stored file exactly.
+ * Everything a model sees for one template's plans: each tool's name, description, flags and
+ * input schema in order (capabilities, then lookups), the run instructions for every kind and
+ * route, and Jev's template question with the gates `env` sets. JSON round trip, so it compares
+ * with the stored file exactly.
  */
-export async function travelModelSurface() {
+export async function modelSurface(name, env) {
+  const template = TEMPLATES[name];
   const seen = [];
   const model = new Experimental_EvaluationMockModelV4({
     doEvaluate: async (options) => {
@@ -23,22 +23,30 @@ export async function travelModelSurface() {
     },
   });
 
-  await chooseTemplate(model, 'Plan Japan');
+  await chooseTemplate(model, 'Plan Japan', { env });
 
   const surface = {
-    tools: CAPABILITIES.map((capability) => ({
-      name: capability.name,
-      description: capability.description,
-      policy: capability.policy,
-      exposeToModel: capability.exposeToModel,
-      callableByUser: capability.callableByUser,
-      input: capability.input.toJSONSchema(),
-    })),
+    tools: [
+      ...template.capabilities.map((capability) => ({
+        name: capability.name,
+        description: capability.description,
+        policy: capability.policy,
+        exposeToModel: capability.exposeToModel,
+        callableByUser: capability.callableByUser,
+        input: capability.input.toJSONSchema(),
+      })),
+      ...(template.lookups ?? []).map((lookup) => ({
+        name: lookup.name,
+        description: lookup.description,
+        perRun: lookup.perRun,
+        input: lookup.input.toJSONSchema(),
+      })),
+    ],
     instructions: {
-      create_intent: instructionsFor(TEMPLATES.travel, 'create_intent', 'reasoning'),
-      edit: instructionsFor(TEMPLATES.travel, 'ask', 'edit'),
-      fast: instructionsFor(TEMPLATES.travel, 'ask', 'fast'),
-      reasoning: instructionsFor(TEMPLATES.travel, 'ask', 'reasoning'),
+      create_intent: instructionsFor(template, 'create_intent', 'reasoning'),
+      edit: instructionsFor(template, 'ask', 'edit'),
+      fast: instructionsFor(template, 'ask', 'fast'),
+      reasoning: instructionsFor(template, 'ask', 'reasoning'),
     },
     chooseTemplate: seen[0].questions.template,
   };
@@ -46,10 +54,22 @@ export async function travelModelSurface() {
   return JSON.parse(JSON.stringify(surface));
 }
 
-// `node --experimental-strip-types tests/support/model-surface.mjs` rewrites the expected file,
-// for a change to what models see that is meant. Review its diff like code.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const file = new URL('./travel-model-surface.json', import.meta.url);
+/** What a model sees for a trip, with job search gated off as in production. */
+export const travelModelSurface = () => modelSurface('travel', {});
 
-  writeFileSync(file, `${JSON.stringify(await travelModelSurface(), null, 2)}\n`);
+/** What a model sees for a job search, with its gate on. */
+export const jobSearchModelSurface = () => modelSurface('job_search', { JOB_SEARCH: 'on' });
+
+// `node --experimental-strip-types tests/support/model-surface.mjs` rewrites both expected files,
+// for a change to what models see that is meant. Review their diffs like code.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  for (const [file, surfaceOf] of [
+    ['./travel-model-surface.json', travelModelSurface],
+    ['./job-search-model-surface.json', jobSearchModelSurface],
+  ]) {
+    writeFileSync(
+      new URL(file, import.meta.url),
+      `${JSON.stringify(await surfaceOf(), null, 2)}\n`,
+    );
+  }
 }

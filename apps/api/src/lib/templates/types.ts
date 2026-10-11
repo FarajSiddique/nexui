@@ -56,6 +56,12 @@ export interface TemplatePrompt {
  * (readiness doc, section 3.1). `templateSchema` lists each one, and `TEMPLATES` must hold a
  * definition for every name it lists.
  */
+/** What a template's seed reads: the goal, and the device's time zone from the create request. */
+export interface SeedInput {
+  goal: string;
+  timezone: string;
+}
+
 export interface TemplateDefinition {
   name: Template;
   /** The kind of the workspace anchor, the object the plan is about. */
@@ -67,6 +73,11 @@ export interface TemplateDefinition {
   /** The sentence Jev reads when it picks a template for a new goal. */
   perception: string;
   /**
+   * An env var that must be `on` for Jev to route new goals here, so a template can ship before
+   * its app side (job search's `JOB_SEARCH`). Without one, the template always routes.
+   */
+  gate?: string;
+  /**
    * The template's own keys in `intents.context`, such as job search's `jobs`. Checked, with
    * the eval tag, on every `update_intent` (`contextSchemaFor`).
    */
@@ -77,7 +88,7 @@ export interface TemplateDefinition {
    */
   figures: readonly { key: string; label: string }[];
   /** The ops that start a plan from its goal: the anchor and the workspace. */
-  seed: (goal: string, newId: () => string) => ChangesetOp[];
+  seed: (input: SeedInput, newId: () => string) => ChangesetOp[];
   /** Ops derived from a staged changeset, committed with it. Deterministic; no model call. */
   derive: (input: DeriveInput) => ChangesetOp[];
   /** What runs and the app's buttons may call on the template's plans, in the order models see. */

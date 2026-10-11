@@ -6,6 +6,7 @@ import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { prepareChangeset, validateOps } from '../apps/api/src/lib/graph/prepare.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { idSequence, intentRow, LATER, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import { jobSnapshot } from './support/jobs.mjs';
 
 const trip = mapSnapshotRow(snapshotRow(travelWorkspace(TRIP_ID)));
 const unplanned = mapSnapshotRow({
@@ -38,5 +39,20 @@ test('an intent with no template may hold only the eval tag', () => {
   assert.throws(
     () => validateOps(unplanned, [write({ jobs: { scan: 'daily' } })], LATER),
     invalid(/^Invalid context/),
+  );
+});
+
+test("a job search's context holds its bookkeeping, checked", () => {
+  const search = jobSnapshot();
+  const jobs = { timezone: 'Europe/London', seen: ['greenhouse:halyard:101'] };
+
+  assert.deepEqual(validateOps(search, [write({ jobs })], LATER), [write({ jobs })]);
+  assert.throws(
+    () => validateOps(search, [write({ jobs: { ...jobs, timezone: 'Mars/Olympus' } })], LATER),
+    invalid(/^Invalid context: jobs\.timezone /),
+  );
+  assert.throws(
+    () => validateOps(search, [write({ jobs: { ...jobs, scan: 'daily' } })], LATER),
+    invalid(/^Invalid context: jobs Unrecognized key/),
   );
 });

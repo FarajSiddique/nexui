@@ -46,7 +46,7 @@ test('a template’s capabilities create only its own kinds, and each name once'
 });
 
 test('a trip’s seed is its anchor and its workspace', () => {
-  const ops = TEMPLATES.travel.seed('Plan Japan', idSequence());
+  const ops = TEMPLATES.travel.seed({ goal: 'Plan Japan', timezone: 'UTC' }, idSequence());
 
   assert.deepEqual(
     ops.map((op) => op.op),

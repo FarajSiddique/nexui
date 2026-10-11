@@ -3,7 +3,9 @@ import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
 import type { RunRoute, Template } from '@nexui/types';
 
 import type { GatewayOptions } from '#lib/ai';
-import { TEMPLATES } from '#lib/templates';
+import { routableTemplates } from '#lib/templates';
+
+type Env = Record<string, string | undefined>;
 
 /** A template, or `unsupported` for a goal no template fits: saved, but not planned. */
 export type TemplateChoice = Template | 'unsupported';
@@ -17,6 +19,8 @@ export interface Perceived<T> {
 export interface PerceptionOptions {
   providerOptions?: GatewayOptions;
   timeoutMs?: number;
+  /** The settings templates' gates read: `process.env` unless a caller passes its own. */
+  env?: Env;
 }
 
 /** Perception runs before the response is sent, so it gets a short budget. */
@@ -29,10 +33,10 @@ export class PerceptionFailedError extends Error {}
 const UNSUPPORTED = 'Anything else, such as a move, a wedding, buying a car or hiring for a team.';
 
 // Each template's own sentence, then `unsupported`: a new template teaches routing by existing.
-function templateCriteria(): Record<TemplateChoice, string> {
+function templateCriteria(env: Env): Record<TemplateChoice, string> {
   const criteria = {} as Record<TemplateChoice, string>;
 
-  for (const template of Object.values(TEMPLATES)) {
+  for (const template of routableTemplates(env)) {
     criteria[template.name] = template.perception;
   }
 
@@ -43,7 +47,8 @@ function templateCriteria(): Record<TemplateChoice, string> {
 
 /**
  * Jev's template question for a new goal (spec section F): each template's `perception`
- * sentence, then `unsupported`. Nexui doesn't guess (job search spec, section 2): if Jev fails,
+ * sentence, then `unsupported`. A gated template is offered only where its gate is on
+ * (`routableTemplates`). Nexui doesn't guess (job search spec, section 2): if Jev fails,
  * runs out of time or picks a choice it wasn't offered (the AI SDK refuses that answer), this
  * throws `PerceptionFailedError` and the caller creates nothing.
  *
@@ -63,7 +68,7 @@ export async function chooseTemplate(
         template: {
           type: 'choice',
           instructions: 'Someone typed this goal to start a plan. Which template fits it?',
-          criteria: templateCriteria(),
+          criteria: templateCriteria(options.env ?? process.env),
         },
       },
       abortSignal: AbortSignal.timeout(options.timeoutMs ?? PERCEPTION_TIMEOUT_MS),

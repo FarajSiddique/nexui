@@ -30,9 +30,12 @@ test('new plans take turns with each template’s example goal', () => {
   assert.equal(exampleGoal([trip], 5), trip.goal);
 });
 
-// Until job search declares its template (PR 2), the + sheet offers trips alone.
+// Until job search's mobile side ships (PR 3), the + sheet offers trips alone.
 test('the + sheet offers every template the API plans, and only those', () => {
-  assert.deepEqual(GOAL_EXAMPLES, Object.values(TEMPLATE_EXAMPLES));
+  assert.deepEqual(
+    GOAL_EXAMPLES,
+    Object.values(TEMPLATE_EXAMPLES).filter((example) => example !== null),
+  );
   assert.equal(plansToday(GOAL_EXAMPLES), 'Today Nexui plans trips.');
   assert.equal(nextGoalPlaceholder(), 'A week in Lisbon in May');
 });

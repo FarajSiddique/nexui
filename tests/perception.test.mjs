@@ -29,7 +29,7 @@ test('Jev picks the template from the goal alone', async () => {
   const providerOptions = { gateway: { models: ['anthropic/claude-haiku-4.5'] } };
 
   assert.equal(
-    await chooseTemplate(model, 'Plan my wedding next June', { providerOptions }),
+    await chooseTemplate(model, 'Plan my wedding next June', { providerOptions, env: {} }),
     'unsupported',
   );
   assert.deepEqual(seen[0].state, { goal: 'Plan my wedding next June' });
@@ -127,6 +127,7 @@ test("Jev reads each template's own sentence, then one for goals none fits", asy
   await chooseTemplate(
     answering({ template: { type: 'choice', choice: 'travel' } }, seen),
     'Plan Japan',
+    { env: { JOB_SEARCH: 'on' } },
   );
 
   const { criteria } = seen[0].questions.template;
@@ -148,14 +149,31 @@ test("Jev reads each template's own sentence, then one for goals none fits", asy
 test('an answer Jev was not offered is refused like a failure', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
 
-  // A stale fixture's `none`, `job_search` before its template exists, a prototype key.
+  // A stale fixture's `none`, `job_search` while its gate is off, a prototype key.
   for (const choice of ['none', 'job_search', 'toString']) {
     await assert.rejects(
-      chooseTemplate(answering({ template: { type: 'choice', choice } }), 'Find a new job'),
+      chooseTemplate(answering({ template: { type: 'choice', choice } }), 'Find a new job', {
+        env: {},
+      }),
       unread,
       choice,
     );
   }
 
   assert.equal(logged.mock.callCount(), 3);
+});
+
+test('a gated template is offered only where its gate is on', async () => {
+  const seen = [];
+  const model = answering({ template: { type: 'choice', choice: 'travel' } }, seen);
+
+  await chooseTemplate(model, 'Plan Japan', { env: {} });
+  await chooseTemplate(model, 'Plan Japan', { env: { JOB_SEARCH: 'on' } });
+
+  assert.deepEqual(Object.keys(seen[0].questions.template.criteria), ['travel', 'unsupported']);
+  assert.deepEqual(Object.keys(seen[1].questions.template.criteria), [
+    'travel',
+    'job_search',
+    'unsupported',
+  ]);
 });

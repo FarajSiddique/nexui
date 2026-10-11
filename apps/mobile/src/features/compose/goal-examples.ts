@@ -1,7 +1,12 @@
 import { TEMPLATE_EXAMPLES, type TemplateExample } from '@nexui/types';
 
-/** Every template's example, in the order `TEMPLATE_EXAMPLES` lists them. */
-export const GOAL_EXAMPLES: readonly TemplateExample[] = Object.values(TEMPLATE_EXAMPLES);
+/**
+ * Every template's example the app offers, in the order `TEMPLATE_EXAMPLES` lists them. A null
+ * entry is a template whose app side hasn't shipped.
+ */
+export const GOAL_EXAMPLES: readonly TemplateExample[] = Object.values(TEMPLATE_EXAMPLES).filter(
+  (example): example is TemplateExample => example !== null,
+);
 
 /**
  * What Nexui plans today, from each template's plans.
