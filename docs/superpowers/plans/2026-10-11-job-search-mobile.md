@@ -147,6 +147,7 @@ The six items PR 2's build and reviews left for this PR, and where each lands:
 9. **`data/place-media.ts` stays keyed by place objects** (readiness doc 3.5 item 4 asked for the summary strip's `key`). The media route answers per place id, so keying on strips would change the API for no gain. `photo-band.ts` does key on the strip.
 10. **The `gate` stays.** PR 2's Decision 2 said this PR removes it. The handoff makes turning job search on in production a merge-checklist item, and the gate is the switch for it and for template #3.
 11. **Criteria are edited through `object.update`**, with no criteria-specific capability (Decision 2). The current employer stays on the never-show list without a remove button, since the scan drops it from the resume anyway.
+12. **The posting note reads `still live today on its job board`** (or `last seen live <date>` from an earlier day), not the spec's "still live this morning" (spec section 6). `lastSeenLiveAt` can be stamped at any hour, not only by a morning scan, and the note names where Nexui looked.
 
 ## Decisions this plan makes (flagged for review)
 
@@ -275,7 +276,7 @@ The plan's own:
 
 New tests: `kind-meta`, `template-intakes`, `mobile-import-direction`, `mobile-upload-form`, `mobile-jobs-timeline`, `mobile-jobs-pipeline`, `mobile-jobs-role`, `mobile-jobs-draft`, `mobile-jobs-search`, `mobile-compose-reply`.
 
-Changed: `mobile-format`, `kind-cards`, `mobile-goal-examples`, `jobs-template`, `jobs-capabilities`, `kind-behaviour`, `capabilities-route`, `model-surface` (its two JSON files), `mobile-change-feed`, `mobile-workspace-actions`, `mobile-workspace-layout`, `mobile-stop-details`, `mobile-map-region`, `mobile-country-names`, `mobile-photo-band`.
+Changed: `mobile-format`, `kind-cards`, `mobile-goal-examples`, `jobs-capabilities`, `kind-behaviour`, `capabilities-route`, `model-surface` (its two JSON files), `mobile-change-feed`, `mobile-workspace-actions`, `mobile-workspace-layout`, `mobile-stop-details`, `mobile-map-region`, `mobile-country-names`, `mobile-photo-band`.
 
 ## Before Task 1: pre-flight
 
@@ -924,7 +925,7 @@ In `DecisionSection`'s `columns`, change the photo line to:
     photo: candidatePhoto(entry.candidate ? photos[entry.candidate.id] : undefined),
 ```
 
-Then run `grep -rn "\.place\b" tests/mobile-workspace-layout.test.mjs apps/mobile/src/features/workspace`. Any decision test or code still reading an option's `.place` reads `.candidate` now. A route stop's `stop.place` is a different type and stays.
+Then run `grep -rn "\.place\b" tests/mobile-workspace-layout.test.mjs apps/mobile/src/features/workspace`. Any decision test or code still reading an option's `.place` reads `.candidate` now. One is known: the decision test in `tests/mobile-workspace-layout.test.mjs` that reads `entry.place` (line 109 at `1468204`) reads `entry.candidate`. A route stop's `stop.place` is a different type and stays.
 
 - [ ] **Step 6: Run the tests**
 
@@ -1331,9 +1332,11 @@ test('the app may change an object through object.update, with its kind’s chec
 Run: `node --experimental-strip-types --test tests/jobs-capabilities.test.mjs tests/kind-behaviour.test.mjs tests/capabilities-route.test.mjs`
 Expected: FAIL:
 
-- `Staff PM can't be edited this way.`-style refusals (a role isn't editable);
-- `Unknown capability`-style failure for `jobs.forgetPass`;
-- `That action isn't available.` (400) for `object.update` from the app.
+- the rename test, with `Role can't be edited this way.` (a role isn't editable, and the fixture's title is `Role`). The stager doesn't check `callableByUser`, so this is the kind check failing, not the flag;
+- the forget test, with `That action isn't available.` from the stager (no `jobs.forgetPass` yet);
+- the flags test, which expects `jobs.forgetPass` and a user-callable `object.update`;
+- the kind-behaviour test (`editable` is `false`, and there is no `nameField`);
+- the route test, with `That action isn't available.` (400). Only `invokeCapability` checks `callableByUser`, so this is the one failure the flag causes.
 
 - [ ] **Step 3: Roles are editable, and name their title field**
 
@@ -2425,7 +2428,13 @@ Expected: FAIL, since `#features/travel` and `#features/registry` don't resolve,
 
 - [ ] **Step 2: Move the files**
 
-Run each `git mv` on its own, as in the Files list. For example:
+`git mv` doesn't create a missing folder, so make the two new ones first:
+
+```bash
+mkdir -p apps/mobile/src/features/travel/sections apps/mobile/src/features/registry
+```
+
+Then run each `git mv` on its own, as in the Files list. For example:
 
 ```bash
 git mv apps/mobile/src/features/workspace/sections/map-section.tsx apps/mobile/src/features/travel/sections/map-section.tsx
@@ -2435,7 +2444,7 @@ Then run `git rm apps/mobile/src/features/place/index.ts`.
 
 - [ ] **Step 3: Move `legBetween` into the travel figures, and `aiMarkFor` into `lib`**
 
-In `packages/types/src/kinds/travel/figures.ts`, add `GraphObject` to its type import from `../../graph.ts`, then add (the body is `workspace-layout.ts`'s, unchanged):
+In `packages/types/src/kinds/travel/figures.ts` (which already imports `GraphObject` and `GraphSnapshot` from `../../graph.ts`), add (the body is `workspace-layout.ts`'s, unchanged):
 
 ```ts
 /** The leg from one stop to another, if the graph has one. */
@@ -4304,7 +4313,8 @@ function Row({
 
 /**
  * What's coming up (spec section 3.2): interviews soonest first, with the past folded to a
- * count. A row opens the role its interview is for.
+ * count. A row opens the role its interview is for. "Now" is read when the plan's data changes,
+ * so an interview that passes while the plan stays open moves to the past on the next change.
  */
 export function TimelineSection({
   section,
@@ -5134,7 +5144,8 @@ function Group({
 /**
  * Roles by stage (spec section 3.2): New first, with Nexui's picks AI-marked and Interested and
  * Pass on each; later stages only with roles in them; Closed folded to a count. Every card opens
- * its role.
+ * its role. "Now" is read when the plan's data changes, so a follow-up note that falls due while
+ * the plan stays open shows on the next change.
  */
 export function PipelineSection({
   section,
@@ -5232,7 +5243,7 @@ Spec section 6 ("Role"), carried items 2 and 5 (Decision 2). A role opens in `/o
 - **What it is:** the title (AI-marked until edited, with **Rename**), company, place and pay.
 - **Where it stands:** a stage picker. Offer adds **Accept offer** and **Decline**, and **Close this role** offers its outcomes.
 - **Why it fits and its gaps.**
-- **View posting**, with the host it opens and when it was last seen live.
+- **View posting**, with the host it opens and when it was last seen live (Departure 12's wording).
 - **Its dates, drafts, people and interviews.**
 - **I applied** and **Ask about this role.**
 
@@ -5546,7 +5557,8 @@ function words(body: string): number {
   return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
-// When the posting went up and when a board last listed it: "Posted Oct 2 · still live today".
+// When the posting went up and when a board last listed it: "Posted Oct 2 · still live today on
+// its job board" (Departure 12).
 function postingNote(data: OpportunityData, now: Date, timeZone?: string): string {
   const parts: string[] = [];
 
@@ -7209,6 +7221,8 @@ Spec sections 2, 4 and 8 (Decision 13). After a new goal, the + sheet now shows 
 - **A saved goal:** the saved-goal reply, as before.
 - **A job search:** the resume step. **Add resume (PDF)** reads the file and starts the build; **Continue without** starts it with none. Either way the build run streams in.
 - **A second job search:** `You already have a job search. Add this to it?` with **Open my search**, which puts the goal back in the composer to send to that plan.
+  - The sheet reads that plan's template from Home's cached list first, then from the plan itself, so the reply shows at once.
+  - If neither has loaded (no list, and the plan's fetch failed), it still shows, as `You already have a plan like this. Add this to it?` with **Open my plan**.
 
 On a plan that takes a document, a **PDF** button beside the composer adds or replaces it. A failed build's Try again starts the build again.
 
@@ -7405,12 +7419,13 @@ import { Button, NexuiTag } from '#ui';
 /**
  * The answer to a second plan of a kind a user keeps one of at a time (job search spec, section
  * 8): it offers the plan already going, and Open puts the goal back in the composer to add to it.
+ * With no `example` (the sheet couldn't learn the plan's template) it names no kind.
  */
 export function ExistingPlanReply({
   example,
   onOpen,
 }: {
-  example: TemplateExample;
+  example: TemplateExample | null;
   onOpen: () => void;
 }): ReactElement {
   const styles = useStyles();
@@ -7419,9 +7434,13 @@ export function ExistingPlanReply({
     <View style={styles.card}>
       <NexuiTag />
       <Text accessibilityRole="header" style={styles.title}>
-        You already have {example.one}. Add this to it?
+        You already have {example ? example.one : 'a plan like this'}. Add this to it?
       </Text>
-      <Button label={`Open my ${example.short}`} variant="primary" onPress={onOpen} />
+      <Button
+        label={example ? `Open my ${example.short}` : 'Open my plan'}
+        variant="primary"
+        onPress={onOpen}
+      />
     </View>
   );
 }
@@ -7460,7 +7479,7 @@ In `apps/mobile/src/app/(app)/compose.tsx`, make these changes. The view tree, `
 **Imports.**
 
 - Add `import { intakeRoute, TEMPLATE_EXAMPLES, TEMPLATE_INTAKES } from '@nexui/types';`.
-- Add `choosePdf`, `useReplaceResume`, `useStartPlan` and `type PickedPdf` to the `#data` import.
+- Add `choosePdf`, `useIntents`, `useReplaceResume`, `useStartPlan` and `type PickedPdf` to the `#data` import.
 - Add `ExistingPlanReply`, `ResumeStep`, `replyFor`, `targetOf` and `type Reply` to the `#features/compose` import.
 
 **`Sent`.** Replace the interface:
@@ -7480,6 +7499,7 @@ interface Sent {
 **State.** After `const cancel = useCancelRun();`, add:
 
 ```tsx
+const intents = useIntents();
 const start = useStartPlan();
 const replace = useReplaceResume();
 const [notice, setNotice] = useState<string | null>(null);
@@ -7491,8 +7511,11 @@ Change `useRun(sent?.runId ?? null)` to `useRun(sent?.reply.type === 'run' ? sen
 
 ```tsx
 const plan = context.data?.intent;
-const intake = plan?.template ? TEMPLATE_INTAKES[plan.template] : null;
-const example = plan?.template ? TEMPLATE_EXAMPLES[plan.template] : null;
+// Home's list is almost always cached, so a second search's reply needn't wait on its plan.
+const template =
+  intents.data?.find((item) => item.id === target)?.template ?? plan?.template ?? null;
+const intake = template ? TEMPLATE_INTAKES[template] : null;
+const example = template ? TEMPLATE_EXAMPLES[template] : null;
 const reading = replace.isPending || (start.isPending && Boolean(start.variables?.pdf));
 const working =
   isRunActive(run.data) ||
@@ -7646,7 +7669,7 @@ const retry = (current: Sent): void => {
   ) : null;
 }
 {
-  sent?.reply.type === 'existing' && example ? (
+  sent?.reply.type === 'existing' ? (
     <ExistingPlanReply example={example} onOpen={openExisting} />
   ) : null;
 }
