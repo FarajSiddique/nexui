@@ -49,9 +49,9 @@ async function discardTrip(db: SupabaseClient, intentId: string): Promise<void> 
 /**
  * CreateIntent (spec section F): Jev picks the template, the template seeds the intent at once,
  * and a reasoning run is queued, which the worker claims after the response to fill it in. A
- * goal no template fits is saved as an intent with no template, workspace or run. If Jev can't read the goal, its
- * `PerceptionFailedError` stands and nothing is created. If the run can't be created, the
- * seeded plan is deleted and the error is rethrown.
+ * goal no template fits is saved as an intent with no template, workspace or run. If Jev can't
+ * read the goal, its `PerceptionFailedError` stands and nothing is created. If the run can't be
+ * created, the seeded plan is deleted and the error is rethrown.
  */
 export async function startIntent(deps: Orchestrator, goal: string): Promise<StartedIntent> {
   const session = deps.openSession('create_intent', goal);

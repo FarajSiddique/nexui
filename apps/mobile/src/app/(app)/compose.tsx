@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactElement } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import {
@@ -48,6 +48,7 @@ export default function ComposeSheet(): ReactElement {
   const ask = useAsk();
   const cancel = useCancelRun();
   const keyboardOverlap = useKeyboardOverlap();
+  const inputRef = useRef<TextInput>(null);
 
   // A plan open underneath keeps its own Realtime channel, so the sheet only listens for a plan
   // it started.
@@ -58,6 +59,12 @@ export default function ComposeSheet(): ReactElement {
   const error = create.error ?? ask.error ?? cancel.error;
   const goal = context.data?.intent.goal;
   const next = params.intentId ? afterAsk(run.data) : null;
+
+  // A "Try one" example only fills the composer; focusing it shows the text landed.
+  const tryExample = (example: string): void => {
+    setText(example);
+    inputRef.current?.focus();
+  };
 
   const send = (message: string): void => {
     const trimmed = message.trim();
@@ -132,7 +139,7 @@ export default function ComposeSheet(): ReactElement {
           </Text>
         </View>
         {sent ? <Text style={styles.bubble}>{sent.text}</Text> : null}
-        {sent && sent.runId === null ? <SavedGoalReply onTry={setText} /> : null}
+        {sent && sent.runId === null ? <SavedGoalReply onTry={tryExample} /> : null}
         {sent?.runId ? (
           <RunCard
             run={run.data}
@@ -162,6 +169,7 @@ export default function ComposeSheet(): ReactElement {
         ) : null}
         <View style={styles.inputRow}>
           <TextInput
+            ref={inputRef}
             accessibilityLabel={target ? 'Ask about this plan' : 'Describe your plan'}
             autoFocus={!sent}
             multiline
