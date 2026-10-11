@@ -4,7 +4,6 @@ export type { DetailProps } from './detail-types';
 export { InsightSection } from './sections/insight-section';
 export { MetricSection } from './sections/metric-section';
 export { ObjectListSection } from './sections/object-list-section';
-export { PendingSection } from './sections/pending-section';
 export { SectionFrame } from './sections/section-frame';
 export type { SectionProps } from './sections/types';
 export { UndoToast } from './undo-toast';

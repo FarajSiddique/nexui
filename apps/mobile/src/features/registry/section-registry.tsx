@@ -3,7 +3,7 @@ import type { ComponentType, ReactElement } from 'react';
 import type { GraphSnapshot, Section } from '@nexui/types';
 
 import type { PhotoState } from '#data';
-import { TimelineSection } from '#features/jobs';
+import { PipelineSection, TimelineSection } from '#features/jobs';
 import { AllocationSection, MapSection, RouteSection } from '#features/travel';
 import {
   ComparisonSection,
@@ -11,7 +11,6 @@ import {
   InsightSection,
   MetricSection,
   ObjectListSection,
-  PendingSection,
   type SectionDataOf,
   type SectionEntry,
   type SectionProps,
@@ -32,7 +31,7 @@ export const SECTION_REGISTRY: { [T in Section['type']]: ComponentType<SectionPr
   comparison: ComparisonSection,
   decision: DecisionSection,
   insight: InsightSection,
-  pipeline: PendingSection,
+  pipeline: PipelineSection,
   timeline: TimelineSection,
 };
 

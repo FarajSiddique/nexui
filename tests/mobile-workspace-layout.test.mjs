@@ -239,7 +239,7 @@ test('a pipeline and a timeline get the objects their queries find, for PR 3 to 
   );
 });
 
-test('a pinned pipeline or timeline never makes an Open band: they draw nothing yet', () => {
+test('a pinned pipeline or timeline never makes an Open band: they list, they never wait on the user', () => {
   const places = doc.sections.find((section) => section.id === 'route').query;
   const pinnedDoc = {
     ...doc,

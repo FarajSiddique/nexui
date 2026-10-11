@@ -231,7 +231,7 @@ function isUnresolved(data: SectionData): boolean {
       return data.insights.length > 0;
     case 'pipeline':
     case 'timeline':
-      // Stand-ins that draw nothing until the mobile PR: never an empty Open band.
+      // Lists, not questions: they never wait on the user, so never open the band.
       return false;
     default:
       return true;

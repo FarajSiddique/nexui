@@ -11,6 +11,13 @@ const httpsUrl = z.url({ protocol: /^https$/ }).max(2000);
 
 export const workModeSchema = z.enum(['remote', 'hybrid', 'onsite']);
 
+/** Work modes in the order the search sheet offers them. */
+export const WORK_MODES = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'onsite', label: 'On-site' },
+] as const satisfies readonly { value: z.infer<typeof workModeSchema>; label: string }[];
+
 export const boardProviderSchema = z.enum(['greenhouse', 'lever', 'ashby']);
 
 /**
