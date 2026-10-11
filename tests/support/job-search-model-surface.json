@@ -155,7 +155,7 @@
     },
     {
       "name": "jobs.addRole",
-      "description": "Add a role to the search, in New, with its company. Use a posting jobs_lookup returned, copying its source and URL exactly, or a role the user described.",
+      "description": "Add a role to the search, in New, with its company. Use a posting jobs_lookup returned, copying its source, URL and boardUrl exactly, or a role the user described.",
       "policy": "internal",
       "exposeToModel": true,
       "callableByUser": true,
@@ -204,6 +204,11 @@
             "maxLength": 200
           },
           "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "boardUrl": {
             "type": "string",
             "maxLength": 2000,
             "format": "uri"
@@ -721,6 +726,11 @@
                   "maxLength": 2000,
                   "format": "uri"
                 },
+                "boardUrl": {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
                 "source": {
                   "type": "object",
                   "properties": {
@@ -858,6 +868,11 @@
                 "maxLength": 200
               },
               "url": {
+                "type": "string",
+                "maxLength": 2000,
+                "format": "uri"
+              },
+              "boardUrl": {
                 "type": "string",
                 "maxLength": 2000,
                 "format": "uri"
@@ -1356,7 +1371,7 @@
     },
     {
       "name": "jobs.lookup",
-      "description": "Read one job posting from its URL (a Greenhouse, Lever or Ashby job page, or a careers page with gh_jid), or a company's open roles from its board. A posting comes back with what jobs_addRole needs.",
+      "description": "Read one job posting from its URL (a Greenhouse, Lever or Ashby job page, or a careers page with gh_jid), or a company's open roles from its board. A posting comes back with what jobs_addRole needs. A boardUrl from a list can be passed back as url to read that posting.",
       "perRun": 10,
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

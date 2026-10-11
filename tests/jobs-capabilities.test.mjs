@@ -419,3 +419,43 @@ test("a model's role takes its source from its URL or the confirmed careers link
     undefined,
   );
 });
+
+test("a model's role gets its source from the board URL a lookup gave when its own URL is a careers page", () => {
+  const s = stager(planWith());
+  const careers = 'https://stripe.com/jobs/listing/staff-engineer/5011';
+  const boardUrl = 'https://boards.greenhouse.io/stripe/jobs/5011';
+
+  s.call('jobs.addRole', {
+    company: { name: 'Stripe' },
+    title: 'Staff Engineer',
+    url: careers,
+    boardUrl,
+  });
+  s.call('jobs.addRole', {
+    company: { name: 'Stripe' },
+    title: 'Not a board',
+    url: 'https://stripe.com/jobs/listing/other/1',
+    boardUrl: 'https://www.linkedin.com/jobs/view/1',
+  });
+
+  const sourceOf = (title) =>
+    s.graph().objects.find((object) => object.title === title).data.source;
+
+  assert.deepEqual(sourceOf('Staff Engineer'), {
+    provider: 'greenhouse',
+    token: 'stripe',
+    job: '5011',
+  });
+  assert.equal(sourceOf('Not a board'), undefined);
+  // The same posting again is a duplicate by its source, whatever URL it carries.
+  assert.throws(
+    () =>
+      s.call('jobs.addRole', {
+        company: { name: 'Stripe' },
+        title: 'Staff Engineer',
+        url: 'https://stripe.com/other',
+        boardUrl,
+      }),
+    refused(/already in this search/),
+  );
+});

@@ -133,7 +133,10 @@ export async function scoreRoles(
   for (const candidate of candidates) {
     const answer = result.answers[questionId(candidate.key)];
 
-    scores.set(candidate.key, answer?.type === 'boolean' ? answer.probability : 0);
+    // A question Jev left unanswered has no score, so the scan neither shows nor drops it.
+    if (answer?.type === 'boolean') {
+      scores.set(candidate.key, answer.probability);
+    }
   }
 
   return scores;

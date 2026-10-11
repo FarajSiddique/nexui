@@ -99,6 +99,7 @@ test('a board lookup lists a company’s open roles; a gone posting says so', as
         {
           title: 'Staff Product Manager',
           url: `https://jobs.lever.co/halyard/${UUID}`,
+          boardUrl: `https://jobs.lever.co/halyard/${UUID}`,
           location: 'London',
           postedAt: new Date(1_760_000_000_000).toISOString(),
         },
@@ -150,4 +151,42 @@ test('a document read answers the resume fenced, so its text can’t pose as ins
   assert.deepEqual(await lookup('document.read').execute({ ref: 'o9' }, ctx), {
     error: 'Nothing is called "o9".',
   });
+});
+
+test('a role list gives each role’s board URL, which a lookup reads when the posting’s own URL is a careers page', async () => {
+  const careers = 'https://stripe.com/jobs/listing/staff-engineer/5011';
+  const { ctx } = context({
+    'https://boards-api.greenhouse.io/v1/boards/stripe/jobs/5011': {
+      id: 5011,
+      title: 'Staff Engineer',
+      absolute_url: careers,
+      location: { name: 'Dublin' },
+      first_published: '2026-10-18T09:00:00Z',
+      content: 'Build payments.',
+    },
+    'https://boards-api.greenhouse.io/v1/boards/stripe/jobs': {
+      jobs: [
+        {
+          id: 5011,
+          title: 'Staff Engineer',
+          absolute_url: careers,
+          first_published: '2026-10-18T09:00:00Z',
+        },
+      ],
+    },
+  });
+  const list = await lookup('jobs.lookup').execute(
+    { board: { provider: 'greenhouse', token: 'stripe' } },
+    ctx,
+  );
+
+  assert.equal(list.roles[0].url, careers);
+  assert.equal(list.roles[0].boardUrl, 'https://boards.greenhouse.io/stripe/jobs/5011');
+
+  const read = await lookup('jobs.lookup').execute({ url: list.roles[0].boardUrl }, ctx);
+
+  assert.equal(read.title, 'Staff Engineer');
+  assert.equal(read.url, careers);
+  assert.equal(read.boardUrl, 'https://boards.greenhouse.io/stripe/jobs/5011');
+  assert.deepEqual(read.source, { provider: 'greenhouse', token: 'stripe', job: '5011' });
 });

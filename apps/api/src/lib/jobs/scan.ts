@@ -31,7 +31,7 @@ import { readJobsConfig, type JobsConfig } from './config.ts';
 import { jobsContext } from './context.ts';
 import { explainFits, type FitWords } from './explain.ts';
 import { compact } from './parts.ts';
-import { isExcluded, type RoleInput } from './roles.ts';
+import { companyKey, isExcluded, type RoleInput } from './roles.ts';
 import { PARTIAL_FIT, personOf, scoreRoles, STRONG_FIT } from './score.ts';
 import { SearchError, searchBoards, searchQuery } from './search.ts';
 import { matchesRole } from './text.ts';
@@ -196,12 +196,20 @@ async function findCandidates(
   const boardDeps: BoardDeps = { contact, fetch: deps.fetch, signal, cache: new Map() };
   const boards: ScanResult['boards'] = [];
   const pool: Posting[] = [];
+  const employer = input.profile?.currentEmployer;
+  // The current employer never surfaces, even if a model edited the never-show list.
+  const isEmployer = (posting: Posting): boolean =>
+    employer !== undefined &&
+    [posting.company, posting.board.token].some(
+      (name) => companyKey(name) === companyKey(employer),
+    );
   const add = (posting: Posting): void => {
     const wanted =
       pool.length < MAX_CANDIDATES &&
       !input.known.has(posting.key) &&
       !pool.some((other) => other.key === posting.key) &&
-      !isExcluded(input.search, posting.company);
+      !isExcluded(input.search, posting.company, posting.board.token) &&
+      !isEmployer(posting);
 
     if (wanted) {
       pool.push(posting);
@@ -342,8 +350,13 @@ export async function scanForRoles(input: ScanInput, deps: ScanDeps): Promise<Sc
   // Shown or dropped goes into `seen`. A fit the caps left out, strong or partial, stays unseen,
   // so the next scan scores it again and can surface it (Decision 19).
   const shown = new Set(chosen.map((one) => one.key));
+  // A candidate Jev left unanswered has no score: neither shown nor dropped, so it is tried again.
   const seen = candidates
-    .filter((one) => shown.has(one.key) || (scores.get(one.key) ?? 0) < PARTIAL_FIT)
+    .filter((one) => {
+      const score = scores.get(one.key);
+
+      return shown.has(one.key) || (score !== undefined && score < PARTIAL_FIT);
+    })
     .map((one) => one.key);
 
   if (chosen.length === 0) {

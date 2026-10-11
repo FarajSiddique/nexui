@@ -11,7 +11,7 @@ import {
   type LookupTool,
 } from '#lib/capabilities';
 
-import { NOT_A_BOARD, parseBoardUrl, postingFor } from './board-urls.ts';
+import { boardPostingUrl, NOT_A_BOARD, parseBoardUrl, postingFor } from './board-urls.ts';
 import { BoardError, listPostings, postingSource, type BoardDeps, type Posting } from './boards.ts';
 import { readJobsConfig } from './config.ts';
 import { compact } from './parts.ts';
@@ -33,6 +33,7 @@ function postingAnswer(found: Posting): Record<string, unknown> {
     title: found.title,
     company: { name: found.company, board: found.board },
     url: found.url,
+    boardUrl: boardPostingUrl(found.board, found.job),
     source: postingSource(found),
     location: found.location,
     workMode: found.workMode,
@@ -53,6 +54,7 @@ async function roleList(
       compact({
         title: found.title,
         url: found.url,
+        boardUrl: boardPostingUrl(found.board, found.job),
         location: found.location,
         postedAt: found.postedAt,
       }),
@@ -100,7 +102,8 @@ const jobsLookup = defineLookup({
   description:
     'Read one job posting from its URL (a Greenhouse, Lever or Ashby job page, or a careers ' +
     "page with gh_jid), or a company's open roles from its board. A posting comes back with " +
-    'what jobs_addRole needs.',
+    'what jobs_addRole needs. A boardUrl from a list can be passed back as url to read that ' +
+    'posting.',
   input: z.strictObject({
     url: z.string().min(1).max(2000).optional(),
     board: boardSchema.optional().describe("A company's board: provider and token"),

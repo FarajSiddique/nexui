@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  boardPostingUrl,
   careersTokens,
   parseBoardUrl,
   resolveCareersLink,
@@ -116,4 +117,28 @@ test('a careers link holds only when the Greenhouse posting points back at that 
     null,
   );
   assert.ok(hosts.every((host) => host === 'boards-api.greenhouse.io'));
+});
+
+test('a posting’s board URL on its own host parses back to the same board and job', () => {
+  const cases = [
+    [{ provider: 'greenhouse', token: 'stripe' }, '5011'],
+    [{ provider: 'lever', token: 'palantir' }, UUID],
+    [{ provider: 'lever', token: 'quantinuum', region: 'eu' }, UUID],
+    [{ provider: 'ashby', token: 'notion' }, UUID],
+  ];
+
+  for (const [board, job] of cases) {
+    const url = boardPostingUrl(board, job);
+
+    assert.deepEqual(parseBoardUrl(url), { kind: 'posting', board, job }, url);
+  }
+
+  assert.equal(
+    boardPostingUrl({ provider: 'greenhouse', token: 'stripe' }, '5011'),
+    'https://boards.greenhouse.io/stripe/jobs/5011',
+  );
+  assert.equal(
+    boardPostingUrl({ provider: 'lever', token: 'quantinuum', region: 'eu' }, UUID),
+    `https://jobs.eu.lever.co/quantinuum/${UUID}`,
+  );
 });

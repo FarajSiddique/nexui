@@ -53,6 +53,11 @@ export const roleInputSchema = z.strictObject({
     .url({ protocol: /^https$/ })
     .max(2000)
     .optional(),
+  /** The board URL a lookup gave, when `url` is the employer's own page. */
+  boardUrl: z
+    .url({ protocol: /^https$/ })
+    .max(2000)
+    .optional(),
   source: jobSourceSchema.optional(),
   location: z.string().max(120).optional(),
   workMode: workModeSchema.optional(),
@@ -75,9 +80,50 @@ function searchOf(ctx: CapabilityContext): { object: GraphObject; data: SearchDa
   return { object, data: object.data as SearchData };
 }
 
-/** Whether the search never shows roles at this company. */
-export function isExcluded(search: SearchData, company: string): boolean {
-  return search.excludeCompanies.some((name) => sameName(name, company));
+const LEGAL_SUFFIXES = new Set([
+  'inc',
+  'incorporated',
+  'ltd',
+  'limited',
+  'llc',
+  'plc',
+  'gmbh',
+  'ag',
+  'sa',
+  'bv',
+  'corp',
+  'corporation',
+  'co',
+  'company',
+]);
+
+/**
+ * A company name as the never-show list compares it: lower case, one trailing legal suffix
+ * dropped, then only letters and digits, so a board token spells the same as the resume.
+ *
+ * @example
+ * companyKey('Jane Street') // 'janestreet' (also 'Janestreet' and 'jane-street')
+ * companyKey('Acme, Inc.') // 'acme'
+ */
+export function companyKey(name: string): string {
+  const words = name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length > 0);
+  const last = words.at(-1);
+
+  if (words.length > 1 && last !== undefined && LEGAL_SUFFIXES.has(last)) {
+    words.pop();
+  }
+
+  return words.join('');
+}
+
+/** Whether the search never shows roles at this company, by its name or its board's token. */
+export function isExcluded(search: SearchData, company: string, token?: string): boolean {
+  const keys = [companyKey(company), ...(token === undefined ? [] : [companyKey(token)])];
+
+  return search.excludeCompanies.some((name) => keys.includes(companyKey(name)));
 }
 
 // The plan's company on that board, or with that name in any case.
@@ -189,12 +235,17 @@ export function addRoleOps(
  * The source a model's role may carry (Decision 21): the one its board URL names, or, for a
  * careers-site URL with `gh_jid`, the Greenhouse posting a lookup confirmed for that host (its
  * token is one the host suggests). Any other URL, or none, gives no source: a model's word isn't
- * a board's.
+ * a board's. The role's `url` is tried first, then the `boardUrl` a lookup gave for it.
  */
 function sourceFromUrl(
   url: string | undefined,
+  boardUrl: string | undefined,
   given: JobSource | undefined,
 ): JobSource | undefined {
+  return sourceFrom(url, given) ?? sourceFrom(boardUrl, given);
+}
+
+function sourceFrom(url: string | undefined, given: JobSource | undefined): JobSource | undefined {
   const link = url ? parseBoardUrl(url) : null;
 
   if (link?.kind === 'posting') {
@@ -217,7 +268,7 @@ const addRole = defineCapability({
   name: 'jobs.addRole',
   description:
     'Add a role to the search, in New, with its company. Use a posting jobs_lookup returned, ' +
-    'copying its source and URL exactly, or a role the user described.',
+    'copying its source, URL and boardUrl exactly, or a role the user described.',
   input: roleInputSchema.extend({
     ref: z.string().optional().describe('A new short ref for the role, such as halyard-pm'),
   }),
@@ -235,7 +286,7 @@ const addRole = defineCapability({
     // and liveness is what code checked (Decision 21). The app's buttons carry what a scan found.
     if (ctx.actor === 'ai') {
       delete role.fit;
-      role.source = sourceFromUrl(role.url, role.source);
+      role.source = sourceFromUrl(role.url, role.boardUrl, role.source);
     }
 
     const { ops, roleId } = addRoleOps(ctx, role, 'new', ctx.actor !== 'ai');

@@ -447,3 +447,69 @@ test('ranking is by probability, ties to the newer posting', () => {
   );
   assert.equal(partial.key, 'e');
 });
+
+// The search's one hit is the employer's Lever board, whose company name is the board token
+// title-cased ("Janestreet"), spelt differently from the resume's "Jane Street".
+async function scanWithEmployerHit(excludeCompanies) {
+  const JANE_JOB = 'd1b2c3d4-0000-4000-8000-000000000004';
+  const base = plan();
+  const snapshot = {
+    ...base,
+    objects: base.objects.map((object) => {
+      if (object.id === SEARCH_ID) {
+        return { ...object, data: { ...object.data, excludeCompanies } };
+      }
+
+      if (object.id === RESUME_ID) {
+        const employed = { ...profile, currentEmployer: 'Jane Street' };
+
+        return { ...object, data: { ...object.data, profile: employed } };
+      }
+
+      return object;
+    }),
+  };
+  const routes = {
+    ...boards,
+    'https://api.parallel.ai/v1/search': {
+      results: [{ url: `https://jobs.lever.co/janestreet/${JANE_JOB}` }],
+    },
+    [`https://api.lever.co/v0/postings/janestreet/${JANE_JOB}`]: {
+      id: JANE_JOB,
+      text: 'Product Manager, Trading',
+      hostedUrl: `https://jobs.lever.co/janestreet/${JANE_JOB}`,
+      createdAt: Date.parse('2026-10-17T09:00:00Z'),
+    },
+  };
+  const asked = [];
+  const janeKey = questionId(`lever:janestreet:${JANE_JOB}`);
+  const result = await scanForRoles(
+    scanInput(snapshot, SEARCH_ID, null),
+    deps(
+      network(routes),
+      jev({ [janeKey]: 0.99, [HALYARD]: 0.9 }, asked),
+      explainer([
+        { id: janeKey, reasons: ['Fits'], gaps: [] },
+        { id: HALYARD, reasons: ['Fits'], gaps: [] },
+      ]),
+    ),
+  );
+
+  return { result, questions: asked.flatMap((one) => Object.keys(one.questions)), janeKey };
+}
+
+test('the current employer stays out when its board token is spelt differently', async () => {
+  const { result, questions, janeKey } = await scanWithEmployerHit(['Jane Street']);
+
+  assert.ok(!questions.includes(janeKey));
+  assert.ok(questions.includes(HALYARD));
+  assert.ok(result.roles.every((role) => role.company.board.token !== 'janestreet'));
+});
+
+test('the current employer stays out even when the never-show list is empty', async () => {
+  const { result, questions, janeKey } = await scanWithEmployerHit([]);
+
+  assert.ok(!questions.includes(janeKey));
+  assert.ok(result.roles.every((role) => role.company.board.token !== 'janestreet'));
+  assert.ok(!result.seen.some((key) => key.includes('janestreet')));
+});

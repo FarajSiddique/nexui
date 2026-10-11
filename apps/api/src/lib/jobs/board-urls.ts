@@ -140,6 +140,31 @@ export function parseBoardUrl(raw: string): BoardLink | null {
 }
 
 /**
+ * A posting's public URL on its board's own host, built from the board and the job id, so a
+ * posting whose `absolute_url` is a custom careers page can still be read and sourced by URL.
+ * `parseBoardUrl` reads it back to the same board and job.
+ *
+ * @example
+ * boardPostingUrl({ provider: 'greenhouse', token: 'stripe' }, '5011')
+ * // 'https://boards.greenhouse.io/stripe/jobs/5011'
+ */
+export function boardPostingUrl(found: Board, job: string): string {
+  const token = encodeURIComponent(found.token);
+
+  if (found.provider === 'greenhouse') {
+    return `https://boards.greenhouse.io/${token}/jobs/${job}`;
+  }
+
+  if (found.provider === 'lever') {
+    const host = found.region === 'eu' ? 'jobs.eu.lever.co' : 'jobs.lever.co';
+
+    return `https://${host}/${token}/${job}`;
+  }
+
+  return `https://${ASHBY_HOST}/${token}/${job}`;
+}
+
+/**
  * Confirms a careers-site link without fetching the site (spikes note 2.4): reads the job from
  * Greenhouse under each guessed token, and accepts it only when the posting's own URL has the
  * pasted host. A third-party careers host (Lyft's) stays refused.

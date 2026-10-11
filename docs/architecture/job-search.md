@@ -56,7 +56,7 @@ The answer is the hits' URLs in relevance order, only those on a board host. A h
 
 1. **Named companies.** Up to five companies the user named, in their order. Each gets its board (the one on file, else `findBoard`), and its open roles whose titles match a target role, newest first, at most 10 a company. A scan given a window (`sinceDays`) keeps only roles posted within it; the build's scan takes any age.
 2. **One web search** from the search's criteria, if `PARALLEL_API_KEY` is set and the pool isn't full. Each hit on a board is read from that board.
-3. **Filter and cap.** Roles the plan already holds, roles a scan already considered (`context.jobs.seen`), and companies on the never-show list are dropped. At most 25 candidates go on. The find phase (steps 1 and 2) has 25 seconds.
+3. **Filter and cap.** Roles the plan already holds, roles a scan already considered (`context.jobs.seen`), and companies on the never-show list are dropped. A company matches by `companyKey` (lower case, one legal suffix such as Inc or Ltd dropped, only letters and digits kept), against its name and its board's token, so `Jane Street`, `Janestreet` and `jane-street` are one company; the resume's current employer is dropped the same way even if the list was edited. At most 25 candidates go on. The find phase (steps 1 and 2) has 25 seconds.
 4. **Score.** One Jev call with a `boolean` question per candidate, "Is this a strong fit for this person?", each question carrying its own role. The person is the resume's profile and the search's criteria, plus the last 10 passes and why: never the resume's text. It has a 10-second limit and one retry.
 5. **Pick.** At 0.85 or above, a strong fit: the best three, best first (ties to the newer posting), go to New. From 0.6 up to 0.85, a partial fit: the best one gets the "Also worth a look" card.
 6. **Explain.** One fast-tier call writes 1 to 3 reasons and at most 2 gaps for each chosen role.
@@ -68,19 +68,19 @@ The answer is the hits' URLs in relevance order, only those on a board host. A h
 
 ## What a model may say
 
-Models read through three lookups (`lookups.ts`), all answering `{ error }` instead of throwing: `web_search` (3 a run; board URLs for a model-written query of up to 120 characters, which the prompt limits to titles, places and industries), `jobs_lookup` (10 a run; one posting from its URL, or a company's open roles from its board; a posting's text comes back fenced in `<posting>`) and `document_read` (5 a run; a document's full text, the resume fenced in `<resume>`).
+Models read through three lookups (`lookups.ts`), all answering `{ error }` instead of throwing: `web_search` (3 a run; board URLs for a model-written query of up to 120 characters, which the prompt limits to titles, places and industries), `jobs_lookup` (10 a run; one posting from its URL, or a company's open roles from its board; a posting's text comes back fenced in `<posting>`; each role and posting also carries a `boardUrl`, the posting's URL on its board's own host, which can be passed back as `url` when the board's own `url` is a custom careers page) and `document_read` (5 a run; a document's full text, the resume fenced in `<resume>`).
 
 `jobs.addRole` is the only way a model adds a role, and a model's word on a role is its title and where it is:
 
 - its `fit` is dropped, since the fit is the scan's judgement;
-- its `source` is taken from the URL, never from the model: the one a board URL names, or for a careers-site `gh_jid` URL the Greenhouse source a lookup confirmed for that host. Any other URL gives none;
+- its `source` is taken from the URL, never from the model: the one a board URL names, or for a careers-site `gh_jid` URL the Greenhouse source a lookup confirmed for that host. The role's `url` is tried first, then its `boardUrl`. Any other URL gives none;
 - it is not stamped live.
 
 A role added from a button carries what a scan found, so it keeps its fit and is stamped live. `accepted`, the outcome that ends a search as hired, is the user's: `jobs.setStage` refuses it from a model.
 
 ## The resume read
 
-`POST /api/intents/[id]/start` and `/resume` read an uploaded PDF once (`resume.ts`, the template's `intake`). The file is checked for `%PDF-` first ("That file isn't a PDF.", 400), then one fast-tier call reads it as a file part with structured output: 16,000 output tokens at most, 60 seconds, one retry for a 429 or 5xx. The text (cut to 20,000 characters) and a profile (headline, current title and employer, location, years, up to 20 skills, up to 10 past roles) are stored as the plan's resume document, and the current employer joins the never-show list.
+`POST /api/intents/[id]/start` and `/resume` read an uploaded PDF once (`resume.ts`, the template's `intake`). The file is checked for `%PDF-` first ("That file isn't a PDF.", 400), then one fast-tier call reads it as a file part with structured output: 16,000 output tokens at most, 60 seconds, one retry for a 429 or 5xx. The text (cut to 20,000 characters) and a profile (headline, current title and employer, location, years, up to 20 skills, up to 10 past roles) are stored as the plan's resume document, and the current employer joins the never-show list. The response's `intake` says what this upload found (`none` on a restart without a file, even when the plan already holds a resume), so the app reads the plan's card, not that field, for "Add your resume".
 
 A blank, illegible or non-resume file, a damaged or password-protected PDF, a timeout and an outage all end the same way: "Couldn't read that PDF. Try another file." The plan still starts. The file is never stored, only the bytes in memory during the request.
 
