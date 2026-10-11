@@ -1,6 +1,7 @@
 import type { TemplateDefinition } from '#lib/templates';
 
 import { JOB_SEARCH_CAPABILITIES, JOBS_SCOPE } from './capabilities.ts';
+import { JOB_SEARCH_LOOKUPS } from './lookups.ts';
 import { RESUME_INTAKE } from './resume.ts';
 import { jobsContextSchema } from './context.ts';
 import { deriveJobSearch } from './derive.ts';
@@ -26,6 +27,7 @@ export const JOB_SEARCH_TEMPLATE: TemplateDefinition = {
   seed: seedJobSearchOps,
   derive: ({ staged, anchorId, now, newId }) => deriveJobSearch(staged, anchorId, now, newId),
   capabilities: JOB_SEARCH_CAPABILITIES,
+  lookups: JOB_SEARCH_LOOKUPS,
   intake: RESUME_INTAKE,
   prompt: JOB_SEARCH_PROMPT,
 };

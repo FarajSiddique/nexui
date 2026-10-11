@@ -986,6 +986,85 @@
         "required": ["id", "after"],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "web.search",
+      "description": "Search the job boards (Greenhouse, Lever, Ashby) for recent postings. The query holds job titles, places and industries only, never resume text. Answers board URLs; read one with jobs_lookup before adding it.",
+      "perRun": 3,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "sinceDays": {
+            "description": "Posted within; 7 by default",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.lookup",
+      "description": "Read one job posting from its URL (a Greenhouse, Lever or Ashby job page, or a careers page with gh_jid), or a company's open roles from its board. A posting comes back with what jobs_addRole needs.",
+      "perRun": 10,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "board": {
+            "description": "A company's board: provider and token",
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": ["greenhouse", "lever", "ashby"]
+              },
+              "token": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,80}$"
+              },
+              "region": {
+                "type": "string",
+                "const": "eu"
+              }
+            },
+            "required": ["provider", "token"],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "document.read",
+      "description": "Read a document's full text, such as the resume or a draft, by its ref.",
+      "perRun": 5,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": ["ref"],
+        "additionalProperties": false
+      }
     }
   ],
   "instructions": {
