@@ -9,6 +9,7 @@ export * from './kinds/cards.ts';
 export * from './kinds/figures.ts';
 export * from './workspace.ts';
 export * from './graph.ts';
+export * from './templates.ts';
 export * from './ops.ts';
 export * from './runs.ts';
 export * from './api.ts';

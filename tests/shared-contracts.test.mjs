@@ -51,3 +51,16 @@ test('a stored workspace doc passes through the upgrade step unchanged', () => {
   assert.equal(types.upgradeWorkspace(doc), doc);
   assert.deepEqual(mapSnapshotRow(snapshotRow(doc)).workspace.doc, doc);
 });
+
+test('every template offers an example goal the create route accepts', () => {
+  assert.deepEqual(Object.keys(types.TEMPLATE_EXAMPLES), types.templateSchema.options);
+
+  for (const [name, example] of Object.entries(types.TEMPLATE_EXAMPLES)) {
+    assert.equal(
+      types.createIntentRequestSchema.safeParse({ goal: example.goal }).success,
+      true,
+      name,
+    );
+    assert.match(example.plans, /^[a-z]+( [a-z]+)*$/, name);
+  }
+});

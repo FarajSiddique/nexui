@@ -13,7 +13,13 @@ import {
 } from '#data';
 import { fonts, createThemedStyles, useColors } from '#theme';
 import { Button } from '#ui';
-import { RunCard, afterAsk, useKeyboardOverlap } from '#features/compose';
+import {
+  RunCard,
+  SavedGoalReply,
+  afterAsk,
+  nextGoalPlaceholder,
+  useKeyboardOverlap,
+} from '#features/compose';
 import { revealOpenBand } from '#features/workspace';
 
 interface Sent {
@@ -35,6 +41,7 @@ export default function ComposeSheet(): ReactElement {
   const [target, setTarget] = useState<string | null>(params.intentId ?? null);
   const [text, setText] = useState(params.prompt ?? '');
   const [sent, setSent] = useState<Sent | null>(null);
+  const [goalPlaceholder] = useState(nextGoalPlaceholder);
   const context = useIntent(target);
   const run = useRun(sent?.runId ?? null);
   const create = useCreateIntent();
@@ -125,9 +132,7 @@ export default function ComposeSheet(): ReactElement {
           </Text>
         </View>
         {sent ? <Text style={styles.bubble}>{sent.text}</Text> : null}
-        {sent && sent.runId === null ? (
-          <Text style={styles.note}>Nexui can plan trips so far. Your plan is saved on Home.</Text>
-        ) : null}
+        {sent && sent.runId === null ? <SavedGoalReply onTry={setText} /> : null}
         {sent?.runId ? (
           <RunCard
             run={run.data}
@@ -163,7 +168,7 @@ export default function ComposeSheet(): ReactElement {
             maxLength={target ? 1000 : 500}
             value={text}
             onChangeText={setText}
-            placeholder={target ? 'Ask anything or change this plan' : 'A week in Portugal in May'}
+            placeholder={target ? 'Ask anything or change this plan' : goalPlaceholder}
             placeholderTextColor={colors.faint}
             selectionColor={colors.ink}
             style={styles.input}
@@ -203,7 +208,6 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.card,
     backgroundColor: colors.userMark,
   },
-  note: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   composer: {
     gap: 6,
     padding: 12,
