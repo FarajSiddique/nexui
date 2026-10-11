@@ -18,6 +18,7 @@
     "typecheck": "turbo run typecheck",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "eval:travel": "node --experimental-strip-types scripts/eval-travel.mjs",
+    "eval:jobs": "node --experimental-strip-types scripts/eval-jobs.mjs",
     "db:new": "supabase migration new",
     "db:push": "supabase db push",
     "db:push:dev": "node scripts/db-push.mjs dev",
