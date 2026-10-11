@@ -37,7 +37,7 @@ test('listing requires a token', async (t) => {
   assert.equal((await GET(new Request(url))).status, 401);
 });
 
-test('Home lists intents, most recent first', async (t) => {
+test('Home lists plans, most recent first, and leaves out saved goals', async (t) => {
   let asked;
 
   mockSupabaseAuth(
@@ -70,6 +70,7 @@ test('Home lists intents, most recent first', async (t) => {
     ],
   });
   assert.equal(asked.searchParams.get('status'), 'neq.archived');
+  assert.equal(asked.searchParams.get('template'), 'not.is.null');
   assert.equal(asked.searchParams.get('order'), 'last_activity_at.desc');
 });
 

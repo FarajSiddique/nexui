@@ -188,6 +188,19 @@ assert.equal(
 );
 console.log('undone: decision open again, candidates back');
 
+// A goal no template fits is saved, and Home leaves it out (mock mode's `saved-goal` fixture).
+const saved = await call('POST', '/api/intents', { goal: 'Smoke test: plan my wedding next June' });
+
+assert.deepEqual(saved, { outcome: 'unsupported' });
+
+const home = await call('GET', '/api/intents');
+
+assert.ok(
+  home.items.every((item) => item.template !== null),
+  'Home lists only plans',
+);
+console.log('saved goal: unsupported, not on Home');
+
 const cancelled = await call('POST', `/api/runs/${asked.runId}/cancel`);
 
 assert.equal(cancelled.status, 'succeeded', 'cancelling a finished run changes nothing');
