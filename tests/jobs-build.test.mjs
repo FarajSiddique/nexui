@@ -10,7 +10,7 @@ import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
-import { failingEvaluationModel } from './support/ai.mjs';
+import { failingEvaluationModel, scriptedModel } from './support/ai.mjs';
 import { graphDb, toSnapshotRow } from './support/graph-db.mjs';
 import { idSequence, LEASE_ID, RUN_ID, runRow, STAMP } from './support/graph.mjs';
 import { COMPANY_ID, jobObject, jobSnapshot, SEARCH_ID, searchData } from './support/jobs.mjs';
@@ -114,6 +114,24 @@ const deps = (env = { NEXUI_CONTACT: 'ops@nexui.test' }) => ({
   clock: () => NOW,
   newId: idSequence(),
   env,
+});
+
+test("a job search's build is told today's date in the plan's time zone", async (t) => {
+  const { db } = start(t);
+  const run = buildRun();
+  const seen = [];
+  const quiet = {
+    evaluationModel: failingEvaluationModel(),
+    languageModel: () => scriptedModel([], seen),
+    providerOptions: () => undefined,
+  };
+
+  t.mock.method(console, 'error', () => {});
+  await executeRun({ db, run, leaseId: LEASE_ID, session: quiet }, deps({}));
+
+  const message = seen[0].prompt.find((part) => part.role === 'user').content[0].text;
+
+  assert.match(message, /^Today is Tuesday, 2026-10-20 \(Europe\/London\)\.\n\n<goal>/);
 });
 
 test('the build run sets the criteria, then scans once: a strong role lands in New, AI-marked', async (t) => {

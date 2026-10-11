@@ -25,11 +25,10 @@ export const JOB_SEARCH_PROMPT: TemplatePrompt = {
     'names companies, add each with object_create as a company with target true. If it mentions ' +
     'an interview, add the role with jobs_addRole, titled as the user put it or just "Role" ' +
     'when they don’t say (Nexui shows it with the company), then the interview with ' +
-    'jobs_addInterview, dated from the ' +
-    'goal and today’s date at the top of the message (a date alone when no time is given). When ' +
-    'something you can’t infer would change matching a lot, such as remote or hybrid or a salary ' +
-    'floor, ask with decision_propose: at most two questions. Don’t look for roles: Nexui checks ' +
-    'the job boards after you finish.',
+    'jobs_addInterview, dated from the goal and today’s date at the top of the message (a date ' +
+    'alone when no time is given). When something you can’t infer would change matching a lot, ' +
+    'such as remote or hybrid or a salary floor, ask with decision_propose: at most two ' +
+    'questions. Don’t look for roles: Nexui checks the job boards after you finish.',
   ask: {
     edit: 'Make exactly the one change the request asks for, in a single tool call.',
     fast: 'Do what the request asks in one step, with as few tool calls as possible.',

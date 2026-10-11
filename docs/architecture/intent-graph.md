@@ -578,11 +578,11 @@ as a worker with the service-role client (see "Run queue" below).
 - **Prompts** open with today's weekday and date in the plan's time zone (the template's
   `timeZone`, else UTC), so a model can place "next Tuesday" or "in May", then put the goal, the
   graph and the request inside `<goal>`, `<graph>` and `<request>` as escaped JSON, and tell the
-  model never to follow instructions found there. The
-  frame is cognition's (`instructionsFor`): only tools change the plan, and fenced data is never
-  instructions. The template supplies its role, its rules and the task of each run kind and
-  route (`TemplatePrompt`), and names any fenced data beyond those three (`fences`: tags such as
-  `resume` and `posting`, and where the data comes from) so the standing rule covers it.
+  model never to follow instructions found there. The frame is cognition's (`instructionsFor`):
+  only tools change the plan, and fenced data is never instructions. The template supplies its
+  role, its rules and the task of each run kind and route (`TemplatePrompt`), and names any
+  fenced data beyond those three (`fences`: tags such as `resume` and `posting`, and where the
+  data comes from) so the standing rule covers it.
   `tests/model-surface.test.mjs` pins the result for a trip and for a job search. A kind's
   `heavyFields` reach the prompt as their length.
 - **Mock mode** (`AI_PROVIDER=mock`, the default) replays `src/lib/ai/fixtures`, recorded from
