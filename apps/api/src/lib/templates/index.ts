@@ -10,4 +10,5 @@ export type {
   TemplateDefinition,
   TemplateIntake,
   TemplatePrompt,
+  TemplateWorkJob,
 } from './types.ts';

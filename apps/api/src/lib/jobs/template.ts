@@ -6,6 +6,7 @@ import { RESUME_INTAKE } from './resume.ts';
 import { jobsContextSchema } from './context.ts';
 import { deriveJobSearch } from './derive.ts';
 import { JOB_SEARCH_PROMPT } from './prompt.ts';
+import { scanAfterBuild } from './scan.ts';
 import { seedJobSearchOps } from './seed.ts';
 
 /** Job search (job search spec): Nexui's second template, declared like the first. */
@@ -29,5 +30,6 @@ export const JOB_SEARCH_TEMPLATE: TemplateDefinition = {
   capabilities: JOB_SEARCH_CAPABILITIES,
   lookups: JOB_SEARCH_LOOKUPS,
   intake: RESUME_INTAKE,
+  afterBuild: scanAfterBuild,
   prompt: JOB_SEARCH_PROMPT,
 };

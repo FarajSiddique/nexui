@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   boardSchema,
   fitSchema,
-  jobKey,
   jobSourceSchema,
   OUTCOME_LABELS,
   outcomeSchema,
@@ -37,7 +36,7 @@ import {
 } from '#lib/capabilities';
 
 import { parseBoardUrl } from './board-urls.ts';
-import { companyName, compact } from './parts.ts';
+import { companyName, compact, sameRole } from './parts.ts';
 
 /** A role to add: what a board lookup or the scan found, or what the user described. */
 export const roleInputSchema = z.strictObject({
@@ -102,16 +101,9 @@ export function findRole(
   ctx: CapabilityContext,
   role: Pick<RoleInput, 'source' | 'url'>,
 ): GraphObject | undefined {
-  const key = role.source ? jobKey(role.source) : null;
-
-  return anchorParts(ctx, 'opportunity').find((candidate) => {
-    const data = candidate.data as OpportunityData;
-
-    return (
-      (key !== null && data.source !== undefined && jobKey(data.source) === key) ||
-      (role.url !== undefined && data.url === role.url)
-    );
-  });
+  return anchorParts(ctx, 'opportunity').find((candidate) =>
+    sameRole(candidate.data as OpportunityData, role.source, role.url),
+  );
 }
 
 /**

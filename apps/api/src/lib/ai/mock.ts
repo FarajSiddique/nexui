@@ -77,19 +77,24 @@ export function mockLanguageModel(fixture: RunFixture | null): LanguageModel {
   });
 }
 
-/** Answers Jev's questions as the fixture recorded, or `travel` and `reasoning` without one. */
+type MockAnswer = { type: 'choice'; choice: string } | { type: 'boolean'; probability: number };
+
+/**
+ * Answers Jev's questions as the fixture recorded: `travel` and `reasoning` without one, and each
+ * `boolean` question its `scores` entry, or 0 (spikes note 4.1, item 4).
+ */
 export function mockEvaluationModel(fixture: RunFixture | null): Experimental_EvaluationModel {
   return new Experimental_EvaluationMockModelV4({
     doEvaluate: async ({ questions }) => {
-      const answers: Record<string, { type: 'choice'; choice: string }> = {};
+      const answers: Record<string, MockAnswer> = {};
 
-      for (const id of Object.keys(questions)) {
+      for (const [id, question] of Object.entries(questions)) {
         if (id === 'template') {
           answers[id] = { type: 'choice', choice: fixture?.perception.template ?? 'travel' };
-        }
-
-        if (id === 'route') {
+        } else if (id === 'route') {
           answers[id] = { type: 'choice', choice: fixture?.perception.route ?? 'reasoning' };
+        } else if (question.type === 'boolean') {
+          answers[id] = { type: 'boolean', probability: fixture?.scores?.[id] ?? 0 };
         }
       }
 

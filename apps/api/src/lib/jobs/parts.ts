@@ -1,4 +1,10 @@
-import type { GraphObject, GraphSnapshot } from '@nexui/types';
+import {
+  jobKey,
+  type GraphObject,
+  type GraphSnapshot,
+  type JobSource,
+  type OpportunityData,
+} from '@nexui/types';
 
 /** The company a role is `at`, if the plan has it. */
 export function companyOf(graph: GraphSnapshot, roleId: string): GraphObject | undefined {
@@ -24,4 +30,15 @@ export function companyName(graph: GraphSnapshot, role: GraphObject): string {
  */
 export function compact<T extends object>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
+}
+
+/**
+ * Whether a role's data is the posting named by `source` (the same board key) or `url` (the same
+ * address). A part that isn't given matches nothing.
+ */
+export function sameRole(data: OpportunityData, source?: JobSource, url?: string): boolean {
+  const sameSource =
+    source !== undefined && data.source !== undefined && jobKey(data.source) === jobKey(source);
+
+  return sameSource || (url !== undefined && data.url === url);
 }

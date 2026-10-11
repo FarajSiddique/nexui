@@ -10,11 +10,29 @@ import type {
   Template,
 } from '@nexui/types';
 
-import type { GatewayOptions, ModelTier } from '#lib/ai';
+import type { AiSession, GatewayOptions, ModelTier } from '#lib/ai';
 import type { Capability, LookupTool } from '#lib/capabilities';
 import type { ModelMode } from '#lib/cognition';
 import type { Upload } from '#lib/http';
 import type { RunUsage } from '#lib/runs';
+
+/**
+ * What a template's code gets after a build run's model steps (`afterBuild`): the plan as the
+ * steps left it, the run's AI session, settings, the network, and a way to stage the template's
+ * capabilities as the run and commit them like a step.
+ */
+export interface TemplateWorkJob {
+  snapshot: GraphSnapshot;
+  anchorId: string;
+  session: AiSession;
+  env: Record<string, string | undefined>;
+  fetch: typeof fetch;
+  now: Date;
+  /** Stages one of the template's capabilities as the run; throws `CapabilityError` if refused. */
+  call(name: string, input: unknown): Record<string, unknown>;
+  /** Commits what `call` staged as one changeset, adding `usage` to the run's. */
+  commit(usage: RunUsage | null): Promise<void>;
+}
 
 /** What a template's derivation reads: the changeset as staged, and the plan before it. */
 export interface DeriveInput {
@@ -140,6 +158,12 @@ export interface TemplateDefinition {
   lookups?: readonly LookupTool[];
   /** A document its plans take before the build run, which then waits for `start`. */
   intake?: TemplateIntake;
+  /**
+   * Code a build run does after its model steps, such as job search's first scan. It runs only
+   * while the run is still running. A failure is logged and the run still succeeds, since its
+   * steps are committed; only a lost lease ends the run.
+   */
+  afterBuild?: (job: TemplateWorkJob) => Promise<void>;
   /** How models plan it. */
   prompt: TemplatePrompt;
   /** Budgets that replace the default for some routes (`routeBudget` in `runs/execute.ts`). */

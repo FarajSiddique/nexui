@@ -4,6 +4,7 @@ import {
   applyOps,
   followUpState,
   interviewTime,
+  jobSourceSchema,
   searchFigures,
   searchParts,
   type ChangesetOp,
@@ -23,7 +24,8 @@ import {
 import { listOf } from '#lib/capabilities';
 
 import { jobsContext } from './context.ts';
-import { companyName, companyOf } from './parts.ts';
+import { companyName, companyOf, sameRole } from './parts.ts';
+import { PARTIAL_INSIGHT_KEY } from './seed.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -469,6 +471,35 @@ function searchSummary(
   return summary;
 }
 
+// The partial-fit card goes once its role is in the plan, by its button or otherwise, and when
+// the search ends in a hire.
+function partialCardOps(graph: GraphSnapshot, searchId: string, hired: boolean): ChangesetOp[] {
+  const { insights, roles } = searchParts(graph, searchId);
+  const card = insights.find(
+    (insight) => (insight.data as InsightData).derivedKey === PARTIAL_INSIGHT_KEY,
+  );
+
+  if (!card) {
+    return [];
+  }
+
+  if (hired) {
+    return removeWithLinks(graph, card);
+  }
+
+  const add = (card.data as InsightData).actions.find(
+    (action) => action.type === 'capability' && action.name === 'jobs.addRole',
+  );
+  const input = add?.type === 'capability' ? add.input : {};
+  const source = jobSourceSchema.safeParse(input.source);
+  const url = typeof input.url === 'string' ? input.url : undefined;
+  const added = roles.some((role) =>
+    sameRole(role.data as OpportunityData, source.success ? source.data : undefined, url),
+  );
+
+  return added ? removeWithLinks(graph, card) : [];
+}
+
 /**
  * `derive.jobSearch` (job search spec, section 3.3): ends the search on an accepted offer,
  * recounts its figures, keeps the follow-up, interview and open-applications cards in step,
@@ -514,6 +545,7 @@ export function deriveJobSearch(
       newId,
     ),
   );
+  ops.push(...partialCardOps(settle(), searchId, hired));
 
   const summary = searchSummary(settle(), search, figures, clock, timeZone);
 

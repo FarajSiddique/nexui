@@ -35,6 +35,7 @@ import { JOB_DECISIONS } from './decisions.ts';
 import { compact } from './parts.ts';
 import { setResume } from './resume.ts';
 import { ROLE_CAPABILITIES } from './roles.ts';
+import { surfaceMatches } from './surface.ts';
 
 /** A job search's kinds, for the generic capabilities, and the examples their descriptions use. */
 export const JOBS_SCOPE: CapabilityScope = {
@@ -298,6 +299,7 @@ export const JOB_SEARCH_CAPABILITIES: readonly Capability[] = [
   draft,
   setSearchStatus,
   setResume,
+  surfaceMatches,
   ...decisionCapabilities(JOBS_SCOPE, JOB_DECISIONS),
   ...workspaceCapabilities(JOBS_SCOPE),
 ];

@@ -15,6 +15,9 @@ type ObjectsQuery = Extract<GraphQuery, { from: 'objects' }>;
 /** The derived key of the card about the resume, from the seed until a resume is read. */
 export const RESUME_INSIGHT_KEY = 'search.resume';
 
+/** The derived key of the partial-fit card a scan leaves ("Also worth a look"). */
+export const PARTIAL_INSIGHT_KEY = 'search.partial';
+
 /** The Open band's card while the plan waits for its resume (spec section 4, step 5). */
 export const START_INSIGHT: InsightData = {
   text: 'Add your resume to start',

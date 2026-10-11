@@ -15,6 +15,7 @@ import {
 
 import type { GatewayOptions } from '#lib/ai';
 import type { RunUsage } from '#lib/runs';
+import type { TemplateWorkJob } from '#lib/templates';
 
 import { parseBoardUrl, type BoardLink } from './board-urls.ts';
 import {
@@ -26,7 +27,7 @@ import {
   type BoardDeps,
   type Posting,
 } from './boards.ts';
-import type { JobsConfig } from './config.ts';
+import { readJobsConfig, type JobsConfig } from './config.ts';
 import { jobsContext } from './context.ts';
 import { explainFits, type FitWords } from './explain.ts';
 import { compact } from './parts.ts';
@@ -372,4 +373,82 @@ export async function scanForRoles(input: ScanInput, deps: ScanDeps): Promise<Sc
     boards,
     usage: explained.usage,
   };
+}
+
+/**
+ * How long the build run's scan may take, so the run fits its function (Decision 11): 25 seconds
+ * of it for the find phase (`FIND_BUDGET_MS`), the rest for Jev and the explain call.
+ */
+export const SCAN_BUDGET_MS = 45_000;
+
+let warnedOff = false;
+
+/**
+ * Job search's `afterBuild`: the build run's one scan (job search spec, section 4, "What the
+ * build run does"), so first matches come from the same code and caps as later ones. It reads
+ * the named companies' open roles of any age and a week of search hits, then commits what it
+ * found through `jobs.surfaceMatches` with the explain call's usage. Without a board contact it
+ * does nothing, and says so once.
+ */
+export async function scanAfterBuild(job: TemplateWorkJob): Promise<void> {
+  const config = readJobsConfig(job.env);
+
+  if (!config.contact) {
+    if (!warnedOff) {
+      warnedOff = true;
+      console.error('[jobs]', 'Board lookups are off: NEXUI_CONTACT is not set.');
+    }
+
+    return;
+  }
+
+  const input = scanInput(job.snapshot, job.anchorId, null);
+
+  if (!input) {
+    return;
+  }
+
+  const result = await scanForRoles(input, {
+    config,
+    fetch: job.fetch,
+    now: job.now,
+    signal: AbortSignal.timeout(SCAN_BUDGET_MS),
+    evaluation: {
+      model: job.session.evaluationModel,
+      providerOptions: job.session.providerOptions('perception'),
+    },
+    explain: {
+      model: job.session.languageModel('fast'),
+      providerOptions: job.session.providerOptions('fast'),
+    },
+  });
+  const found =
+    result.roles.length > 0 ||
+    result.partial !== null ||
+    result.seen.length > 0 ||
+    result.boards.length > 0;
+
+  if (!found) {
+    return;
+  }
+
+  const surface: Record<string, unknown> = {
+    roles: result.roles,
+    seen: result.seen,
+    boards: result.boards,
+  };
+
+  if (result.partial) {
+    surface.partial = result.partial;
+  }
+
+  try {
+    job.call('jobs.surfaceMatches', surface);
+  } catch {
+    console.error('[jobs]', 'The scan’s matches were refused.');
+
+    return;
+  }
+
+  await job.commit(result.usage);
 }
