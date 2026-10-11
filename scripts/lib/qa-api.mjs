@@ -26,7 +26,8 @@ export function qaApi(session, api = process.env.NEXUI_API ?? 'http://localhost:
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    const json = await response.json();
+    // A delete answers 204 with no body.
+    const json = response.status === 204 ? null : await response.json();
 
     if (!response.ok) {
       throw new Error(`${method} ${path} → ${response.status} ${JSON.stringify(json)}`);
