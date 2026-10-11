@@ -6,9 +6,18 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const mobile = fileURLToPath(new URL('../apps/mobile/', import.meta.url));
-const { ESLint } = createRequire(`${mobile}package.json`)('eslint');
+const requireFromMobile = createRequire(`${mobile}package.json`);
+const { ESLint } = requireFromMobile('eslint');
+const { version: reactVersion } = requireFromMobile('react/package.json');
 // A probe isn't on disk, and `import/no-cycle` throws when it can't resolve the file it lints.
-const eslint = new ESLint({ cwd: mobile, overrideConfig: { rules: { 'import/no-cycle': 'off' } } });
+// eslint-plugin-react can't find React from the repo root either, so it is told the version.
+const eslint = new ESLint({
+  cwd: mobile,
+  overrideConfig: {
+    settings: { react: { version: reactVersion } },
+    rules: { 'import/no-cycle': 'off' },
+  },
+});
 
 async function refusals(file, source) {
   const [result] = await eslint.lintText(source, { filePath: `${mobile}${file}` });
@@ -45,6 +54,36 @@ test(
     );
     assert.equal(
       await refusals('src/features/travel/probe.ts', probe('#features/registry', 'SectionView')),
+      1,
+    );
+  },
+);
+
+test('the template folders never import each other', { timeout: 120_000 }, async () => {
+  assert.equal(
+    await refusals('src/features/jobs/probe.ts', probe('#features/travel', 'RouteSection')),
+    1,
+  );
+  assert.equal(
+    await refusals('src/features/travel/probe.ts', probe('#features/jobs', 'TimelineSection')),
+    1,
+  );
+  assert.equal(
+    await refusals('src/features/workspace/probe.ts', probe('#features/jobs', 'TimelineSection')),
+    1,
+  );
+});
+
+test(
+  'features/jobs imports the workspace, never the registries',
+  { timeout: 120_000 },
+  async () => {
+    assert.equal(
+      await refusals('src/features/jobs/probe.ts', probe('#features/workspace', 'SectionFrame')),
+      0,
+    );
+    assert.equal(
+      await refusals('src/features/jobs/probe.ts', probe('#features/registry', 'SectionView')),
       1,
     );
   },

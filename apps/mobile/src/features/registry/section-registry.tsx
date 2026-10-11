@@ -3,6 +3,7 @@ import type { ComponentType, ReactElement } from 'react';
 import type { GraphSnapshot, Section } from '@nexui/types';
 
 import type { PhotoState } from '#data';
+import { TimelineSection } from '#features/jobs';
 import { AllocationSection, MapSection, RouteSection } from '#features/travel';
 import {
   ComparisonSection,
@@ -32,7 +33,7 @@ export const SECTION_REGISTRY: { [T in Section['type']]: ComponentType<SectionPr
   decision: DecisionSection,
   insight: InsightSection,
   pipeline: PendingSection,
-  timeline: PendingSection,
+  timeline: TimelineSection,
 };
 
 /** One section, drawn by its registered primitive. */
