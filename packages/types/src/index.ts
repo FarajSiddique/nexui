@@ -11,6 +11,7 @@ export * from './kinds/cards.ts';
 export * from './kinds/figures.ts';
 export * from './kinds/travel/meta.ts';
 export * from './kinds/jobs/meta.ts';
+export * from './kinds/jobs/intake.ts';
 export * from './kinds/meta.ts';
 export * from './workspace.ts';
 export * from './graph.ts';

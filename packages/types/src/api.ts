@@ -37,6 +37,9 @@ export const createIntentResponseSchema = z.discriminatedUnion('outcome', [
 
 export type CreateIntentResponse = z.infer<typeof createIntentResponseSchema>;
 
+/** The largest file `start` and `resume` take: under Vercel's 4.5 MB body limit (spec section 4). */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
 // POST /api/intents/:id/start: answers 202 while the build run works. `intake` says what reading
 // the upload found: a resume, one that couldn't be read, or no file.
 export const startResponseSchema = z.object({
