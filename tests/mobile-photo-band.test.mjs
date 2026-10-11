@@ -4,7 +4,11 @@ import test from 'node:test';
 import { photoBand } from '../apps/mobile/src/features/home/photo-band.ts';
 
 const stops = (count) =>
-  Array.from({ length: count }, (_, index) => ({ label: `Stop ${index + 1}`, ai: false }));
+  Array.from({ length: count }, (_, index) => ({
+    label: `Stop ${index + 1}`,
+    ai: false,
+    key: `place:stop-${index + 1}`,
+  }));
 const card = (photos, count) => ({ photos, summary: { line: '', strip: stops(count) } });
 
 test('a Home card shows its photos, with "+N" for the stops beyond them', () => {
@@ -16,4 +20,16 @@ test('a Home card shows its photos, with "+N" for the stops beyond them', () => 
 test('a card with no photos has no band, so no "+N"', () => {
   assert.deepEqual(photoBand(card([], 3)), { photos: [], more: 0 });
   assert.deepEqual(photoBand({ photos: [], summary: { line: '' } }), { photos: [], more: 0 });
+});
+
+test("a job search's company chips are not stops, so they never add a +N", () => {
+  const chips = [
+    { label: 'Ledgerly', ai: true },
+    { label: 'Halyard', ai: false },
+  ];
+
+  assert.deepEqual(
+    photoBand({ photos: ['a'], summary: { line: '', strip: chips, stripStyle: 'chips' } }),
+    { photos: ['a'], more: 0 },
+  );
 });
