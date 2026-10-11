@@ -47,6 +47,7 @@ test('one search: the six board hosts, the last 7 days, fast, 10 results, the ke
   ]);
   assert.equal(seen[0].url, 'https://api.parallel.ai/v1/search');
   assert.equal(seen[0].init.method, 'POST');
+  assert.equal(seen[0].init.redirect, 'error');
   assert.equal(seen[0].init.headers['x-api-key'], 'par_test');
   assert.deepEqual(JSON.parse(seen[0].init.body), {
     objective: 'Open job postings for Staff PM roles in London, remote welcome, in fintech.',

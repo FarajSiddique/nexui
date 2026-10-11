@@ -360,7 +360,9 @@ export const RESUME_INTAKE: TemplateIntake = {
       return { outcome: 'none', input: { status: 'none' }, usage: null };
     }
 
-    const read = await readResume(file, ai);
+    // The client's name goes to the model and into the document, so it is cleaned once, here.
+    const named = { ...file, name: file.name.replace(/[\u0000-\u001f\u007f]/g, '') };
+    const read = await readResume(named, ai);
 
     if (read.outcome === 'unreadable') {
       return { outcome: 'unreadable', input: { status: 'unreadable' }, usage: read.usage };
@@ -368,7 +370,7 @@ export const RESUME_INTAKE: TemplateIntake = {
 
     return {
       outcome: 'read',
-      input: { status: 'read', text: read.text, profile: read.profile, fileName: file.name },
+      input: { status: 'read', text: read.text, profile: read.profile, fileName: named.name },
       usage: read.usage,
     };
   },

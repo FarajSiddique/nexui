@@ -19,7 +19,7 @@ export const boardProviderSchema = z.enum(['greenhouse', 'lever', 'ashby']);
  */
 export const boardSchema = z.strictObject({
   provider: boardProviderSchema,
-  token: z.string().regex(/^[A-Za-z0-9._-]{1,80}$/),
+  token: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/),
   region: z.literal('eu').optional(),
 });
 

@@ -279,7 +279,8 @@ new plan's snapshot for `awaiting_resume` only.
 
 A goal Nexui can't plan is saved, and the sheet shows `SavedGoalReply`
 (`apps/mobile/src/features/compose/saved-goal-reply.tsx`) instead of a run: what Nexui plans today
-(from `TEMPLATE_EXAMPLES` in `@nexui/types`; `GOAL_EXAMPLES` skips a template whose entry is null, one whose app side hasn't shipped) and a "Try one" button per template that fills the
+(from `TEMPLATE_EXAMPLES` in `@nexui/types`; `GOAL_EXAMPLES` skips a template whose entry is
+null, one whose app side hasn't shipped) and a "Try one" button per template that fills the
 composer with its example goal. There is no "Open plan", and the next send starts a new plan. The
 new-plan placeholder takes turns across the templates' examples (`nextGoalPlaceholder`). A 503
 shows its message above the composer and keeps the typed goal.

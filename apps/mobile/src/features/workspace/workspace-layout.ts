@@ -249,6 +249,10 @@ function isUnresolved(data: SectionData): boolean {
       return (data.decision?.data as Partial<DecisionData> | undefined)?.status === 'open';
     case 'insight':
       return data.insights.length > 0;
+    case 'pipeline':
+    case 'timeline':
+      // Stand-ins that draw nothing until the mobile PR: never an empty Open band.
+      return false;
     default:
       return true;
   }

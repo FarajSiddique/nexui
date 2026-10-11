@@ -54,7 +54,7 @@ function InsightCard({
         <View style={styles.actions}>
           {buttons.map(({ label, next }, index) => (
             <Button
-              key={label}
+              key={`${index}-${label}`}
               label={label}
               variant={index === 0 ? 'primary' : 'secondary'}
               disabled={busy && next.type === 'capability'}

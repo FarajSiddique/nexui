@@ -68,7 +68,7 @@ The answer is the hits' URLs in relevance order, only those on a board host. A h
 
 ## What a model may say
 
-Models read through three lookups (`lookups.ts`), all answering `{ error }` instead of throwing: `web_search` (3 a run; board URLs for titles, places and industries only), `jobs_lookup` (10 a run; one posting from its URL, or a company's open roles from its board; a posting's text comes back fenced in `<posting>`) and `document_read` (5 a run; a document's full text, the resume fenced in `<resume>`).
+Models read through three lookups (`lookups.ts`), all answering `{ error }` instead of throwing: `web_search` (3 a run; board URLs for a model-written query of up to 120 characters, which the prompt limits to titles, places and industries), `jobs_lookup` (10 a run; one posting from its URL, or a company's open roles from its board; a posting's text comes back fenced in `<posting>`) and `document_read` (5 a run; a document's full text, the resume fenced in `<resume>`).
 
 `jobs.addRole` is the only way a model adds a role, and a model's word on a role is its title and where it is:
 
@@ -86,7 +86,7 @@ A blank, illegible or non-resume file, a damaged or password-protected PDF, a ti
 
 ## Privacy
 
-- Parallel's queries come from the criteria only. Jev and the explain call read the profile and criteria, not the resume's text.
+- Two kinds of web search query. The scan's search (`searchQuery`) is built from the criteria only. The model's `web_search` lookup sends a query the model writes (up to 120 characters, three a run), and its only guard is the prompt rule that the query holds job titles, places and industries, never resume text. That is a residual risk the prompt rule covers, not code. Jev and the explain call read the profile and criteria, not the resume's text.
 - Logs carry a tag and a status code at most (`[jobs]`, `[resume]`, `[lookups]`, `[runs]`). They never carry resume text, a file name, a URL, a query, a company, a posting, a provider's message or the value of `NEXUI_CONTACT`.
 - The contact reaches only the boards, in the User-Agent.
 
@@ -94,7 +94,7 @@ A blank, illegible or non-resume file, a damaged or password-protected PDF, a ti
 
 Set in `apps/api/.env.local` (see `apps/api/.env.example`):
 
-- `JOB_SEARCH`: `on` lets Jev route new goals to job search and plans start. Unset, the template doesn't route (`gate`). The app side ships with job search's mobile PR, so production leaves it unset until then.
+- `JOB_SEARCH`: `on` lets Jev route new goals to job search. The gate governs only routing (`routableTemplates`): the `start` and `resume` routes aren't gated. Unset, the template doesn't route (`gate`). The app side ships with job search's mobile PR, so production leaves it unset until then.
 - `NEXUI_CONTACT`: an email address or URL (at most 200 characters) the boards can reach us at. Unset or invalid, board lookups and the scan are off; an invalid value logs that, without the value.
 - `PARALLEL_API_KEY`: unset, web search is off and scans read only the boards of companies a user named. Production waits for Parallel's written answer on its acceptable-use policy.
 

@@ -126,6 +126,7 @@ export async function searchBoards(
   try {
     response = await deps.fetch(SEARCH_URL, {
       method: 'POST',
+      redirect: 'error',
       headers: { 'x-api-key': deps.key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         objective: query.objective,

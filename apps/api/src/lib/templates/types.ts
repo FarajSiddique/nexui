@@ -72,11 +72,6 @@ export interface TemplatePrompt {
   ask: Record<RunRoute, string>;
 }
 
-/**
- * One use case: everything the API needs to plan it, so nothing outside its folder names it
- * (readiness doc, section 3.1). `templateSchema` lists each one, and `TEMPLATES` must hold a
- * definition for every name it lists.
- */
 /** What a template's seed reads: the goal, and the device's time zone from the create request. */
 export interface SeedInput {
   goal: string;
@@ -118,6 +113,11 @@ export interface TemplateIntake {
   read(file: Upload | null, ai: IntakeAi): Promise<IntakeRead>;
 }
 
+/**
+ * One use case: everything the API needs to plan it, so nothing outside its folder names it
+ * (readiness doc, section 3.1). `templateSchema` lists each one, and `TEMPLATES` must hold a
+ * definition for every name it lists.
+ */
 export interface TemplateDefinition {
   name: Template;
   /** The kind of the workspace anchor, the object the plan is about. */

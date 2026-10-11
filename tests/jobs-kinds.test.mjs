@@ -4,6 +4,7 @@ import test from 'node:test';
 import { KIND_BEHAVIOUR } from '../apps/api/src/lib/kinds/behaviour.ts';
 import {
   anchorFigures,
+  boardSchema,
   followUpState,
   jobKey,
   KIND_REGISTRY,
@@ -134,6 +135,15 @@ test('stages and pass reasons are listed in the order the app shows them', () =>
       'Not the work I want',
     ],
   );
+});
+
+test('a board token starts with a letter or digit, so `.` and `..` are refused', () => {
+  const parse = (token) => boardSchema.safeParse({ provider: 'lever', token });
+
+  assert.equal(parse('..').success, false);
+  assert.equal(parse('.x').success, false);
+  assert.equal(parse('acme.io').success, true);
+  assert.equal(parse('acme-co').success, true);
 });
 
 test("a job key is the provider, the board's token and its id for the role", () => {

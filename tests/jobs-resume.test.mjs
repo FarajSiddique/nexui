@@ -150,6 +150,18 @@ test("mock mode reads the matching fixture's answer", async () => {
   assert.equal(read.input.fileName, 'cv.pdf');
 });
 
+test("control characters are stripped from the file's name before the model and the document", async () => {
+  const seen = [];
+  const read = await RESUME_INTAKE.read(
+    { ...PDF, name: 'cv\u0000\n.pdf\u007f' },
+    ai(scriptedModel([textStep(JSON.stringify(answer))], seen)),
+  );
+  const user = seen[0].prompt.find((message) => message.role === 'user');
+
+  assert.equal(read.input.fileName, 'cv.pdf');
+  assert.equal(user.content.find((part) => part.type === 'file').filename, 'cv.pdf');
+});
+
 test('a profile is held to its limits', () => {
   assert.deepEqual(
     normalizeProfile({

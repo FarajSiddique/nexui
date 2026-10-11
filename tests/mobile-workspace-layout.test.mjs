@@ -238,3 +238,36 @@ test('a pipeline and a timeline get the objects their queries find, for PR 3 to 
     ['Tokyo', 'Kyoto'],
   );
 });
+
+test('a pinned pipeline or timeline never makes an Open band: they draw nothing yet', () => {
+  const places = doc.sections.find((section) => section.id === 'route').query;
+  const pinnedDoc = {
+    ...doc,
+    sections: [
+      ...doc.sections,
+      {
+        id: 'pipeline',
+        type: 'pipeline',
+        pin: 'open',
+        query: places,
+        stageField: 'data.days',
+        stages: [{ value: '4', label: 'Four days' }],
+        collapsedStages: [],
+      },
+      {
+        id: 'coming-up',
+        type: 'timeline',
+        pin: 'open',
+        query: places,
+        dateField: 'title',
+        labelField: 'title',
+      },
+    ],
+  };
+  const blocks = layoutWorkspace(pinnedDoc, base());
+
+  assert.equal(
+    blocks.some((block) => block.kind === 'open'),
+    false,
+  );
+});

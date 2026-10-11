@@ -223,6 +223,12 @@ async function undoStart(db: SupabaseClient, eventId: string): Promise<void> {
  * build failed: then it starts again, reading only a new file and keeping what the plan has
  * (Decision 20); a plan without an intake, or a file the intake refuses, a 400. If the run can't
  * be queued, the start is undone and the error rethrown.
+ *
+ * Two edge cases. Overlapping `start` calls can both pass the `started` check and both read the
+ * upload, but `create_run` locks the intent row and refuses a second working run (NXU12), and
+ * the loser's commit is undone, so at most one build runs; the cost is one extra read. And only
+ * a `failed` build can be started again: a build the user stopped stays started, and its plan
+ * gets roles from the scheduled scan that comes with PR 4.
  */
 export async function startPlan(
   deps: Orchestrator,
