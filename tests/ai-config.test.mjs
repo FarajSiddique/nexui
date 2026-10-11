@@ -15,7 +15,7 @@ test('mock is the default and needs no key', () => {
   assert.equal(config.gatewayApiKey, null);
   assert.deepEqual(config.models, {
     perception: 'typesafe-ai/jev',
-    fast: 'anthropic/claude-haiku-4.5',
+    fast: 'anthropic/claude-haiku-5.5',
     reasoning: 'anthropic/claude-sonnet-5.5',
   });
   assert.deepEqual(config.fallbacks, {

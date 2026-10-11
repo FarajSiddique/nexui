@@ -28,7 +28,7 @@ const ENV_NAMES: Record<ModelPurpose, string> = {
 
 const DEFAULT_MODELS: Record<ModelPurpose, string> = {
   perception: 'typesafe-ai/jev',
-  fast: 'anthropic/claude-haiku-4.5',
+  fast: 'anthropic/claude-haiku-5.5',
   reasoning: 'anthropic/claude-sonnet-5.5',
 };
 
@@ -41,7 +41,7 @@ const DEFAULT_FALLBACKS: Record<ModelPurpose, string[]> = {
 function checkModelId(name: string, value: string): string {
   if (!MODEL_ID.test(value)) {
     throw new AiConfigurationError(
-      `${name} must be a Gateway model id such as anthropic/claude-haiku-4.5.`,
+      `${name} must be a Gateway model id such as anthropic/claude-haiku-5.5.`,
     );
   }
 
@@ -77,7 +77,7 @@ function readFallbacks(env: Env, purpose: ModelPurpose): string[] {
  *
  * @example
  * readAiConfig({ AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: 'vck_…' }).models.fast
- * // 'anthropic/claude-haiku-4.5'
+ * // 'anthropic/claude-haiku-5.5'
  */
 export function readAiConfig(env: Env = process.env): AiConfig {
   const provider = env.AI_PROVIDER?.trim() || 'mock';

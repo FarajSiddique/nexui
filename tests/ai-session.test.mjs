@@ -81,7 +81,7 @@ test('a live session uses the configured Gateway models and fallbacks', () => {
     'Make Kyoto 3 days',
   );
 
-  assert.equal(session.languageModel('fast').modelId, 'anthropic/claude-haiku-4.5');
+  assert.equal(session.languageModel('fast').modelId, 'anthropic/claude-haiku-5.5');
   assert.equal(session.languageModel('reasoning').modelId, 'anthropic/claude-sonnet-5.5');
   assert.equal(session.evaluationModel.modelId, 'typesafe-ai/jev');
   assert.deepEqual(session.providerOptions('reasoning'), {
