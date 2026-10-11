@@ -101,7 +101,7 @@ test("derive counts roles and rebuilds Home's line, badge and company chips", ()
     ],
     links: [jobLink(1, ROLE_ID, COMPANY_ID, 'at')],
   });
-  const ops = deriveJobSearch(snapshot, SEARCH_ID, NOW);
+  const ops = deriveJobSearch(snapshot, SEARCH_ID, NOW, idSequence());
 
   assert.deepEqual(ops[0].patch.data.derived, {
     new: 1,
@@ -133,7 +133,7 @@ test('the badge is the first that applies: hired, ready to start, paused, follow
   const notStarted = { jobs: { timezone: 'UTC', seen: [] } };
   const paused = { ...searchData, status: 'paused' };
   const badge = (options) =>
-    summaryOf(deriveJobSearch(jobSnapshot(options), SEARCH_ID, NOW))?.badge;
+    summaryOf(deriveJobSearch(jobSnapshot(options), SEARCH_ID, NOW, idSequence()))?.badge;
 
   assert.deepEqual(badge({ objects: [newRole] }), { text: '1 new role', tone: 'attention' });
   assert.deepEqual(badge({ objects: [newRole, quiet] }), {
@@ -169,11 +169,12 @@ test('the line names the next interview, or what the search looks for', () => {
   });
 
   assert.equal(
-    summaryOf(deriveJobSearch(jobSnapshot({ objects: [interview] }), SEARCH_ID, NOW)).line,
+    summaryOf(deriveJobSearch(jobSnapshot({ objects: [interview] }), SEARCH_ID, NOW, idSequence()))
+      .line,
     'interview Thu',
   );
   assert.equal(
-    summaryOf(deriveJobSearch(jobSnapshot(), SEARCH_ID, NOW)).line,
+    summaryOf(deriveJobSearch(jobSnapshot(), SEARCH_ID, NOW, idSequence())).line,
     'Looking for Staff Product Manager roles',
   );
 });

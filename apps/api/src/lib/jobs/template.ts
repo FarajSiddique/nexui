@@ -22,7 +22,7 @@ export const JOB_SEARCH_TEMPLATE: TemplateDefinition = {
     { key: 'inPlay', label: 'roles in play' },
   ],
   seed: seedJobSearchOps,
-  derive: ({ staged, anchorId, now }) => deriveJobSearch(staged, anchorId, now),
+  derive: ({ staged, anchorId, now, newId }) => deriveJobSearch(staged, anchorId, now, newId),
   capabilities: JOB_SEARCH_CAPABILITIES,
   prompt: JOB_SEARCH_PROMPT,
 };
