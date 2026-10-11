@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { anchorMeta } from '@nexui/types';
@@ -24,8 +24,6 @@ import {
   UndoToast,
   focusIntent,
   useRevealOpenBand,
-  capabilityFor,
-  optimisticOps,
   type WorkspaceAction,
   layoutWorkspace,
 } from '#features/workspace';
@@ -96,35 +94,28 @@ export default function WorkspaceScreen(): ReactElement {
   });
 
   const handleAction = (action: WorkspaceAction): void => {
-    if (action.type === 'openPlace') {
-      router.push({ pathname: '/place', params: { intentId: id, placeId: action.placeId } });
+    switch (action.type) {
+      case 'open':
+        router.push({ pathname: '/place', params: { intentId: id, placeId: action.objectId } });
 
-      return;
+        return;
+      case 'ask':
+        router.push({
+          pathname: '/compose',
+          params: action.prompt ? { intentId: id, prompt: action.prompt } : { intentId: id },
+        });
+
+        return;
+      case 'capability':
+        edit.mutate(
+          { request: action.request, optimistic: action.optimistic },
+          { onSuccess: (result) => setUndoable(result.event.id) },
+        );
+
+        return;
+      case 'link':
+        void Linking.openURL(action.url).catch(() => undefined);
     }
-
-    if (action.type === 'ask') {
-      router.push({
-        pathname: '/compose',
-        params: action.prompt ? { intentId: id, prompt: action.prompt } : { intentId: id },
-      });
-
-      return;
-    }
-
-    if (!snapshot) {
-      return;
-    }
-
-    const request = capabilityFor(action, snapshot);
-
-    if (!request) {
-      return;
-    }
-
-    edit.mutate(
-      { request, optimistic: optimisticOps(action, snapshot) },
-      { onSuccess: (result) => setUndoable(result.event.id) },
-    );
   };
 
   const renderBody = (): ReactElement => {

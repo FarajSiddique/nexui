@@ -19,6 +19,7 @@ import { AiText, NexuiTag, Button } from '#ui';
 
 import type { DecisionOption } from '../workspace-layout';
 import { aiMarkFor } from '../ai-mark';
+import { resolveAction } from '../workspace-actions';
 import { ComparisonTable, type ComparisonRow } from './comparison-table';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
@@ -146,13 +147,7 @@ export function DecisionSection({
                   label="Choose"
                   accessibilityLabel={`Choose ${column.title}`}
                   disabled={busy}
-                  onPress={() =>
-                    onAction({
-                      type: 'resolveDecision',
-                      decisionId: decision.id,
-                      optionId: column.id,
-                    })
-                  }
+                  onPress={() => onAction(resolveAction(decision.id, column.id))}
                 />
               )}
             />
@@ -161,9 +156,7 @@ export function DecisionSection({
             label="Keep the day free"
             variant="text"
             disabled={busy}
-            onPress={() =>
-              onAction({ type: 'resolveDecision', decisionId: decision.id, optionId: null })
-            }
+            onPress={() => onAction(resolveAction(decision.id, null))}
           />
         </View>
       )}

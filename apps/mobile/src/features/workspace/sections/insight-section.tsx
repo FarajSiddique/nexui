@@ -1,27 +1,15 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import type { GraphObject, InsightAction, InsightData } from '@nexui/types';
+import type { GraphObject, InsightData } from '@nexui/types';
 
 import { fonts, createThemedStyles } from '#theme';
 import { ActorAvatar, Button } from '#ui';
 
-import type { WorkspaceAction } from '../workspace-actions';
+// Buttons this app doesn't draw yet (upload, copy, start) are left out until job search's intake lands.
+import { fromInsightAction, type WorkspaceAction } from '../workspace-actions';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
-
-// `upload`, `copy` and `start` get their buttons in job search's mobile PR; until then they
-// are left out.
-function toAction(action: InsightAction): WorkspaceAction | null {
-  switch (action.type) {
-    case 'ask':
-      return { type: 'ask', prompt: action.prompt };
-    case 'capability':
-      return { type: 'capability', name: action.name, input: action.input };
-    default:
-      return null;
-  }
-}
 
 function InsightCard({
   insight,
@@ -36,7 +24,7 @@ function InsightCard({
   const data = insight.data as InsightData;
   const derived = data.derivedKey !== undefined || insight.source?.type === 'derived';
   const buttons = data.actions.flatMap((action) => {
-    const next = toAction(action);
+    const next = fromInsightAction(action);
 
     return next ? [{ label: action.label, next }] : [];
   });

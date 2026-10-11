@@ -16,9 +16,7 @@ import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
 import { PlaceSheet } from '#features/place';
 import {
   UndoToast,
-  capabilityFor,
   daysAction,
-  optimisticOps,
   rememberDays,
   stopDetails,
   useEditMemoryStore,
@@ -64,19 +62,13 @@ export default function PlaceScreen(): ReactElement {
   const setDays = (days: number): void => {
     const action = details ? daysAction(details.place, days) : null;
 
-    if (!details || !snapshot || !action) {
-      return;
-    }
-
-    const request = capabilityFor(action, snapshot);
-
-    if (!request) {
+    if (!details || !action) {
       return;
     }
 
     rememberDays(details.place.id, details.data.days, days);
     edit.mutate(
-      { request, optimistic: optimisticOps(action, snapshot) },
+      { request: action.request, optimistic: action.optimistic },
       { onSuccess: (result) => setUndoable(result.event.id) },
     );
   };

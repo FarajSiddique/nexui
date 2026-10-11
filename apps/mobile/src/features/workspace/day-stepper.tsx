@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { formatDays } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 
-import { MAX_PLACE_DAYS } from './workspace-actions';
+import { MAX_PLACE_DAYS } from './trip-actions';
 
 /** What the stepper sits on: a card (soft buttons) or a soft panel (card buttons). */
 type Surface = 'card' | 'soft';

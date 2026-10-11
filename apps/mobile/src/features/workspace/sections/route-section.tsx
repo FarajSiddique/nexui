@@ -12,7 +12,7 @@ import { aiMarkFor } from '../ai-mark';
 import { DayStepper, SmallButton } from '../day-stepper';
 import { stopButtonLabel, stopKind } from '../stop-details';
 import { rememberDays, useEditMemoryStore } from '../use-edit-memory-store';
-import { daysAction } from '../workspace-actions';
+import { daysAction, moveAction } from '../trip-actions';
 import type { RouteStop, SectionDataOf } from '../workspace-layout';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
@@ -160,6 +160,7 @@ function UnallocatedRow({ data }: { data: SectionDataOf<'route'> }): ReactElemen
 export function RouteSection({
   section,
   data,
+  snapshot,
   onAction,
   photos,
 }: SectionProps<'route'>): ReactElement {
@@ -197,8 +198,14 @@ export function RouteSection({
             isFirst={index === 0}
             isLast={index === data.stops.length - 1}
             onDays={(days) => setDays(stop.place, days)}
-            onMove={(by) => onAction({ type: 'move', placeId: stop.place.id, by })}
-            onOpen={() => onAction({ type: 'openPlace', placeId: stop.place.id })}
+            onMove={(by) => {
+              const action = moveAction(snapshot, stop.place.id, by);
+
+              if (action) {
+                onAction(action);
+              }
+            }}
+            onOpen={() => onAction({ type: 'open', objectId: stop.place.id })}
           />
           {stop.legAfter ? <LegRow leg={stop.legAfter} /> : null}
         </View>
