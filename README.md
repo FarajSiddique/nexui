@@ -139,11 +139,11 @@ cross-origin requests for Expo web, and no cookies are involved.
 apps/
   mobile/
     src/app/                  # Root layout (auth guard), (auth) and (app) route groups
-    src/features/             # Per-area components, helpers and stores: auth, home, workspace, changes, compose, …
+    src/features/             # Per-area components, helpers and stores: auth, home, workspace, travel, jobs, registry, changes, compose, …
     src/ui/                   # Shared building blocks: buttons, pills, list states, tab header
     src/theme/                # Palettes, fonts, useTheme and the appearance choice
     src/data/                 # API client, Supabase client, TanStack Query hooks, Realtime, health
-    src/lib/                  # Pure helpers shared across features (format.ts)
+    src/lib/                  # Pure helpers shared across features (format.ts, ai-mark.ts)
   api/
     src/app/api/health/        # GET /api/health
     src/app/api/intents/       # GET, POST /api/intents; :id and :id/changesets
@@ -172,7 +172,10 @@ tests/                         # Node tests: contracts, graph queries/derivation
   that holds it (`TRAVEL_SCOPE.kinds` in `apps/api/src/lib/travel/capabilities.ts` for trips,
   which the template copies). An anchor kind, the one a template's plan hangs off (like
   `trip`), is also listed in `ANCHOR_KINDS` and `KIND_FIGURES` in
-  `packages/types/src/kinds/figures.ts`. See [Intent graph](docs/architecture/intent-graph.md).
+  `packages/types/src/kinds/figures.ts`, and its meta line in `KIND_META`
+  (`packages/types/src/kinds/meta.ts`). A kind with a details sheet adds its body to its
+  template's `apps/mobile/src/features/<template>/` and a line to `DETAIL_REGISTRY`. See
+  [Intent graph](docs/architecture/intent-graph.md) and [Mobile](docs/architecture/mobile.md).
 - Protect a new API route with `verifyRequest()` from
   `apps/api/src/lib/supabase/verify-request.ts`, which returns the user or a ready
   401 response. Keep Supabase clients and data access in `apps/api/src/lib/supabase/`.

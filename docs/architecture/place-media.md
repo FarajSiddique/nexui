@@ -228,11 +228,11 @@ Two cases add no photos:
 - They are decorative except the sheet's, which is labelled "Photo of {name}".
 - Text and buttons drawn on a photo use the `photoScrim` and `photoInk` tokens, which are the same in both themes.
 
-**Route cards** (`features/workspace/sections/route-section.tsx`).
+**Route cards** (`features/travel/sections/route-section.tsx`).
 
 - A stop with a photo, or whose photo may still come, is a card. Its 148pt photo (960px copy) has the stop number on it in a ringed 28pt badge, followed by the name, type and `why`, then the ↑↓ and day controls.
 - A stop with no photo is the compact row.
-- Each stop is one button ("Berlin, stop 1, 3 days. Show details") that reports `{ type: 'openPlace', placeId }`. The workspace pushes `/place` with `intentId` and `placeId`.
+- Each stop is one button ("Berlin, stop 1, 3 days. Show details") that reports `{ type: 'open', objectId }` with the place's id. The workspace pushes `/object` with `intentId` and `objectId`.
 
 **Decision options** (`decision-section.tsx`).
 
@@ -246,14 +246,14 @@ Two cases add no photos:
 
 **The sheet.**
 
-- `apps/mobile/src/app/(app)/place.tsx` is an iOS form sheet and a modal on Android and web, with the + sheet's options.
-- It reads the plan from `useIntent`'s cache, builds `stopDetails(snapshot, placeId)` (`features/workspace/stop-details.ts`, pure), and renders `PlaceSheet` (`features/place/place-sheet.tsx`).
+- `apps/mobile/src/app/(app)/object.tsx` is an iOS form sheet and a modal on Android and web, with the + sheet's options. It reads the plan from `useIntent`'s cache and draws a place with its `DETAIL_REGISTRY` body, `PlaceBody` (`features/travel/place-body.tsx`; see "The object sheet" in [`mobile.md`](./mobile.md)).
+- `PlaceBody` builds `stopDetails(snapshot, placeId)` (`features/travel/stop-details.ts`, pure), reads the introduction (`usePlaceAbout`) and photo, and renders `PlaceSheet` (`features/travel/place-sheet.tsx`).
 
 `PlaceSheet` shows, top to bottom:
 
 - **The photo and Done.** With a photo, the sheet opens on it, 244pt and edge to edge, with Done over it. The credit sits underneath, "Photo: {author}, {license}, via Wikimedia Commons" (`photoCredit`), as one link to the file's Commons page. Without one it opens on Done and the name. Done opens the plan when there's no history to go back to, as after a reload on web.
 - **The name**, on the Nexui highlighter while unreviewed.
-- **"{Type} in {Country}, the {nth} of {n} stops"**. `countryName` reads the bundled CLDR list in `lib/country-names.ts`, since Hermes has no `Intl.DisplayNames`.
+- **"{Type} in {Country}, the {nth} of {n} stops"**. `countryName` (`features/travel/travel-format.ts`) reads the bundled CLDR list in `features/travel/country-names.ts`, since Hermes has no `Intl.DisplayNames`.
 - **Days here**, with the shared `DayStepper`, and **Daily cost**.
 - **Why it's on your route.**
 - **About {name}** (`usePlaceAbout`): "Looking up {name}…" while pending and the app is still polling; hidden with no article or once the polls run out. **Read more on Wikipedia** opens the article.
@@ -262,9 +262,9 @@ Two cases add no photos:
 
 Sheet behaviour:
 
-- Links open with `Linking.openURL` through the sheet's `onOpenLink`.
-- Day changes in the sheet go through the same `daysAction`, `capabilityFor`, `optimisticOps`, `rememberDays` and `UndoToast` as the route.
-- A stop removed while its sheet is open shows "This stop is no longer on your route."
+- Links open with `Linking.openURL`: the sheet's `onOpenLink` reports a `link` action.
+- Day changes in the sheet go through the same `daysAction` (`features/travel/trip-actions.ts`, which builds the `trip.setPlaceDays` request and its optimistic ops), `rememberDays` and `UndoToast` as the route.
+- A place taken off the route while its sheet is open shows "This stop is no longer on your route."; one deleted from the plan shows the object sheet's "This is no longer in your plan."
 
 **Native builds.** `expo-image` is a native module (with its config plugin in `app.config.ts`), so photos need a dev client and preview build that include it.
 
