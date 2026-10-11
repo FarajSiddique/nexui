@@ -1,6 +1,7 @@
 import { chicagoWeekend } from './chicago-weekend.ts';
 import { japanAskFreeDays } from './japan-ask-free-days.ts';
 import { japanDecember } from './japan-december.ts';
+import { jobSearchStaffPm } from './job-search-staff-pm.ts';
 import { savedGoal } from './saved-goal.ts';
 import type { RunFixture } from './types.ts';
 
@@ -10,10 +11,13 @@ import type { RunFixture } from './types.ts';
  * any trip with a free day. Its "Extra day in Tokyo" option extends `o4`, Tokyo on the
  * japan-december trip; elsewhere `o4` may be another stop, or none, which `decision.propose` drops.
  * `saved-goal` saves any goal that mentions a wedding, for the unsupported path.
+ * `job-search-staff-pm`, written by hand, starts a job search for any goal with "staff pm" and
+ * answers a mock resume read.
  */
 export const FIXTURES: readonly RunFixture[] = [
   japanDecember,
   chicagoWeekend,
   japanAskFreeDays,
   savedGoal,
+  jobSearchStaffPm,
 ];

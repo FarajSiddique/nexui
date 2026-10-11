@@ -150,3 +150,24 @@ test('an insight can offer an upload, a copy or a start; a summary a chip strip 
     true,
   );
 });
+
+test('creating an intent may wait for a resume, or point at the search already going', () => {
+  const snapshot = mapSnapshotRow(snapshotRow(travelWorkspace(TRIP_ID)));
+
+  assert.equal(
+    types.createIntentResponseSchema.safeParse({ outcome: 'awaiting_resume', snapshot }).success,
+    true,
+  );
+  assert.equal(
+    types.createIntentResponseSchema.safeParse({
+      outcome: 'existing_search',
+      intentId: snapshot.intent.id,
+    }).success,
+    true,
+  );
+  assert.equal(
+    types.createIntentRequestSchema.parse({ goal: 'Find a PM role', timezone: 'Mars/Olympus' })
+      .timezone,
+    undefined,
+  );
+});

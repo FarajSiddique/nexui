@@ -109,6 +109,7 @@ export function editObject(state, id, changes) {
  * `apply_changeset` call with that SQLSTATE (e.g. `'NXU08'`) instead of applying it, so a test can
  * exercise `commitChangeset`'s single automatic retry; every later call applies as normal.
  * `failCreateRun` makes `create_run` fail with that SQLSTATE.
+ * `activeIntents` is what a read of `intents` answers (the one-search rule).
  */
 export function graphDb(
   initialRow = null,
@@ -119,6 +120,7 @@ export function graphDb(
     onStep,
     failApplyOnce,
     failCreateRun,
+    activeIntents = [],
   } = {},
 ) {
   const now = () => new Date().toISOString();
@@ -132,6 +134,7 @@ export function graphDb(
     claims: [],
     reaps: 0,
     created: null,
+    intentQueries: [],
     createdRun: null,
     discarded: null,
     finished: null,
@@ -172,6 +175,12 @@ export function graphDb(
   };
 
   const fetch = postgrest({
+    // The one-search rule's read of the user's plans; the filters are recorded, not applied.
+    'table:intents': (url) => {
+      state.intentQueries.push(Object.fromEntries(url.searchParams));
+
+      return activeIntents.map((id) => ({ id }));
+    },
     get_intent_snapshot: () => {
       state.loads += 1;
       onLoad?.(state, state.loads);

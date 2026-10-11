@@ -58,6 +58,19 @@ switch (command) {
   case 'goal': {
     const started = await call('POST', '/api/intents', { goal: args[0] });
 
+    if (started.outcome === 'awaiting_resume') {
+      console.log(
+        `intent ${started.snapshot.intent.id} (${started.snapshot.intent.template}) waits: ` +
+          `node scripts/try-run.mjs start ${started.snapshot.intent.id} [resume.pdf]`,
+      );
+      break;
+    }
+
+    if (started.outcome === 'existing_search') {
+      console.log(`a job search is already going: intent ${started.intentId}`);
+      break;
+    }
+
     if (started.outcome !== 'started') {
       console.log(`saved, not planned (${started.outcome})`);
       break;

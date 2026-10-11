@@ -6,14 +6,10 @@ import { FIXTURES } from '../apps/api/src/lib/ai/fixtures/index.ts';
 import { findFixture } from '../apps/api/src/lib/ai/mock.ts';
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
 import { createStager } from '../apps/api/src/lib/staging/stage.ts';
-import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { chooseTemplate, routeAsk } from '../apps/api/src/lib/perception/perceive.ts';
 import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
-import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
-import { idSequence, RUN_ID, seedRow, TRIP_ID } from './support/graph.mjs';
-
-const CAPABILITIES = TEMPLATES.travel.capabilities;
-const findCapability = (name) => CAPABILITIES.find((capability) => capability.name === name);
+import { applyOps } from '../packages/types/src/index.ts';
+import { idSequence, INTENT_ID, RUN_ID, STAMP } from './support/graph.mjs';
 
 const fixture = {
   name: 'test-job',
@@ -104,8 +100,15 @@ test('shipped fixtures are well formed', () => {
       shipped.name,
     );
 
+    // A saved goal runs no capabilities; every other fixture's calls are its template's.
+    if (shipped.perception.template === 'unsupported') {
+      continue;
+    }
+
+    const { capabilities } = TEMPLATES[shipped.perception.template ?? 'travel'];
+
     for (const call of shipped.steps.flat()) {
-      const capability = findCapability(call.capability);
+      const capability = capabilities.find((candidate) => candidate.name === call.capability);
 
       assert.ok(capability?.exposeToModel, `${shipped.name}: ${call.capability}`);
       assert.equal(capability.input.safeParse(call.input).success, true, JSON.stringify(call));
@@ -113,27 +116,49 @@ test('shipped fixtures are well formed', () => {
   }
 });
 
-test('every create fixture replays cleanly against a freshly seeded trip', () => {
+// A plan the template just seeded, before its build run. The seed and the replay share one id
+// sequence, as one run's ids would, so a replayed object never takes the seed's ids.
+function freshPlan(name, goal, newId) {
+  const empty = {
+    intent: {
+      id: INTENT_ID,
+      goal,
+      template: name,
+      status: 'exploring',
+      context: {},
+      summary: { line: '' },
+      createdAt: STAMP,
+      updatedAt: STAMP,
+      lastActivityAt: STAMP,
+    },
+    workspace: null,
+    objects: [],
+    relationships: [],
+  };
+
+  return applyOps(empty, TEMPLATES[name].seed({ goal, timezone: 'UTC' }, newId), STAMP);
+}
+
+test('every create fixture replays cleanly against a fresh seed of its own template', () => {
   for (const shipped of FIXTURES.filter(
     // A saved goal starts no run, so it has nothing to replay.
     (candidate) =>
       candidate.kind === 'create_intent' && candidate.perception.template !== 'unsupported',
   )) {
+    const name = shipped.perception.template ?? 'travel';
+    const newId = idSequence();
     const stager = createStager({
-      capabilities: CAPABILITIES,
-      snapshot: mapSnapshotRow(seedRow(travelWorkspace(TRIP_ID))),
+      capabilities: TEMPLATES[name].capabilities,
+      snapshot: freshPlan(name, shipped.match.join(' '), newId),
       actor: 'ai',
       runId: RUN_ID,
-      newId: idSequence(),
+      newId,
     });
 
     for (const call of shipped.steps.flat()) {
       stager.call(call.capability, call.input);
     }
 
-    assert.ok(
-      stager.graph().objects.some((object) => object.kind === 'place'),
-      `${shipped.name} adds places`,
-    );
+    assert.ok(stager.takeOps().length > 0, `${shipped.name} changes its plan`);
   }
 });

@@ -17,6 +17,7 @@ export const JOB_SEARCH_TEMPLATE: TemplateDefinition = {
     'Getting a job: a job search, a career move, roles at named companies, or one application ' +
     'or interview, such as prep for a Google interview.',
   gate: 'JOB_SEARCH',
+  singleActive: true,
   context: { jobs: jobsContextSchema },
   figures: [
     { key: 'new', label: 'new roles' },

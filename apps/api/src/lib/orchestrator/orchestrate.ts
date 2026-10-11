@@ -5,13 +5,14 @@ import type { GraphSnapshot, RunRecord, RunRoute } from '@nexui/types';
 import {
   createIntent,
   discardIntent,
+  findActiveIntent,
   ChangesetInvalidError,
   logLine,
   loadSnapshot,
 } from '#lib/graph';
 import { chooseTemplate, routeAsk } from '#lib/perception';
 import { createRun, scheduleRun, workRun, type RunWorker } from '#lib/runs';
-import { UNSUPPORTED_GOAL } from '#lib/templates';
+import { TEMPLATES, UNSUPPORTED_GOAL } from '#lib/templates';
 import type { OpenSession } from '#lib/ai';
 
 export interface Orchestrator {
@@ -27,10 +28,14 @@ export interface Orchestrator {
 
 /**
  * What `startIntent` did with a goal (job search spec, section 2): seeded a plan and queued the
- * run that fills it in, or saved a goal no template fits, with no plan and no run.
+ * run that fills it in; seeded a plan that waits for its intake (`start` queues the run); saved
+ * a goal no template fits; or found the plan of this template already going.
  */
 export type StartedIntent =
-  { outcome: 'started'; snapshot: GraphSnapshot; runId: string } | { outcome: 'unsupported' };
+  | { outcome: 'started'; snapshot: GraphSnapshot; runId: string }
+  | { outcome: 'awaiting_resume'; snapshot: GraphSnapshot }
+  | { outcome: 'unsupported' }
+  | { outcome: 'existing_search'; intentId: string };
 
 export interface StartedAsk {
   runId: string;
@@ -49,9 +54,10 @@ async function discardTrip(db: SupabaseClient, intentId: string): Promise<void> 
 /**
  * CreateIntent (spec section F): Jev picks the template, the template seeds the intent at once,
  * and a reasoning run is queued, which the worker claims after the response to fill it in. A
- * goal no template fits is saved as an intent with no template, workspace or run. If Jev can't
- * read the goal, its `PerceptionFailedError` stands and nothing is created. If the run can't be
- * created, the seeded plan is deleted and the error is rethrown.
+ * template with an intake waits for `start` instead; a `singleActive` one answers with the plan
+ * already going. A goal no template fits is saved as an intent with no template, workspace or
+ * run. If Jev can't read the goal, its `PerceptionFailedError` stands and nothing is created. If
+ * the run can't be created, the seeded plan is deleted and the error is rethrown.
  */
 export async function startIntent(
   deps: Orchestrator,
@@ -59,18 +65,33 @@ export async function startIntent(
   timezone = 'UTC',
 ): Promise<StartedIntent> {
   const session = deps.openSession('create_intent', goal);
-  const template = await chooseTemplate(session.evaluationModel, goal, {
+  const choice = await chooseTemplate(session.evaluationModel, goal, {
     providerOptions: session.providerOptions('perception'),
   });
 
   // Saved, not planned: no workspace, no run and no model call beyond Jev.
-  if (template === 'unsupported') {
+  if (choice === 'unsupported') {
     await createIntent(deps.db, { goal, template: null, timezone });
 
     return { outcome: 'unsupported' };
   }
 
-  const snapshot = await createIntent(deps.db, { goal, template, timezone });
+  const template = TEMPLATES[choice];
+
+  if (template.singleActive) {
+    const existing = await findActiveIntent(deps.db, choice);
+
+    if (existing) {
+      return { outcome: 'existing_search', intentId: existing };
+    }
+  }
+
+  const snapshot = await createIntent(deps.db, { goal, template: choice, timezone });
+
+  if (template.intake) {
+    return { outcome: 'awaiting_resume', snapshot };
+  }
+
   let run: RunRecord;
 
   try {
@@ -81,7 +102,7 @@ export async function startIntent(
       input: {
         text: goal,
         route: 'reasoning',
-        template,
+        template: choice,
         perception: 'model',
       },
     });

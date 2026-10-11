@@ -14,7 +14,7 @@ export {
   mapRpcError,
   RunLeaseLostError,
 } from './errors.ts';
-export { listChanges, listIntents } from './lists.ts';
+export { findActiveIntent, listChanges, listIntents } from './lists.ts';
 export { changesetLabel, DIRECT_EDIT_LABEL } from './payload.ts';
 export { validateOps } from './prepare.ts';
 export { graphErrorResponse, logLine } from './respond.ts';

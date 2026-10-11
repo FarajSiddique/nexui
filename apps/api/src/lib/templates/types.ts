@@ -116,6 +116,11 @@ export interface TemplateDefinition {
    */
   gate?: string;
   /**
+   * At most one of the user's plans of this template is going at once (job search spec,
+   * section 8): a new goal for it answers `existing_search` with that plan.
+   */
+  singleActive?: boolean;
+  /**
    * The template's own keys in `intents.context`, such as job search's `jobs`. Checked, with
    * the eval tag, on every `update_intent` (`contextSchemaFor`).
    */

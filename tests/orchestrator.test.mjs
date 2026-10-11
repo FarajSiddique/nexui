@@ -8,6 +8,7 @@ import { PerceptionFailedError } from '../apps/api/src/lib/perception/perceive.t
 import { getAdminClient, getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, failingEvaluationModel } from './support/ai.mjs';
+import { useEnv } from './support/env.mjs';
 import { graphDb } from './support/graph-db.mjs';
 import {
   INTENT_ID,
@@ -59,7 +60,14 @@ const askFixture = {
   perception: { route: 'edit' },
   steps: [[{ capability: 'trip.setPlaceDays', input: { placeId: 'o1', days: 3 } }]],
 };
-const fixtures = [tripFixture, savedFixture, askFixture];
+const jobFixture = {
+  name: 'test-job',
+  kind: 'create_intent',
+  match: ['staff pm'],
+  perception: { template: 'job_search' },
+  steps: [],
+};
+const fixtures = [tripFixture, savedFixture, jobFixture, askFixture];
 
 function orchestrator() {
   const openSession = sessionOpener({ AI_PROVIDER: 'mock' }, fixtures);
@@ -72,8 +80,8 @@ function orchestrator() {
   };
 }
 
-function setup(t, row = null) {
-  const fake = graphDb(row);
+function setup(t, row = null, options = {}) {
+  const fake = graphDb(row, options);
 
   mockSupabaseAuth(t, fake.fetch);
 
@@ -204,4 +212,44 @@ test('an ask on an intent without a workspace is refused', async (t) => {
       error instanceof ChangesetInvalidError && error.message === "Nexui can't plan this yet.",
   );
   assert.equal(fake.state.createdRun, null);
+});
+
+test('a job search is seeded with the device’s zone and waits for its resume: no run', async (t) => {
+  useEnv(t, { JOB_SEARCH: 'on' });
+
+  const { fake, tasks, deps } = setup(t);
+  const started = await startIntent(deps, 'Find a Staff PM role in London', 'Europe/London');
+
+  assert.equal(started.outcome, 'awaiting_resume');
+  assert.equal(started.snapshot.intent.template, 'job_search');
+  assert.deepEqual(started.snapshot.intent.context, {
+    jobs: { timezone: 'Europe/London', seen: [] },
+  });
+  assert.equal(fake.state.createdRun, null);
+  assert.equal(tasks.length, 0);
+  // The one-search rule reads the user's plans of this template that are still going: an
+  // active or paused search counts; one that ended in a hire (completed) doesn't.
+  assert.equal(fake.state.intentQueries[0].template, 'eq.job_search');
+  assert.equal(fake.state.intentQueries[0].status, 'not.in.(completed,archived)');
+});
+
+test('a second job search goal while one is going answers with that plan, and creates nothing', async (t) => {
+  useEnv(t, { JOB_SEARCH: 'on' });
+
+  const { fake, deps } = setup(t, null, { activeIntents: [INTENT_ID] });
+
+  assert.deepEqual(await startIntent(deps, 'Find a Staff PM role in Berlin'), {
+    outcome: 'existing_search',
+    intentId: INTENT_ID,
+  });
+  assert.equal(fake.state.created, null);
+});
+
+test("with its gate off, Jev isn't offered job search, and an answer naming it is refused", async (t) => {
+  useEnv(t, { JOB_SEARCH: undefined });
+
+  const { deps } = setup(t);
+
+  // The fixture answers `job_search`, which Jev wasn't offered, so the SDK refuses it.
+  await assert.rejects(startIntent(deps, 'Find a Staff PM role in London'), PerceptionFailedError);
 });

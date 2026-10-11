@@ -94,6 +94,18 @@ export default function ComposeSheet(): ReactElement {
           return;
         }
 
+        // A job search waits for its resume, and a second one is the first. The sheet draws
+        // both in job search's mobile PR; until then it opens the plan.
+        if (result.outcome === 'awaiting_resume' || result.outcome === 'existing_search') {
+          const id =
+            result.outcome === 'existing_search' ? result.intentId : result.snapshot.intent.id;
+
+          router.dismiss();
+          router.push({ pathname: '/intent/[id]', params: { id } });
+
+          return;
+        }
+
         setTarget(result.snapshot.intent.id);
         setSent({ text: trimmed, runId: result.runId });
       },
