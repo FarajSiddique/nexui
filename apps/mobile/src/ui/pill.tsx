@@ -3,13 +3,13 @@ import { ActivityIndicator, Text, View } from 'react-native';
 
 import { fonts, createThemedStyles, useColors } from '#theme';
 
-/** A summary badge: attention (accent), ok, or running (with a spinner). */
+/** A summary badge: attention (accent), ok, running (with a spinner), or quiet (plain). */
 export function Pill({
   text,
   tone,
 }: {
   text: string;
-  tone: 'attention' | 'ok' | 'running';
+  tone: 'attention' | 'ok' | 'running' | 'quiet';
 }): ReactElement {
   const styles = useStyles();
   const colors = useColors();

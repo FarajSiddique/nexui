@@ -13,6 +13,7 @@ import { InsightSection } from './insight-section';
 import { MapSection } from './map-section';
 import { MetricSection } from './metric-section';
 import { ObjectListSection } from './object-list-section';
+import { PendingSection } from './pending-section';
 import { RouteSection } from './route-section';
 import type { SectionProps } from './types';
 
@@ -26,6 +27,8 @@ export const SECTION_REGISTRY: { [T in Section['type']]: ComponentType<SectionPr
   comparison: ComparisonSection,
   decision: DecisionSection,
   insight: InsightSection,
+  pipeline: PendingSection,
+  timeline: PendingSection,
 };
 
 /** One section, drawn by its registered primitive. */

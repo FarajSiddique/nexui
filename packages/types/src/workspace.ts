@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { kindNameSchema } from './kinds/registry.ts';
-import { idSchema, relTypeSchema } from './primitives.ts';
+import { capabilityNameSchema, fitsFreeJson, idSchema, relTypeSchema } from './primitives.ts';
 
 /**
  * A figure a metric or allocation shows: `<anchor kind>.<figure>`, such as `trip.totalDays`, read
@@ -72,6 +72,20 @@ const metricSpecSchema = z.strictObject({
   emphasis: z.literal('whenPositive').optional(),
 });
 
+/**
+ * A button on a pipeline card (job search spec, section 3.2). The app calls `capability` with
+ * `{ objectId, ...input }`; `pick: 'passReason'` asks for a pass reason first.
+ */
+export const cardActionSchema = z.strictObject({
+  label: z.string().min(1).max(30),
+  capability: capabilityNameSchema,
+  input: z.record(z.string(), z.json()).refine(fitsFreeJson, 'Too much input.').optional(),
+  tone: z.enum(['primary', 'secondary']),
+  pick: z.literal('passReason').optional(),
+});
+
+export type CardAction = z.infer<typeof cardActionSchema>;
+
 export const sectionSchema = z.discriminatedUnion('type', [
   z.strictObject({
     ...sectionBase,
@@ -119,6 +133,36 @@ export const sectionSchema = z.discriminatedUnion('type', [
     fields: z.array(fieldSpecSchema).max(6),
   }),
   z.strictObject({ ...sectionBase, type: z.literal('insight'), query: graphQuerySchema }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('pipeline'),
+    query: graphQuerySchema,
+    stageField: fieldPathSchema,
+    // Shown in this order. `collapsedStages` show as one count row each, such as closed roles;
+    // the name stays apart from `sectionBase`'s `collapsed`, which folds a whole section.
+    stages: z
+      .array(z.strictObject({ value: z.string().min(1).max(40), label: z.string().min(1).max(30) }))
+      .min(1)
+      .max(10),
+    collapsedStages: z.array(z.string().min(1).max(40)).max(10),
+    cardActions: z
+      .array(
+        z.strictObject({
+          stage: z.string().min(1).max(40),
+          actions: z.array(cardActionSchema).min(1).max(3),
+        }),
+      )
+      .max(10)
+      .optional(),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    type: z.literal('timeline'),
+    query: graphQuerySchema,
+    dateField: fieldPathSchema,
+    labelField: fieldPathSchema,
+    empty: z.string().max(120).optional(),
+  }),
 ]);
 
 export type Section = z.infer<typeof sectionSchema>;

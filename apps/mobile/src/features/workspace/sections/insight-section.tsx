@@ -10,12 +10,17 @@ import type { WorkspaceAction } from '../workspace-actions';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 
-function toAction(action: InsightAction): WorkspaceAction {
-  if (action.type === 'ask') {
-    return { type: 'ask', prompt: action.prompt };
+// `upload`, `copy` and `start` get their buttons in job search's mobile PR; until then they
+// are left out.
+function toAction(action: InsightAction): WorkspaceAction | null {
+  switch (action.type) {
+    case 'ask':
+      return { type: 'ask', prompt: action.prompt };
+    case 'capability':
+      return { type: 'capability', name: action.name, input: action.input };
+    default:
+      return null;
   }
-
-  return { type: 'capability', name: action.name, input: action.input };
 }
 
 function InsightCard({
@@ -30,6 +35,11 @@ function InsightCard({
   const styles = useStyles();
   const data = insight.data as InsightData;
   const derived = data.derivedKey !== undefined || insight.source?.type === 'derived';
+  const buttons = data.actions.flatMap((action) => {
+    const next = toAction(action);
+
+    return next ? [{ label: action.label, next }] : [];
+  });
 
   return (
     <SectionFrame accent={data.severity === 'attention'}>
@@ -40,15 +50,15 @@ function InsightCard({
           {data.detail ? <Text style={styles.detail}>{data.detail}</Text> : null}
         </View>
       </View>
-      {data.actions.length > 0 ? (
+      {buttons.length > 0 ? (
         <View style={styles.actions}>
-          {data.actions.map((action, index) => (
+          {buttons.map(({ label, next }, index) => (
             <Button
-              key={action.label}
-              label={action.label}
+              key={label}
+              label={label}
               variant={index === 0 ? 'primary' : 'secondary'}
-              disabled={busy && action.type === 'capability'}
-              onPress={() => onAction(toAction(action))}
+              disabled={busy && next.type === 'capability'}
+              onPress={() => onAction(next)}
             />
           ))}
         </View>

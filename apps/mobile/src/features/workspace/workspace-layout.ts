@@ -76,7 +76,9 @@ export type SectionData =
   | { type: 'objectList'; objects: GraphObject[] }
   | { type: 'comparison'; objects: GraphObject[] }
   | { type: 'decision'; decision: GraphObject | null; options: DecisionOption[] }
-  | { type: 'insight'; insights: GraphObject[] };
+  | { type: 'insight'; insights: GraphObject[] }
+  | { type: 'pipeline'; objects: GraphObject[] }
+  | { type: 'timeline'; objects: GraphObject[] };
 
 export type SectionDataOf<T extends Section['type']> = Extract<SectionData, { type: T }>;
 
@@ -233,6 +235,10 @@ function sectionData(
       return decisionData(snapshot, section.decisionId);
     case 'insight':
       return { type: 'insight', insights: evaluateQuery(snapshot, section.query) };
+    case 'pipeline':
+      return { type: 'pipeline', objects: evaluateQuery(snapshot, section.query) };
+    case 'timeline':
+      return { type: 'timeline', objects: evaluateQuery(snapshot, section.query) };
   }
 }
 

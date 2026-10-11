@@ -36,7 +36,7 @@ export const intentSummarySchema = z.strictObject({
   badge: z
     .strictObject({
       text: z.string().min(1).max(60),
-      tone: z.enum(['attention', 'ok', 'running']),
+      tone: z.enum(['attention', 'ok', 'running', 'quiet']),
     })
     .optional(),
   strip: z
@@ -51,6 +51,8 @@ export const intentSummarySchema = z.strictObject({
     )
     .max(12)
     .optional(),
+  // How Home draws the strip: a trip's stops as a route, a job search's companies as chips.
+  stripStyle: z.enum(['route', 'chips']).optional(),
 });
 
 export type IntentSummary = z.infer<typeof intentSummarySchema>;

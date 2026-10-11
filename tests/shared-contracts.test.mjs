@@ -77,3 +77,69 @@ test('every template offers an example goal the create route accepts', () => {
     assert.match(example.plans, /^[a-z]+( [a-z]+)*$/, name);
   }
 });
+
+test('a pipeline and a timeline are sections, and a card action names one capability', () => {
+  const query = { from: 'objects', kind: 'opportunity' };
+  const pipeline = {
+    id: 'pipeline',
+    type: 'pipeline',
+    query,
+    stageField: 'data.stage',
+    stages: [{ value: 'new', label: 'New' }],
+    collapsedStages: ['closed'],
+    cardActions: [
+      {
+        stage: 'new',
+        actions: [
+          { label: 'Pass', capability: 'jobs.pass', tone: 'secondary', pick: 'passReason' },
+        ],
+      },
+    ],
+  };
+
+  assert.equal(types.sectionSchema.safeParse(pipeline).success, true);
+  assert.equal(
+    types.sectionSchema.safeParse({
+      id: 'coming-up',
+      type: 'timeline',
+      query,
+      dateField: 'data.at',
+      labelField: 'data.label',
+    }).success,
+    true,
+  );
+  assert.equal(
+    types.cardActionSchema.safeParse({ label: 'Go', capability: 'not a name', tone: 'primary' })
+      .success,
+    false,
+  );
+  assert.equal(
+    types.cardActionSchema.safeParse({ label: 'Go', capability: 'jobs.setStage', tone: 'loud' })
+      .success,
+    false,
+  );
+});
+
+test('an insight can offer an upload, a copy or a start; a summary a chip strip and a quiet badge', () => {
+  for (const action of [
+    { type: 'upload', label: 'Add resume', docType: 'resume' },
+    { type: 'copy', label: 'Copy address', text: 'me@in.nexui.app' },
+    { type: 'start', label: 'Start without' },
+  ]) {
+    assert.equal(types.insightActionSchema.safeParse(action).success, true, action.type);
+  }
+
+  assert.equal(
+    types.insightActionSchema.safeParse({ type: 'upload', label: 'Add', docType: 'brief' }).success,
+    false,
+  );
+  assert.equal(
+    types.intentSummarySchema.safeParse({
+      line: '',
+      badge: { text: 'Paused', tone: 'quiet' },
+      stripStyle: 'chips',
+      strip: [{ label: 'Halyard', ai: true }],
+    }).success,
+    true,
+  );
+});

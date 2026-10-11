@@ -209,3 +209,32 @@ test('map pins follow route order and mark what Nexui added', () => {
     ],
   );
 });
+
+test('a pipeline and a timeline get the objects their queries find, for PR 3 to draw', () => {
+  const places = doc.sections.find((section) => section.id === 'route').query;
+  const jobDoc = {
+    ...doc,
+    sections: [
+      ...doc.sections,
+      {
+        id: 'pipeline',
+        type: 'pipeline',
+        query: places,
+        stageField: 'data.days',
+        stages: [{ value: '4', label: 'Four days' }],
+        collapsedStages: [],
+      },
+      { id: 'coming-up', type: 'timeline', query: places, dateField: 'title', labelField: 'title' },
+    ],
+  };
+  const blocks = layoutWorkspace(jobDoc, base());
+
+  assert.deepEqual(
+    find(blocks, 'pipeline').objects.map((object) => object.title),
+    ['Tokyo', 'Kyoto'],
+  );
+  assert.deepEqual(
+    find(blocks, 'coming-up').objects.map((object) => object.title),
+    ['Tokyo', 'Kyoto'],
+  );
+});
