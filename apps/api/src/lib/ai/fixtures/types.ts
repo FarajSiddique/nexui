@@ -21,4 +21,6 @@ export interface RunFixture {
   perception: { template?: TemplateChoice; route?: RunRoute };
   /** Each model step's tool calls, in order. */
   steps: readonly (readonly FixtureToolCall[])[];
+  /** What a structured-output call (a resume read) answers in mock mode, as JSON. */
+  output?: unknown;
 }

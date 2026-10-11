@@ -1,3 +1,4 @@
+import type { LanguageModel } from 'ai';
 import type { z } from 'zod';
 
 import type {
@@ -9,9 +10,11 @@ import type {
   Template,
 } from '@nexui/types';
 
-import type { ModelTier } from '#lib/ai';
+import type { GatewayOptions, ModelTier } from '#lib/ai';
 import type { Capability, LookupTool } from '#lib/capabilities';
 import type { ModelMode } from '#lib/cognition';
+import type { Upload } from '#lib/http';
+import type { RunUsage } from '#lib/runs';
 
 /** What a template's derivation reads: the changeset as staged, and the plan before it. */
 export interface DeriveInput {
@@ -62,6 +65,41 @@ export interface SeedInput {
   timezone: string;
 }
 
+/** The model an intake reads with: the fast tier and its fallbacks. */
+export interface IntakeAi {
+  model: LanguageModel;
+  providerOptions: GatewayOptions;
+  /** How long the read may take; tests shorten it. */
+  timeoutMs?: number;
+}
+
+/** What reading an upload found, as the input of the template's intake capability. */
+export interface IntakeRead {
+  outcome: 'read' | 'unreadable' | 'none';
+  input: Record<string, unknown>;
+  /** The read's model and tokens, which the build run adds to its usage. */
+  usage: RunUsage | null;
+}
+
+/**
+ * A document a template's plan takes before its build run, such as job search's resume (job
+ * search spec, section 4). A template with one is seeded and waits (`awaiting_resume`);
+ * `POST /api/intents/[id]/start` reads the upload, stores what it found through `capability`,
+ * and queues the build run; `POST /api/intents/[id]/resume` replaces it later.
+ */
+export interface TemplateIntake {
+  /** The code-only capability that stores a read: its `input`, plus `start`. */
+  capability: string;
+  /** The message for an upload `resume` can't read. */
+  unreadable: string;
+  /** True once the plan's build run was queued, after which `start` answers 409. */
+  started(snapshot: GraphSnapshot): boolean;
+  /** Refuses a file before any model call: the message to answer 400 with, or null. */
+  refuse(file: Upload): string | null;
+  /** Reads the upload, or records that there is none. Never throws for a bad file. */
+  read(file: Upload | null, ai: IntakeAi): Promise<IntakeRead>;
+}
+
 export interface TemplateDefinition {
   name: Template;
   /** The kind of the workspace anchor, the object the plan is about. */
@@ -95,6 +133,8 @@ export interface TemplateDefinition {
   capabilities: readonly Capability[];
   /** Read-only tools its runs' models get beside the capabilities (`toModelTools`). */
   lookups?: readonly LookupTool[];
+  /** A document its plans take before the build run, which then waits for `start`. */
+  intake?: TemplateIntake;
   /** How models plan it. */
   prompt: TemplatePrompt;
   /** Budgets that replace the default for some routes (`routeBudget` in `runs/execute.ts`). */

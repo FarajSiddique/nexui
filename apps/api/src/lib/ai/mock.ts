@@ -30,13 +30,24 @@ const noUsage = {
 
 /**
  * Replays the fixture's steps in order, then answers in text, which ends a tool loop. With no
- * fixture it answers in text at once, so the run changes nothing.
+ * fixture it answers in text at once, so the run changes nothing. A structured-output call gets
+ * the fixture's `output` when it has one.
  */
 export function mockLanguageModel(fixture: RunFixture | null): LanguageModel {
   let step = 0;
 
   return new MockLanguageModelV4({
-    doGenerate: async () => {
+    doGenerate: async (options) => {
+      // A structured-output call (a resume read) gets the fixture's answer and takes no step.
+      if (options.responseFormat?.type === 'json' && fixture?.output !== undefined) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify(fixture.output) }],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: noUsage,
+          warnings: [],
+        };
+      }
+
       const index = step;
       const calls = fixture?.steps[index] ?? [];
 
