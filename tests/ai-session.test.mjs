@@ -114,7 +114,11 @@ test('shipped fixtures are well formed', () => {
 });
 
 test('every create fixture replays cleanly against a freshly seeded trip', () => {
-  for (const shipped of FIXTURES.filter((candidate) => candidate.kind === 'create_intent')) {
+  for (const shipped of FIXTURES.filter(
+    // A saved goal starts no run, so it has nothing to replay.
+    (candidate) =>
+      candidate.kind === 'create_intent' && candidate.perception.template !== 'unsupported',
+  )) {
     const stager = createStager({
       capabilities: CAPABILITIES,
       snapshot: mapSnapshotRow(seedRow(travelWorkspace(TRIP_ID))),

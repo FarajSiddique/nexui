@@ -101,15 +101,15 @@ test('a capability request names a capability and keeps its input small', () => 
   );
 });
 
-test('creating an intent may start no run', () => {
+test('creating an intent answers what Nexui did with the goal', () => {
   const snapshot = {
     intent: {
       id: INTENT_ID,
-      goal: 'Find a new job',
-      template: null,
+      goal: 'Plan Japan in December',
+      template: 'travel',
       status: 'exploring',
       context: {},
-      summary: { line: 'Nexui can plan trips so far.' },
+      summary: { line: '' },
       createdAt: STAMP,
       updatedAt: STAMP,
       lastActivityAt: STAMP,
@@ -118,8 +118,15 @@ test('creating an intent may start no run', () => {
     objects: [],
     relationships: [],
   };
+  const started = { outcome: 'started', snapshot, runId: RUN_ID };
 
-  assert.equal(createIntentResponseSchema.parse({ snapshot, runId: null }).runId, null);
+  assert.equal(createIntentResponseSchema.parse(started).runId, RUN_ID);
+  assert.deepEqual(createIntentResponseSchema.parse({ outcome: 'unsupported' }), {
+    outcome: 'unsupported',
+  });
+  // A started plan always has its run, and every answer names its outcome.
+  assert.equal(createIntentResponseSchema.safeParse({ ...started, runId: null }).success, false);
+  assert.equal(createIntentResponseSchema.safeParse({ snapshot, runId: RUN_ID }).success, false);
 });
 
 test('a stopping run is still active; finished ones are not', () => {

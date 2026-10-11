@@ -18,6 +18,7 @@ import { revealOpenBand } from '#features/workspace';
 
 interface Sent {
   text: string;
+  /** The run working on it, or null for a goal Nexui saved because it can't plan it yet. */
   runId: string | null;
 }
 
@@ -70,9 +71,17 @@ export default function ComposeSheet(): ReactElement {
 
     create.mutate(trimmed, {
       onSuccess: (result) => {
+        setText('');
+
+        // A saved goal opens no plan, so the next send starts a new one.
+        if (result.outcome === 'unsupported') {
+          setSent({ text: trimmed, runId: null });
+
+          return;
+        }
+
         setTarget(result.snapshot.intent.id);
         setSent({ text: trimmed, runId: result.runId });
-        setText('');
       },
     });
   };
@@ -129,7 +138,7 @@ export default function ComposeSheet(): ReactElement {
             onSeeChanges={seeChanges}
           />
         ) : null}
-        {sent && !params.intentId ? (
+        {sent && target && !params.intentId ? (
           <Button label="Open plan" variant="primary" onPress={openPlan} />
         ) : null}
       </ScrollView>

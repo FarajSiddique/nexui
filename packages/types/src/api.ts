@@ -15,11 +15,13 @@ import { runRouteSchema } from './runs.ts';
 // POST /api/intents
 export const createIntentRequestSchema = z.object({ goal: z.string().trim().min(3).max(500) });
 
-// The new intent, and the run that fills it in. A goal that isn't a trip starts no run.
-export const createIntentResponseSchema = z.object({
-  snapshot: graphSnapshotSchema,
-  runId: idSchema.nullable(),
-});
+// What Nexui did with the goal (job search spec, section 2): a plan seeded with its run queued,
+// or a goal no template fits, saved with no plan and no run. PR 2 adds `awaiting_resume` and
+// `existing_search`.
+export const createIntentResponseSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('started'), snapshot: graphSnapshotSchema, runId: idSchema }),
+  z.object({ outcome: z.literal('unsupported') }),
+]);
 
 export type CreateIntentResponse = z.infer<typeof createIntentResponseSchema>;
 

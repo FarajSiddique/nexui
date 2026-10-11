@@ -60,18 +60,20 @@ async function tag(intentId, name) {
 
 async function runCase(testCase) {
   const started = await call('POST', '/api/intents', { goal: testCase.goal });
-  const intentId = started.snapshot.intent.id;
 
-  await tag(intentId, testCase.name);
-
-  if (!started.runId) {
+  // A saved goal has no id to tag, so `--clean` can't remove it; it stays off Home.
+  if (started.outcome !== 'started') {
     return {
-      intentId,
-      checks: [{ label: 'Jev saw a trip', ok: false, detail: 'no run started' }],
+      intentId: null,
+      checks: [{ label: 'Jev saw a trip', ok: false, detail: `answered ${started.outcome}` }],
       notes: [],
       plan: [],
     };
   }
+
+  const intentId = started.snapshot.intent.id;
+
+  await tag(intentId, testCase.name);
 
   const goalRun = await waitForRun(started.runId);
   let snapshot = await call('GET', `/api/intents/${intentId}`);

@@ -17,9 +17,11 @@ import { qaApi, readSession } from './lib/qa-api.mjs';
 const [sessionPath = '.qa/session.json', api = 'http://localhost:3000'] = process.argv.slice(2);
 const { call, waitForRun } = qaApi(readSession(sessionPath), api);
 
-const { snapshot: created, runId } = await call('POST', '/api/intents', {
-  goal: 'Smoke test: three quiet days away',
-});
+const started = await call('POST', '/api/intents', { goal: 'Smoke test: three quiet days away' });
+
+assert.equal(started.outcome, 'started', `the goal was ${started.outcome}`);
+
+const { snapshot: created, runId } = started;
 const createRun = await waitForRun(runId);
 
 assert.equal(createRun.status, 'succeeded', `the create run ${createRun.status}`);

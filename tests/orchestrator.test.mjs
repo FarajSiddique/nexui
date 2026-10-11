@@ -88,6 +88,7 @@ test('a trip goal is seeded at once and filled in by a run after the response', 
   const { fake, tasks, deps } = setup(t);
   const started = await startIntent(deps, 'A test trip to Lisbon');
 
+  assert.equal(started.outcome, 'started');
   assert.equal(started.runId, RUN_ID);
   assert.equal(started.snapshot.intent.template, 'travel');
   assert.equal(fake.state.created.p_template, 'travel');
@@ -139,14 +140,19 @@ test('a trip whose run cannot start is discarded, and the error stands', async (
   assert.equal(tasks.length, 0);
 });
 
-test('a goal no template fits gets a plain intent and no run', async (t) => {
+test('a goal no template fits is saved with no workspace, no run and no model call beyond Jev', async (t) => {
   const { fake, tasks, deps } = setup(t);
-  const started = await startIntent(deps, 'Plan my wedding next June');
 
-  assert.equal(started.runId, null);
-  assert.equal(started.snapshot.intent.template, null);
-  assert.equal(started.snapshot.intent.summary.line, "Nexui can't plan this yet.");
+  assert.deepEqual(await startIntent(deps, 'Plan my wedding next June'), {
+    outcome: 'unsupported',
+  });
   assert.equal(fake.state.created.p_template, null);
+  assert.deepEqual(
+    fake.state.created.p_ops.map((op) => op.op),
+    ['update_intent'],
+  );
+  assert.equal(fake.state.snapshot.intent.summary.line, "Nexui can't plan this yet.");
+  assert.equal(fake.state.snapshot.workspace, null);
   assert.equal(fake.state.createdRun, null);
   assert.equal(tasks.length, 0);
 });

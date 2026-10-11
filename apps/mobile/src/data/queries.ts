@@ -360,6 +360,11 @@ export function useCreateIntent(): UseMutationResult<CreateIntentResponse, Error
   return useMutation({
     mutationFn: createIntent,
     onSuccess: (result) => {
+      // A saved goal has no plan to show, and Home doesn't list it.
+      if (result.outcome !== 'started') {
+        return;
+      }
+
       client.setQueryData(queryKeys.intent(result.snapshot.intent.id), result.snapshot);
       refreshLists(client);
     },

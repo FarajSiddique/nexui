@@ -1,4 +1,5 @@
 import {
+  type CreateIntentResponse,
   createIntentRequestSchema,
   createIntentResponseSchema,
   intentListResponseSchema,
@@ -14,6 +15,12 @@ import { runWorker } from '#lib/runs';
 import { getAdminClient, getUserClient, verifyRequest } from '#lib/supabase';
 
 const headers = corsHeaders(['GET', 'POST'], ['Authorization', 'Content-Type']);
+
+// Each outcome's status (job search spec, section 2). A new outcome must name its own.
+const CREATE_STATUS: Record<CreateIntentResponse['outcome'], number> = {
+  started: 201,
+  unsupported: 201,
+};
 
 // The worker claims the run that fills in a new trip in `after()`, once the response is sent.
 export const maxDuration = 300;
@@ -42,9 +49,10 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 /**
- * Starts a plan from a goal (spec section F): Jev picks the template, the trip and workspace are
- * seeded at once, and a run fills them in after the response. Answers `{ snapshot, runId }`.
- * If Jev can't read the goal, it answers 503 and writes nothing.
+ * Starts a plan from a goal (spec section F; job search spec, section 2). Jev picks the
+ * template: a trip is seeded at once and a run fills it in after the response (`started`), and
+ * a goal no template fits is saved with no plan (`unsupported`). If Jev can't read the goal, it
+ * answers 503 and writes nothing.
  */
 export async function POST(request: Request): Promise<Response> {
   const user = await verifyRequest(request, headers);
@@ -76,7 +84,9 @@ export async function POST(request: Request): Promise<Response> {
       parsed.data.goal,
     );
 
-    return Response.json(createIntentResponseSchema.parse(started), { status: 201, headers });
+    const body = createIntentResponseSchema.parse(started);
+
+    return Response.json(body, { status: CREATE_STATUS[body.outcome], headers });
   } catch (error) {
     // Nexui doesn't guess a template; the + sheet keeps the goal so a retry is one tap.
     if (error instanceof PerceptionFailedError) {

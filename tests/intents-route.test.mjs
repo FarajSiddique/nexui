@@ -230,6 +230,7 @@ test('creating an intent seeds the trip, starts its run and answers at once', as
   const body = await response.json();
 
   assert.equal(response.status, 201);
+  assert.equal(body.outcome, 'started');
   assert.equal(body.snapshot.intent.goal, 'Plan Japan in December');
   assert.equal(body.runId, RUN_ID);
   assert.equal(created.p_goal, 'Plan Japan in December');
@@ -241,6 +242,43 @@ test('creating an intent seeds the trip, starts its run and answers at once', as
   assert.equal(run.p_kind, 'create_intent');
   assert.equal(run.p_input.text, 'Plan Japan in December');
   assert.equal(tasks.length, 1);
+});
+
+test('a goal no template fits is saved: a 201 with no plan and no run', async (t) => {
+  useMockAi(t);
+
+  const tasks = captureRuns(t);
+  let created;
+
+  // No `create_run` handler: a run would answer 500 and fail the test.
+  mockSupabaseAuth(
+    t,
+    postgrest({
+      create_intent: (args) => {
+        created = args;
+
+        return {};
+      },
+      get_intent_snapshot: () => ({
+        ...snapshotRow(travelWorkspace(TRIP_ID)),
+        intent: { ...intentRow, goal: 'Plan my wedding next June', template: null },
+        workspace: null,
+        objects: [],
+        relationships: [],
+      }),
+    }),
+  );
+
+  // Mock mode's `saved-goal` fixture answers `unsupported` for a wedding.
+  const response = await POST(
+    authed(url, { method: 'POST', body: JSON.stringify({ goal: 'Plan my wedding next June' }) }),
+  );
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(await response.json(), { outcome: 'unsupported' });
+  assert.equal(created.p_goal, 'Plan my wedding next June');
+  assert.equal(created.p_template, null);
+  assert.equal(tasks.length, 0);
 });
 
 test('a goal must be 3 to 500 characters', async (t) => {
