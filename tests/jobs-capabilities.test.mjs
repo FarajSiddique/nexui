@@ -381,3 +381,41 @@ test('buttons may add, move, pass, log contact and pause; only models add interv
     expected,
   );
 });
+
+test("a model's role takes its source from its URL or the confirmed careers link, never its word", () => {
+  const LEVER_JOB = 'a1b2c3d4-0000-4000-8000-000000000001';
+  const s = stager(planWith());
+  const added = (title, url, source) => {
+    s.call('jobs.addRole', { company: { name: 'Corvid' }, title, url, source });
+
+    return s.graph().objects.find((object) => object.title === title).data.source;
+  };
+
+  // A board URL names the source; a source that disagrees is ignored.
+  assert.deepEqual(
+    added('Lead PM', `https://jobs.lever.co/corvid/${LEVER_JOB}/apply`, {
+      provider: 'greenhouse',
+      token: 'elsewhere',
+      job: '1',
+    }),
+    { provider: 'lever', token: 'corvid', job: LEVER_JOB },
+  );
+  // A careers-site URL keeps the Greenhouse source a lookup confirmed for that host.
+  assert.deepEqual(
+    added('Group PM', 'https://corvid.com/jobs?gh_jid=77', {
+      provider: 'greenhouse',
+      token: 'corvid',
+      job: '77',
+    }),
+    { provider: 'greenhouse', token: 'corvid', job: '77' },
+  );
+  // Any other URL, or none, gives no source.
+  assert.equal(
+    added('Head of Product', 'https://www.linkedin.com/jobs/view/1', {
+      provider: 'ashby',
+      token: 'corvid',
+      job: CORVID_JOB,
+    }),
+    undefined,
+  );
+});

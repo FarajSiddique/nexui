@@ -16,6 +16,7 @@ import {
   type ChangesetOp,
   type CompanyData,
   type GraphObject,
+  type JobSource,
   type OpportunityData,
   type SearchData,
   type Stage,
@@ -35,6 +36,7 @@ import {
   type CapabilityContext,
 } from '#lib/capabilities';
 
+import { parseBoardUrl } from './board-urls.ts';
 import { companyName, compact } from './parts.ts';
 
 /** A role to add: what a board lookup or the scan found, or what the user described. */
@@ -191,6 +193,34 @@ export function addRoleOps(
   return { ops, roleId };
 }
 
+/**
+ * The source a model's role may carry (Decision 21): the one its board URL names, or, for a
+ * careers-site URL with `gh_jid`, the Greenhouse posting a lookup confirmed for that host (its
+ * token is one the host suggests). Any other URL, or none, gives no source: a model's word isn't
+ * a board's.
+ */
+function sourceFromUrl(
+  url: string | undefined,
+  given: JobSource | undefined,
+): JobSource | undefined {
+  const link = url ? parseBoardUrl(url) : null;
+
+  if (link?.kind === 'posting') {
+    return { ...link.board, job: link.job };
+  }
+
+  if (
+    link?.kind === 'careers' &&
+    given?.provider === 'greenhouse' &&
+    given.job === link.job &&
+    link.tokens.includes(given.token)
+  ) {
+    return given;
+  }
+
+  return undefined;
+}
+
 const addRole = defineCapability({
   name: 'jobs.addRole',
   description:
@@ -213,6 +243,7 @@ const addRole = defineCapability({
     // and liveness is what code checked (Decision 21). The app's buttons carry what a scan found.
     if (ctx.actor === 'ai') {
       delete role.fit;
+      role.source = sourceFromUrl(role.url, role.source);
     }
 
     const { ops, roleId } = addRoleOps(ctx, role, 'new', ctx.actor !== 'ai');
