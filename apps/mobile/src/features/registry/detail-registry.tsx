@@ -5,6 +5,7 @@ import { isKindName, type KindName } from '@nexui/types';
 
 import { createThemedStyles } from '#theme';
 import { Button, ListEmpty } from '#ui';
+import { RoleBody } from '#features/jobs';
 import { PlaceBody } from '#features/travel';
 import type { DetailProps } from '#features/workspace';
 
@@ -14,6 +15,7 @@ import type { DetailProps } from '#features/workspace';
  */
 export const DETAIL_REGISTRY: { [K in KindName]?: ComponentType<DetailProps> } = {
   place: PlaceBody,
+  opportunity: RoleBody,
 };
 
 /** True when a kind has a details body, so a row or the meta line may open it. */

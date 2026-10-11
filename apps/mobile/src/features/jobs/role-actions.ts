@@ -76,3 +76,29 @@ export function cardAction(
 
   return { type: 'capability', request: { name: action.capability, input }, optimistic: [] };
 }
+
+/**
+ * Renames a role through `object.update` (Decision 2), shown at once: its object title follows
+ * `data.title` on the server too. Null for an empty, too long or unchanged title.
+ */
+export function renameAction(role: GraphObject, title: string): CapabilityAction | null {
+  const next = title.trim();
+  const data = role.data as OpportunityData;
+
+  if (next.length === 0 || next.length > 200 || next === data.title) {
+    return null;
+  }
+
+  return {
+    type: 'capability',
+    request: { name: 'object.update', input: { ref: role.id, data: { title: next } } },
+    optimistic: [
+      {
+        op: 'update_object',
+        id: role.id,
+        patch: { title: next, data: { ...data, title: next } },
+        origin: 'direct',
+      },
+    ],
+  };
+}

@@ -65,3 +65,19 @@ export function roleLine(role: OpportunityData, company: string | null): string 
 export function outcomeLabel(outcome: Outcome): string {
   return capitalize(OUTCOME_LABELS[outcome]);
 }
+
+/**
+ * The host a role's link opens, shown before the user leaves the app: a role a model added may
+ * link to any https page (PR #43). Null for a link that isn't https or doesn't parse.
+ *
+ * @example linkHost('https://apply.example.net/jobs/1?ref=x') // 'apply.example.net'
+ */
+export function linkHost(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+
+    return parsed.protocol === 'https:' ? parsed.hostname : null;
+  } catch {
+    return null;
+  }
+}
