@@ -15,5 +15,4 @@ export {
   photoCredit,
   placeName,
   travelTo,
-  tripMeta,
 } from './format.ts';

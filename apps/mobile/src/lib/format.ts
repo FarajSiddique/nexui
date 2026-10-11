@@ -1,5 +1,5 @@
 import {
-  formatDateRange,
+  formatMoney,
   isKindName,
   KIND_CARDS,
   readField,
@@ -9,10 +9,12 @@ import {
   type Money,
   type PhotoCredit,
   type PlaceData,
-  type TripData,
 } from '@nexui/types';
 
 import { COUNTRY_NAMES } from './country-names.ts';
+
+// Shared with the meta line in `@nexui/types`; cards and metrics read it from here.
+export { formatMoney };
 
 /** @example formatDays(1) // '1 day' */
 export function formatDays(days: number): string {
@@ -30,48 +32,6 @@ export function formatHours(hours: number): string {
   }
 
   return rest === 0 ? `${whole}h` : `${whole}h ${rest}m`;
-}
-
-const currencyFormats = new Map<string, Intl.NumberFormat>();
-
-function currencyFormat(currency: string, digits: number): Intl.NumberFormat {
-  const key = `${currency}:${digits}`;
-  const cached = currencyFormats.get(key);
-
-  if (cached) {
-    return cached;
-  }
-
-  const created = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits,
-  });
-
-  currencyFormats.set(key, created);
-
-  return created;
-}
-
-/**
- * A short amount for a metric or a cell. Callers add "≈" where the figure is an estimate.
- *
- * @example
- * formatMoney({ amount: 3140, currency: 'USD' }) // '$3.1k'
- */
-export function formatMoney(money: Money): string {
-  const { amount, currency } = money;
-
-  if (amount >= 1_000_000) {
-    return `${currencyFormat(currency, 1).format(amount / 1_000_000)}m`;
-  }
-
-  if (amount >= 1_000) {
-    return `${currencyFormat(currency, 1).format(amount / 1_000)}k`;
-  }
-
-  return currencyFormat(currency, 0).format(amount);
 }
 
 const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
@@ -117,33 +77,6 @@ export function dayLabel(iso: string, now: Date): string {
   }
 
   return longDate.format(date);
-}
-
-/**
- * The line under a workspace's title.
- *
- * @example
- * tripMeta({ startDate: '2026-12-12', endDate: '2026-12-24', travelers: 2, pace: 'balanced' })
- * // 'Dec 12 – 24, 2 travelers, balanced pace'
- */
-export function tripMeta(trip: Partial<TripData>): string {
-  const parts: string[] = [];
-
-  if (trip.startDate && trip.endDate) {
-    parts.push(formatDateRange(trip.startDate, trip.endDate));
-  } else if (trip.totalDays) {
-    parts.push(formatDays(trip.totalDays));
-  }
-
-  if (trip.travelers) {
-    parts.push(`${trip.travelers} ${trip.travelers === 1 ? 'traveler' : 'travelers'}`);
-  }
-
-  if (trip.pace) {
-    parts.push(`${trip.pace} pace`);
-  }
-
-  return parts.join(', ');
 }
 
 /** @example humanizeKey('hoursFromKyoto') // 'Hours from kyoto' */

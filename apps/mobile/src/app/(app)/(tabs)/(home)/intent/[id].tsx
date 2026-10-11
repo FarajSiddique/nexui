@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import type { GraphSnapshot, TripData } from '@nexui/types';
+import { anchorMeta } from '@nexui/types';
 
 import {
   ApiError,
@@ -17,7 +17,6 @@ import {
   useWorkspaceEdit,
   useIntentLive,
 } from '#data';
-import { tripMeta } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { ListEmpty, ListError, RefetchNotice, SkeletonRows, Pill } from '#ui';
 import {
@@ -30,13 +29,6 @@ import {
   type WorkspaceAction,
   layoutWorkspace,
 } from '#features/workspace';
-
-function anchorMeta(snapshot: GraphSnapshot): string {
-  const anchorId = snapshot.workspace?.doc.anchorId;
-  const anchor = snapshot.objects.find((object) => object.id === anchorId);
-
-  return anchor?.kind === 'trip' ? tripMeta(anchor.data as Partial<TripData>) : '';
-}
 
 function goBack(): void {
   if (router.canGoBack()) {
@@ -157,7 +149,7 @@ export default function WorkspaceScreen(): ReactElement {
           <Text accessibilityRole="header" style={styles.title}>
             {data.intent.goal}
           </Text>
-          {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+          {meta ? <Text style={styles.meta}>{meta.text}</Text> : null}
           {drafting ? <Pill text="Drafting" tone="running" /> : null}
         </View>
         {intent.isRefetchError ? (

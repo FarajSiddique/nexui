@@ -17,7 +17,6 @@ import {
   ordinalWord,
   photoCredit,
   travelTo,
-  tripMeta,
 } from '../apps/mobile/src/lib/format.ts';
 
 const object = (kind, data, extra = {}) => ({
@@ -70,15 +69,6 @@ test('relative times and day groups use the local calendar', () => {
       older,
     ),
   );
-});
-
-test('the trip meta line names dates, travelers and pace', () => {
-  assert.equal(
-    tripMeta({ startDate: '2026-12-12', endDate: '2026-12-24', travelers: 2, pace: 'balanced' }),
-    'Dec 12 – 24, 2 travelers, balanced pace',
-  );
-  assert.equal(tripMeta({ totalDays: 3, travelers: 1 }), '3 days, 1 traveler');
-  assert.equal(tripMeta({}), '');
 });
 
 test('fields format by their spec, and missing values show a dash', () => {
