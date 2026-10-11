@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { aiMarkFor } from '../apps/mobile/src/features/workspace/ai-mark.ts';
+import {
+  countryName,
+  legFigures,
+  photoCredit,
+  travelTo,
+} from '../apps/mobile/src/features/travel/travel-format.ts';
+import { aiMarkFor } from '../apps/mobile/src/lib/ai-mark.ts';
 import {
   capitalize,
   cardText,
-  countryName,
   dayLabel,
   formatDate,
   formatDateTime,
@@ -17,10 +22,7 @@ import {
   formatTime,
   humanizeKey,
   isDateOnly,
-  legFigures,
   ordinalWord,
-  photoCredit,
-  travelTo,
 } from '../apps/mobile/src/lib/format.ts';
 
 const object = (kind, data, extra = {}) => ({

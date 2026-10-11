@@ -3,11 +3,10 @@ import { Text, View } from 'react-native';
 
 import type { GraphObject, ThingData } from '@nexui/types';
 
-import { cardText } from '#lib';
+import { aiMarkFor, cardText } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText } from '#ui';
 
-import { aiMarkFor } from '../ai-mark';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
 

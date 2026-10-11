@@ -10,17 +10,17 @@ import {
   useUndo,
   useWorkspaceEdit,
 } from '#data';
-import { placeName } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
-import { PlaceSheet } from '#features/place';
 import {
-  UndoToast,
+  PlaceSheet,
   daysAction,
+  placeName,
   rememberDays,
   stopDetails,
   useEditMemoryStore,
-} from '#features/workspace';
+} from '#features/travel';
+import { UndoToast } from '#features/workspace';
 
 // Closes the sheet onto its plan. A sheet opened from a link or a reload on web has no history
 // to go back to, so it opens the plan instead.

@@ -5,7 +5,7 @@ import test from 'node:test';
 
 delete Intl.DisplayNames;
 
-const { countryName } = await import('../apps/mobile/src/lib/format.ts');
+const { countryName } = await import('../apps/mobile/src/features/travel/travel-format.ts');
 
 test('country names come from the code even without Intl.DisplayNames', () => {
   assert.equal(countryName('DE'), 'Germany');

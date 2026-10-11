@@ -4,18 +4,21 @@ import { Pressable, Text, View } from 'react-native';
 import type { GraphObject, LegData, PlaceData } from '@nexui/types';
 
 import type { PhotoState } from '#data';
-import { capitalize, formatDays, legFigures, placeName } from '#lib';
+import { aiMarkFor, capitalize, formatDays } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, PlacePhoto } from '#ui';
+import {
+  SectionFrame,
+  type RouteStop,
+  type SectionDataOf,
+  type SectionProps,
+} from '#features/workspace';
 
-import { aiMarkFor } from '../ai-mark';
 import { DayStepper, SmallButton } from '../day-stepper';
 import { stopButtonLabel, stopKind } from '../stop-details';
-import { rememberDays, useEditMemoryStore } from '../use-edit-memory-store';
+import { legFigures, placeName } from '../travel-format';
 import { daysAction, moveAction } from '../trip-actions';
-import type { RouteStop, SectionDataOf } from '../workspace-layout';
-import { SectionFrame } from './section-frame';
-import type { SectionProps } from './types';
+import { rememberDays, useEditMemoryStore } from '../use-edit-memory-store';
 
 /**
  * One stop. With a photo, or while one may still come, it's a card: the photo full width with

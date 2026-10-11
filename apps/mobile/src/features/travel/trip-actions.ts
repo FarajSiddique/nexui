@@ -6,7 +6,7 @@ import {
   type PlaceData,
 } from '@nexui/types';
 
-import type { CapabilityAction } from './workspace-actions.ts';
+import type { CapabilityAction } from '#features/workspace';
 
 export const MAX_PLACE_DAYS = 365;
 

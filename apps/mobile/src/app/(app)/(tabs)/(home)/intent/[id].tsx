@@ -20,13 +20,13 @@ import {
 import { fonts, createThemedStyles } from '#theme';
 import { ListEmpty, ListError, RefetchNotice, SkeletonRows, Pill } from '#ui';
 import {
-  SectionView,
   UndoToast,
   focusIntent,
   useRevealOpenBand,
   type WorkspaceAction,
   layoutWorkspace,
 } from '#features/workspace';
+import { SectionView } from '#features/registry';
 
 function goBack(): void {
   if (router.canGoBack()) {

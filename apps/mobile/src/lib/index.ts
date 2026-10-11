@@ -1,8 +1,9 @@
 // The pure display layer loads this barrel under Node, so keep '.ts' paths and no react-native.
+export { aiMarkFor } from './ai-mark.ts';
+export type { AiMark } from './ai-mark.ts';
 export {
   capitalize,
   cardText,
-  countryName,
   dayLabel,
   formatDate,
   formatDateTime,
@@ -14,9 +15,5 @@ export {
   formatTime,
   humanizeKey,
   isDateOnly,
-  legFigures,
   ordinalWord,
-  photoCredit,
-  placeName,
-  travelTo,
 } from './format.ts';

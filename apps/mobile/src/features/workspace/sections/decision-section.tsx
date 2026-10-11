@@ -13,12 +13,11 @@ import {
 } from '@nexui/types';
 
 import type { PhotoState } from '#data';
-import { cardText, formatField, humanizeKey } from '#lib';
+import { aiMarkFor, cardText, formatField, humanizeKey } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, NexuiTag, Button } from '#ui';
 
 import type { DecisionOption } from '../workspace-layout';
-import { aiMarkFor } from '../ai-mark';
 import { resolveAction } from '../workspace-actions';
 import { ComparisonTable, type ComparisonRow } from './comparison-table';
 import { SectionFrame } from './section-frame';

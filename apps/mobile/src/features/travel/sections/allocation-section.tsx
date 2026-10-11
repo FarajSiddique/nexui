@@ -3,10 +3,7 @@ import { Text, View } from 'react-native';
 
 import { formatDays } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
-
-import type { SectionDataOf } from '../workspace-layout';
-import { SectionFrame } from './section-frame';
-import type { SectionProps } from './types';
+import { SectionFrame, type SectionDataOf, type SectionProps } from '#features/workspace';
 
 function caption(data: SectionDataOf<'allocation'>): string {
   const used = data.parts.reduce((sum, part) => sum + part.value, 0);

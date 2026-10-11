@@ -3,10 +3,9 @@ import { Text } from 'react-native';
 
 import { readField } from '@nexui/types';
 
-import { cardText, formatField } from '#lib';
+import { aiMarkFor, cardText, formatField } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 
-import { aiMarkFor } from '../ai-mark';
 import { ComparisonTable } from './comparison-table';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';

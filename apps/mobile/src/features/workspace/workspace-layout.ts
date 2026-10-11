@@ -2,6 +2,7 @@ import {
   anchorFigures,
   evaluateQuery,
   figureValue,
+  legBetween,
   readField,
   type AnchorFigures,
   type DecisionData,
@@ -15,9 +16,7 @@ import {
   type WorkspaceDoc,
 } from '@nexui/types';
 
-import { placeName } from '#lib';
-
-import { aiMarkFor } from './ai-mark.ts';
+import { aiMarkFor, cardText } from '#lib';
 
 export interface MapPin {
   id: string;
@@ -95,25 +94,6 @@ function countOf(value: FigureValue | undefined): number | null {
   return typeof value === 'number' ? value : null;
 }
 
-/** The leg from one stop to another, if the graph has one. */
-export function legBetween(
-  snapshot: GraphSnapshot,
-  fromId: string,
-  toId: string,
-): GraphObject | null {
-  const end = (legId: string, type: 'leg_from' | 'leg_to'): string | undefined =>
-    snapshot.relationships.find((edge) => edge.sourceId === legId && edge.type === type)?.targetId;
-
-  return (
-    snapshot.objects.find(
-      (object) =>
-        object.kind === 'leg' &&
-        end(object.id, 'leg_from') === fromId &&
-        end(object.id, 'leg_to') === toId,
-    ) ?? null
-  );
-}
-
 function mapPins(places: GraphObject[]): MapPin[] {
   return places
     .filter((place) => {
@@ -126,7 +106,7 @@ function mapPins(places: GraphObject[]): MapPin[] {
 
       return {
         id: place.id,
-        label: placeName(place),
+        label: cardText(place).title,
         lat: data.lat,
         lng: data.lng,
         order: index + 1,
@@ -209,7 +189,7 @@ function sectionData(
 
         return {
           id: object.id,
-          label: typeof label === 'string' && label.length > 0 ? label : placeName(object),
+          label: typeof label === 'string' && label.length > 0 ? label : cardText(object).title,
           value: typeof value === 'number' && value > 0 ? value : 0,
           ai: aiMarkFor(object).highlight,
         };

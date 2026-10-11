@@ -8,7 +8,7 @@ import {
   stopButtonLabel,
   stopDetails,
   stopSubtitle,
-} from '../apps/mobile/src/features/workspace/stop-details.ts';
+} from '../apps/mobile/src/features/travel/stop-details.ts';
 import {
   KYOTO_ID,
   KYOTO_REL_ID,

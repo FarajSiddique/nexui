@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { mapSnapshotRow } from '../apps/api/src/lib/graph/mappers.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
-import { daysAction, moveAction } from '../apps/mobile/src/features/workspace/trip-actions.ts';
+import { daysAction, moveAction } from '../apps/mobile/src/features/travel/trip-actions.ts';
 import {
   fromInsightAction,
   resolveAction,
