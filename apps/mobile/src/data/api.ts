@@ -9,6 +9,7 @@ import {
   intentListResponseSchema,
   intentMediaSchema,
   runRecordSchema,
+  startResponseSchema,
   type AskResponse,
   type CapabilityRequest,
   type ChangesResponse,
@@ -21,11 +22,13 @@ import {
   type IntentListItem,
   type IntentMedia,
   type RunRecord,
+  type StartResponse,
 } from '@nexui/types';
 
 import { fetchWithSession } from './authenticated-fetch';
 import { requestJson, type Parser } from './api-request.ts';
 import { supabase } from './supabase';
+import { appendPdf, type PickedPdf } from './upload-form';
 
 const apiUrl = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
@@ -143,6 +146,46 @@ export function createIntent(goal: string): Promise<CreateIntentResponse> {
     '/api/intents',
     createIntentResponseSchema,
     postJson({ goal, timezone: deviceTimeZone() }),
+  );
+}
+
+// Reading a resume takes up to 60 seconds on the server, so these allow 90.
+const INTAKE_TIMEOUT_MS = 90_000;
+
+// A POST with the PDF as multipart, or with no body to start without one. Fetch sets the
+// multipart boundary itself, so no Content-Type is given.
+function postPdf(pdf: PickedPdf | null): RequestInit {
+  if (!pdf) {
+    return { method: 'POST' };
+  }
+
+  const form = new FormData();
+
+  appendPdf(form, pdf);
+
+  return { method: 'POST', body: form };
+}
+
+/**
+ * Starts a plan that waits for its intake (job search spec, section 4), with the resume or
+ * without. Answers once the file is read and the build run queued.
+ */
+export function startPlan(intentId: string, pdf: PickedPdf | null): Promise<StartResponse> {
+  return callApi(
+    `/api/intents/${intentId}/start`,
+    startResponseSchema,
+    postPdf(pdf),
+    INTAKE_TIMEOUT_MS,
+  );
+}
+
+/** Replaces a started plan's resume, as one change with Undo. */
+export function replaceResume(intentId: string, pdf: PickedPdf): Promise<CommitResponse> {
+  return callApi(
+    `/api/intents/${intentId}/resume`,
+    commitResponseSchema,
+    postPdf(pdf),
+    INTAKE_TIMEOUT_MS,
   );
 }
 

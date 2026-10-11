@@ -91,5 +91,15 @@ test('decisions and insight buttons go to the server as they are, with nothing s
     type: 'ask',
     prompt: 'Prep me',
   });
-  assert.equal(fromInsightAction({ type: 'start', label: 'Start without' }), null);
+  assert.deepEqual(fromInsightAction({ type: 'start', label: 'Start without' }), {
+    type: 'start',
+  });
+  assert.deepEqual(fromInsightAction({ type: 'upload', label: 'Add resume', docType: 'resume' }), {
+    type: 'upload',
+    docType: 'resume',
+  });
+  assert.deepEqual(
+    fromInsightAction({ type: 'copy', label: 'Copy address', text: 'me@in.nexui.app' }),
+    { type: 'copy', text: 'me@in.nexui.app' },
+  );
 });

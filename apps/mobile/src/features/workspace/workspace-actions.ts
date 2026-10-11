@@ -9,7 +9,10 @@ export type WorkspaceAction =
   | { type: 'ask'; prompt: string }
   | { type: 'open'; objectId: string }
   | { type: 'capability'; request: CapabilityRequest; optimistic: ChangesetOp[] }
-  | { type: 'link'; url: string };
+  | { type: 'link'; url: string }
+  | { type: 'upload'; docType: 'resume' }
+  | { type: 'start' }
+  | { type: 'copy'; text: string };
 
 export type CapabilityAction = Extract<WorkspaceAction, { type: 'capability' }>;
 
@@ -28,8 +31,8 @@ export function resolveAction(decisionId: string, optionId: string | null): Capa
   };
 }
 
-/** An insight's button as an action, or null for a button this app doesn't draw yet. */
-export function fromInsightAction(action: InsightAction): WorkspaceAction | null {
+/** An insight's button as an action. */
+export function fromInsightAction(action: InsightAction): WorkspaceAction {
   switch (action.type) {
     case 'ask':
       return { type: 'ask', prompt: action.prompt };
@@ -39,7 +42,11 @@ export function fromInsightAction(action: InsightAction): WorkspaceAction | null
         request: { name: action.name, input: action.input },
         optimistic: [],
       };
-    default:
-      return null;
+    case 'upload':
+      return { type: 'upload', docType: action.docType };
+    case 'start':
+      return { type: 'start' };
+    case 'copy':
+      return { type: 'copy', text: action.text };
   }
 }

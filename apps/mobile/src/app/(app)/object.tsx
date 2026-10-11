@@ -1,8 +1,19 @@
+import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 
-import { useIntent, useUndo, useWorkspaceEdit } from '#data';
+import { intakeRoute, TEMPLATE_INTAKES } from '@nexui/types';
+
+import {
+  choosePdf,
+  useIntent,
+  useReplaceResume,
+  useStartPlan,
+  useUndo,
+  useWorkspaceEdit,
+  type PickedPdf,
+} from '#data';
 import { fonts, createThemedStyles } from '#theme';
 import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
 import { DetailView } from '#features/registry';
@@ -31,6 +42,9 @@ export default function ObjectScreen(): ReactElement {
   const intent = useIntent(intentId);
   const edit = useWorkspaceEdit(intentId);
   const undo = useUndo();
+  const start = useStartPlan();
+  const replace = useReplaceResume();
+  const [notice, setNotice] = useState<string | null>(null);
   const [undoable, setUndoable] = useState<string | null>(null);
   const hideUndo = useCallback(() => setUndoable(null), []);
   const scroll = useRef<ScrollView>(null);
@@ -39,6 +53,62 @@ export default function ObjectScreen(): ReactElement {
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
   }, [objectId]);
+
+  const busy = edit.isPending || start.isPending || replace.isPending;
+  const snapshot = intent.data;
+  const intake = snapshot?.intent.template ? TEMPLATE_INTAKES[snapshot.intent.template] : null;
+  const reading =
+    intake !== null && (replace.isPending || (start.isPending && Boolean(start.variables?.pdf)));
+
+  // A picked PDF goes where the plan's intake takes it: `start` before its first run, `resume`
+  // after (job search spec, section 4).
+  const sendPdf = (pdf: PickedPdf): void => {
+    if (!snapshot) {
+      return;
+    }
+
+    if (intakeRoute(snapshot.intent) === 'resume') {
+      replace.mutate(
+        { intentId: intentId, pdf },
+        { onSuccess: (result) => setUndoable(result.event.id) },
+      );
+
+      return;
+    }
+
+    start.mutate({ intentId: intentId, pdf });
+  };
+
+  const addFile = async (): Promise<void> => {
+    setNotice(null);
+
+    try {
+      const choice = await choosePdf();
+
+      if (!choice) {
+        return;
+      }
+
+      if ('problem' in choice) {
+        setNotice(choice.problem);
+
+        return;
+      }
+
+      sendPdf(choice.pdf);
+    } catch {
+      setNotice("Couldn't open your files. Try again.");
+    }
+  };
+
+  const copy = async (text: string): Promise<void> => {
+    try {
+      await Clipboard.setStringAsync(text);
+      setNotice('Copied.');
+    } catch {
+      setNotice("Couldn't copy that.");
+    }
+  };
 
   const handleAction = (action: WorkspaceAction): void => {
     switch (action.type) {
@@ -56,6 +126,18 @@ export default function ObjectScreen(): ReactElement {
           { request: action.request, optimistic: action.optimistic },
           { onSuccess: (result) => setUndoable(result.event.id) },
         );
+
+        return;
+      case 'upload':
+        void addFile();
+
+        return;
+      case 'start':
+        start.mutate({ intentId: intentId, pdf: null });
+
+        return;
+      case 'copy':
+        void copy(action.text);
 
         return;
       case 'link':
@@ -87,7 +169,7 @@ export default function ObjectScreen(): ReactElement {
         snapshot={intent.data}
         onAction={handleAction}
         onDone={() => close(intentId)}
-        busy={edit.isPending}
+        busy={busy}
       />
     );
   };
@@ -107,6 +189,26 @@ export default function ObjectScreen(): ReactElement {
         {undo.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
             Couldn&apos;t undo that. {undo.error.message}
+          </Text>
+        ) : null}
+        {reading ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            {intake?.reading}
+          </Text>
+        ) : null}
+        {notice ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            {notice}
+          </Text>
+        ) : null}
+        {start.isError ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            Couldn&apos;t start this plan. {start.error.message}
+          </Text>
+        ) : null}
+        {replace.isError ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            Couldn&apos;t add that resume. {replace.error.message}
           </Text>
         ) : null}
         {renderBody()}
@@ -131,5 +233,6 @@ const useStyles = createThemedStyles((colors) => ({
   // The place body's photo bleeds through this padding.
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 96 },
   gone: { gap: 12 },
+  notice: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },
 }));

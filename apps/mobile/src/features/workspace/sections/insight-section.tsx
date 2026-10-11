@@ -6,7 +6,6 @@ import type { GraphObject, InsightData } from '@nexui/types';
 import { fonts, createThemedStyles } from '#theme';
 import { ActorAvatar, Button } from '#ui';
 
-// Buttons this app doesn't draw yet (upload, copy, start) are left out until job search's intake lands.
 import { fromInsightAction, type WorkspaceAction } from '../workspace-actions';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
@@ -23,11 +22,10 @@ function InsightCard({
   const styles = useStyles();
   const data = insight.data as InsightData;
   const derived = data.derivedKey !== undefined || insight.source?.type === 'derived';
-  const buttons = data.actions.flatMap((action) => {
-    const next = fromInsightAction(action);
-
-    return next ? [{ label: action.label, next }] : [];
-  });
+  const buttons = data.actions.map((action) => ({
+    label: action.label,
+    next: fromInsightAction(action),
+  }));
 
   return (
     <SectionFrame accent={data.severity === 'attention'}>
@@ -45,7 +43,7 @@ function InsightCard({
               key={`${index}-${label}`}
               label={label}
               variant={index === 0 ? 'primary' : 'secondary'}
-              disabled={busy && next.type === 'capability'}
+              disabled={busy && next.type !== 'ask' && next.type !== 'copy'}
               onPress={() => onAction(next)}
             />
           ))}
