@@ -13,7 +13,14 @@ export {
 } from './helpers.ts';
 export { defineLookup } from './lookup.ts';
 export type { LookupContext, LookupTool } from './lookup.ts';
-export { buildRefTable, claimRefs, compareObjects, refOf } from './refs.ts';
+export {
+  buildRefTable,
+  checkNewRef,
+  claimRefs,
+  compareObjects,
+  refOf,
+  resolveRef,
+} from './refs.ts';
 export type { RefTable } from './refs.ts';
 export { CapabilityError, defineCapability } from './types.ts';
 export type {

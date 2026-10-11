@@ -154,6 +154,389 @@
       }
     },
     {
+      "name": "jobs.addRole",
+      "description": "Add a role to the search, in New, with its company. Use a posting jobs_lookup returned, copying its source and URL exactly, or a role the user described.",
+      "policy": "internal",
+      "exposeToModel": true,
+      "callableByUser": true,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "domain": {
+                "type": "string",
+                "pattern": "^[a-z0-9.-]{1,253}$"
+              },
+              "board": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["greenhouse", "lever", "ashby"]
+                  },
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,80}$"
+                  },
+                  "region": {
+                    "type": "string",
+                    "const": "eu"
+                  }
+                },
+                "required": ["provider", "token"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": ["greenhouse", "lever", "ashby"]
+              },
+              "token": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,80}$"
+              },
+              "region": {
+                "type": "string",
+                "const": "eu"
+              },
+              "job": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]{1,64}$"
+              }
+            },
+            "required": ["provider", "token", "job"],
+            "additionalProperties": false
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "workMode": {
+            "type": "string",
+            "enum": ["remote", "hybrid", "onsite"]
+          },
+          "salary": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "max": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            },
+            "required": ["currency"],
+            "additionalProperties": false
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "fit": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "reasons": {
+                "minItems": 1,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "gaps": {
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              }
+            },
+            "required": ["score", "reasons", "gaps"],
+            "additionalProperties": false
+          },
+          "ref": {
+            "description": "A new short ref for the role, such as halyard-pm",
+            "type": "string"
+          }
+        },
+        "required": ["company", "title"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.setStage",
+      "description": "Move a role to another stage. Closing it needs an outcome: passed, rejected, withdrew, no_reply, posting_closed, declined or accepted. Accepted ends the search as hired, and only the user may set it.",
+      "policy": "internal",
+      "exposeToModel": true,
+      "callableByUser": true,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["new", "interested", "applied", "interviewing", "offer", "closed"]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "rejected",
+              "withdrew",
+              "no_reply",
+              "posting_closed",
+              "declined",
+              "accepted"
+            ]
+          }
+        },
+        "required": ["objectId", "stage"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.pass",
+      "description": "Pass on a role: it closes as passed, and a reason, if given, joins the pass reasons the scans learn from.",
+      "policy": "internal",
+      "exposeToModel": false,
+      "callableByUser": true,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "too_junior",
+              "too_senior",
+              "wrong_location",
+              "not_this_company",
+              "pay_too_low",
+              "not_the_work"
+            ]
+          }
+        },
+        "required": ["objectId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.logContact",
+      "description": "Record contact about a role: sent (the user sent a follow-up) or received (the company replied).",
+      "policy": "internal",
+      "exposeToModel": true,
+      "callableByUser": true,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["sent", "received"]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": ["objectId", "direction"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.addInterview",
+      "description": "Add an interview for a role, and who it is with, and move the role to Interviewing. at is an ISO date-time with offset, or a date when no time was given.",
+      "policy": "internal",
+      "exposeToModel": true,
+      "callableByUser": false,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "ref": {
+            "description": "A new short ref for the interview, such as screen",
+            "type": "string"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              }
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "with": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "role": {
+                "type": "string",
+                "enum": ["recruiter", "hiring_manager", "referral", "interviewer", "other"]
+              },
+              "email": {
+                "type": "string",
+                "maxLength": 200,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          },
+          "link": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": ["objectId", "at", "label"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.draft",
+      "description": "Write a draft for a role or an interview: a cover letter, a brief (an application brief for a role, an interview brief for an interview), a follow-up email or a withdrawal note. Nothing is sent.",
+      "policy": "internal",
+      "exposeToModel": true,
+      "callableByUser": false,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "for": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "docType": {
+            "type": "string",
+            "enum": ["cover_letter", "brief", "follow_up", "withdrawal"]
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "to": {
+            "type": "string",
+            "maxLength": 200,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          }
+        },
+        "required": ["for", "docType", "body"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.setSearchStatus",
+      "description": "Pause or resume the search (status), or resume new-role checks after they paused (roleChecks on).",
+      "policy": "internal",
+      "exposeToModel": true,
+      "callableByUser": true,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["active", "paused"]
+          },
+          "roleChecks": {
+            "type": "string",
+            "const": "on"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "decision.propose",
       "description": "Put a choice to the user: a question with 2 to 4 options, pinned at the top of the plan. Use it instead of choosing for them. An option can carry the criteria picking it sets (roles, locations, workModes or salaryFloor).",
       "policy": "internal",
