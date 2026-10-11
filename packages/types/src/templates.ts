@@ -9,10 +9,11 @@ export interface TemplateExample {
 }
 
 /**
- * Every template's example, in the order the + sheet offers them. A template `templateSchema`
- * lists without one fails typecheck, so the app never offers a template the API can't plan,
- * and never misses one it can.
+ * Every template's example, in the order the + sheet offers them, or null for a template whose
+ * app side hasn't shipped (job search, until its mobile PR). A template `templateSchema` lists
+ * without an entry fails typecheck, so the app never offers a template it can't show.
  */
-export const TEMPLATE_EXAMPLES: Record<Template, TemplateExample> = {
+export const TEMPLATE_EXAMPLES: Record<Template, TemplateExample | null> = {
   travel: { plans: 'trips', goal: 'A week in Lisbon in May' },
+  job_search: null,
 };

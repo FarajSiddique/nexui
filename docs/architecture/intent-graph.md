@@ -100,10 +100,12 @@ The mobile side is in [`mobile.md`](./mobile.md).
 `version`, and an `upgrade(data, fromVersion)` function. `parseKindData(kind, data, version?)`
 upgrades old data first, then validates it, and is what `apps/api/src/lib/graph/prepare.ts` calls
 before any object write reaches the database. It registers `trip`, `place`, `leg`, `stay`,
-`decision`, `option`, `insight`, and the fallback `thing`. Their schemas are grouped by who uses
-them: `kinds/money.ts` (money and currency conversion), `kinds/common.ts` (`decision`, `option`,
-`insight` and `thing`, which every template uses) and `kinds/travel/` (`schemas.ts` for `trip`,
-`place`, `leg` and `stay`; `figures.ts` for a trip's figures).
+`decision`, `option`, `insight`, and the fallback `thing`, then job search's six: `search`,
+`company`, `opportunity` (a role), `interview`, `person` and `document`. Their schemas are grouped
+by who uses them: `kinds/money.ts` (money and currency conversion), `kinds/common.ts` (`decision`,
+`option`, `insight` and `thing`, which every template uses), `kinds/travel/` (`schemas.ts` for
+`trip`, `place`, `leg` and `stay`; `figures.ts` for a trip's figures) and `kinds/jobs/`
+(`schemas.ts` for the six kinds; `figures.ts` for a search's figures and `searchParts`).
 
 To add a kind: add its Zod schema (in its template's `kinds/<template>/` folder, or `common.ts`
 when every template uses it) and a registry entry with `version: 1` and `upgrade: (data) =>
@@ -119,18 +121,27 @@ fails typecheck:
 - `KIND_BEHAVIOUR` (`apps/api/src/lib/kinds/behaviour.ts`): how the generic `object.*`,
   `relationship.create` and `workspace.addSection` capabilities treat each kind. `creatable` lets
   `object.create` make one and `object.delete` remove one; `editable` lets `object.update`
-  change one (an anchor is editable, never creatable); `positioned` puts a new one at the end of
+  change one, for every object of the kind or, as a predicate, for those it accepts (an anchor is
+  editable, never creatable; a job search's documents are editable except the resume);
+  `positioned` puts a new one at the end of
   its ordered list (a place joins the route); `links` are the relationships `object.create` makes
   from its inputs (a leg's `from` and `to` places, with `title` naming it from them);
   `dependents` is what `object.delete` takes with it (a place's legs and stays). `plural`,
   `modelHelp`, `createNote`, `deleteNote` and `linkNote` are the words capability descriptions
-  and the data help use. A template's capability scope lists its kinds and the capabilities
+  and the data help use. `heavyFields` are data fields too long to send on every step: the prompt
+  shows each as its length (`[8000 characters, not shown]`), and the template's prompt says how to
+  read it. A document's `body` is one, and `document_read` returns it. `readOnlyFields` are data
+  fields `object.update` refuses because code owns them, such as a search's `status`, `roleChecks`
+  and `passReasons`. Of job search's kinds only companies and people are creatable through
+  `object.create`; roles are added and moved by `jobs.*`, which link them to their company and
+  stamp their dates, and `object.update` refuses a role, the resume and the search's bookkeeping.
+  A template's capability scope lists its kinds and the capabilities
   read the rest here, so a new kind needs no capability code. `lib/kinds` imports no other domain.
 
 `KIND_FIGURES` (`packages/types/src/kinds/figures.ts`) is keyed by anchor kind instead
-(`ANCHOR_KINDS`: the kinds that anchor a workspace, `trip` so far). Each entry recomputes that
-anchor's figures from a snapshot with no model involved; the trip's are `totalDays`,
-`allocatedDays`, `unallocatedDays` and `estCost`. The workspace's metric, allocation and route
+(`ANCHOR_KINDS`: the kinds that anchor a workspace, `trip` and `search`). Each entry recomputes
+that anchor's figures from a snapshot with no model involved; the trip's are `totalDays`,
+`allocatedDays`, `unallocatedDays` and `estCost`, and the search's are `new` and `inPlay`. The workspace's metric, allocation and route
 sections read figures this way, not from `data.derived`, so an optimistic edit moves them at
 once; the Changes feed still reads `data.derived` from an event's ops. The template's
 derivation writes the same numbers to the anchor's `data.derived` on the server.
@@ -143,29 +154,33 @@ A template is one use case, declared in one object so no other code has to name 
 `TemplateDefinition` (`apps/api/src/lib/templates/types.ts`) has these fields, and these
 readers:
 
-| Field          | Holds                                                                                            | Read by                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `name`         | Its `templateSchema` value                                                                       | `TEMPLATES` is keyed by it; Jev's answer and `startIntent` use it                                                                  |
-| `anchorKind`   | The kind of the workspace anchor (`trip`)                                                        | No runtime reader (the capabilities read `TRAVEL_SCOPE.anchorKind`); a test checks it is one of `kinds`, editable, never creatable |
-| `anchorRef`    | What models call the anchor (`trip`)                                                             | `createStager` builds the ref table with it; `instructionsFor` names it in the prompt                                              |
-| `kinds`        | Every kind its plans hold, the anchor's included                                                 | No runtime reader: a copy of `TRAVEL_SCOPE.kinds`, which the capabilities read; a test checks they create only these kinds         |
-| `perception`   | The sentence Jev reads when it picks a template for a goal                                       | `chooseTemplate` (`perception/perceive.ts`), as this template's criterion                                                          |
-| `context`      | Its own keys in `intents.context`, as Zod schemas                                                | `contextSchemaFor`, which `validateOps` applies to an `update_intent` that sets `context`                                          |
-| `figures`      | The anchor's `data.derived` keys the event payload reports when a change moves them, with labels | `figureChanges` (`graph/payload.ts`)                                                                                               |
-| `seed`         | The ops that start a plan from its goal: the anchor and the workspace                            | `createIntent` (`graph/commit.ts`)                                                                                                 |
-| `derive`       | Ops derived from a staged changeset (a `DeriveInput`), committed with it                         | `deriveForTemplate`, from `prepareChangeset`                                                                                       |
-| `capabilities` | What runs and the app's buttons may call, in the order models see them                           | `executeRun` (the run's tools) and `invokeCapability`                                                                              |
-| `prompt`       | The role, the anchor's description, the rules, the create task and each ask task                 | `instructionsFor` (`cognition/prompts.ts`)                                                                                         |
-| `routes`       | Model budgets that replace the default for some routes (optional)                                | `routeBudget` (`runs/execute.ts`)                                                                                                  |
+| Field          | Holds                                                                                                                                                                                  | Read by                                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `name`         | Its `templateSchema` value                                                                                                                                                             | `TEMPLATES` is keyed by it; Jev's answer and `startIntent` use it                                                                  |
+| `anchorKind`   | The kind of the workspace anchor (`trip`)                                                                                                                                              | No runtime reader (the capabilities read `TRAVEL_SCOPE.anchorKind`); a test checks it is one of `kinds`, editable, never creatable |
+| `anchorRef`    | What models call the anchor (`trip`)                                                                                                                                                   | `createStager` builds the ref table with it; `instructionsFor` names it in the prompt                                              |
+| `kinds`        | Every kind its plans hold, the anchor's included                                                                                                                                       | No runtime reader: a copy of `TRAVEL_SCOPE.kinds`, which the capabilities read; a test checks they create only these kinds         |
+| `perception`   | The sentence Jev reads when it picks a template for a goal                                                                                                                             | `chooseTemplate` (`perception/perceive.ts`), as this template's criterion                                                          |
+| `gate`         | An env var that must be `on` for Jev to route new goals here (optional), so a template can ship before its app side: job search's `JOB_SEARCH`                                         | `routableTemplates` (`templates/registry.ts`), which `chooseTemplate` offers Jev; a template without one always routes             |
+| `singleActive` | The user has at most one going plan of this template (optional; job search)                                                                                                            | `startIntent`, which answers `existing_search` with that plan instead of seeding another                                           |
+| `context`      | Its own keys in `intents.context`, as Zod schemas                                                                                                                                      | `contextSchemaFor`, which `validateOps` applies to an `update_intent` that sets `context`                                          |
+| `figures`      | The anchor's `data.derived` keys the event payload reports when a change moves them, with labels                                                                                       | `figureChanges` (`graph/payload.ts`)                                                                                               |
+| `seed`         | The ops that start a plan from `{ goal, timezone }` (`SeedInput`; the timezone is the device's, from the create request): the anchor and the workspace                                 | `createIntent` (`graph/commit.ts`)                                                                                                 |
+| `derive`       | Ops derived from a staged changeset (a `DeriveInput`), committed with it                                                                                                               | `deriveForTemplate`, from `prepareChangeset`                                                                                       |
+| `capabilities` | What runs and the app's buttons may call, in the order models see them                                                                                                                 | `executeRun` (the run's tools) and `invokeCapability`                                                                              |
+| `lookups`      | Read-only tools its runs' models get beside the capabilities (optional), each with a per-run cap                                                                                       | `toModelTools`, called by `executeRun`                                                                                             |
+| `intake`       | A document its plans take before the build run (optional; job search's resume): the capability that stores it, the refusal and read of an upload, and whether the plan has started     | `startPlan` and `replaceIntake` (`orchestrator/orchestrate.ts`); `startIntent` seeds a plan with one and waits                     |
+| `afterBuild`   | Code a build run does after its model steps (optional; job search's first scan)                                                                                                        | `runAfterBuild` in `executeRun`                                                                                                    |
+| `prompt`       | The role, the anchor's description, the rules, the create task and each ask task, and optionally `fences`: the extra tags of fenced data (`resume`, `posting`) and where it comes from | `instructionsFor` (`cognition/prompts.ts`), which names the tags in its rule on fenced data                                        |
+| `routes`       | Model budgets that replace the default for some routes (optional)                                                                                                                      | `routeBudget` (`runs/execute.ts`)                                                                                                  |
 
 `TEMPLATES` (`apps/api/src/lib/templates/registry.ts`) is a `Record<Template, TemplateDefinition>`,
 so a name `templateSchema` (`packages/types/src/graph.ts`) lists without a definition fails
 typecheck. `templateFor(name)` returns the definition, or null for an intent with no template (a
 saved goal Nexui can't plan yet): it derives nothing, no run or capability applies to it, and its
 context may hold only the eval tag. `contextSchemaFor` adds that tag (`context.eval`, written by
-`scripts/eval-travel.mjs`) to every template's keys, so a template can't forget it. The
-database's check still allows `job_search`, which `templateSchema` lists once a definition exists.
-Code reads a template through `TEMPLATES` or `templateFor` and does not compare names.
+`scripts/eval-travel.mjs` and `scripts/eval-jobs.mjs`) to every template's keys, so a template
+can't forget it. Code reads a template through `TEMPLATES` or `templateFor` and does not compare names.
 `UNSUPPORTED_GOAL` ("Nexui can't plan this yet.", same file) is a saved goal's summary line and
 the refusal to ask about it or stage a change on it.
 
@@ -173,18 +188,37 @@ The `lib/travel` domain (`apps/api/src/lib/travel/`) holds everything only the t
 knows: `template.ts` builds `TRAVEL_TEMPLATE`; `seed.ts` has `seedTravelOps` and
 `travelWorkspace`; `derive.ts` has `deriveTrip`; `capabilities.ts` has `TRAVEL_SCOPE` and
 `TRAVEL_CAPABILITIES` (`trip.setPlaceDays`, `trip.reorderPlaces` and the generic ones built for
-trips); `decisions.ts` has `TRAVEL_DECISIONS`; `prompt.ts` has `TRAVEL_PROMPT`. A template is
-its own domain rather than a folder under `lib/templates`, because the lint bans `../` imports
+trips); `decisions.ts` has `TRAVEL_DECISIONS`; `prompt.ts` has `TRAVEL_PROMPT`.
+
+A template is its own domain rather than a folder under `lib/templates`, because the lint bans `../` imports
 and a file in a subfolder couldn't import `TemplateDefinition` from beside it. `lib/templates`
 keeps the interface, the map and the code that dispatches on it.
 
-**Load order.** `TRAVEL_CAPABILITIES` and `TEMPLATES` are built at module load from other
+The `lib/jobs` domain (`apps/api/src/lib/jobs/`) is job search's, laid out the same way and by
+role (see [`job-search.md`](./job-search.md) for the flow):
+
+- Template: `template.ts` builds `JOB_SEARCH_TEMPLATE`; `seed.ts` has `seedJobSearchOps` and
+  `jobSearchWorkspace`; `derive.ts` has `deriveJobSearch`; `prompt.ts` has `JOB_SEARCH_PROMPT`;
+  `context.ts` has the `jobs` context schema (time zone, `startedAt`, `seen`); `decisions.ts`
+  has `JOB_DECISIONS`; `parts.ts` has small helpers shared by the others.
+- Capabilities: `capabilities.ts` has `JOBS_SCOPE` and `JOB_SEARCH_CAPABILITIES`; `roles.ts` has
+  `jobs.addRole`, `jobs.setStage`, `jobs.pass` and `jobs.logContact`; `resume.ts` has the resume
+  read, `jobs.setResume` and `RESUME_INTAKE`; `surface.ts` has `jobs.surfaceMatches`, which only
+  code calls.
+- Boards and search: `board-urls.ts` (which URLs count as a board's), `boards.ts` (the three
+  boards' APIs), `search.ts` (Parallel's web search) and `text.ts` (posting text as plain text).
+- Scan: `scan.ts` (`scanForRoles` and `scanAfterBuild`), `score.ts` (Jev's scores),
+  `explain.ts` (the fast tier's reasons) and `lookups.ts` (`JOB_SEARCH_LOOKUPS`, the models'
+  read-only tools).
+- `config.ts` reads `NEXUI_CONTACT` and `PARALLEL_API_KEY`.
+
+**Load order.** `TRAVEL_CAPABILITIES`, `JOB_SEARCH_CAPABILITIES` and `TEMPLATES` are built at module load from other
 domains' exports, so the domains load along one acyclic chain. Its import rules are about
 runtime imports (`import type` doesn't count, and `travel/template.ts` and `travel/prompt.ts`
 use it for `TemplateDefinition` and `TemplatePrompt`): `lib/kinds` imports no other domain,
-`lib/capabilities` only `lib/kinds`, `lib/travel` only `lib/capabilities`, and `lib/templates`
-only the domains below it (`lib/kinds`, `lib/capabilities` and `lib/travel`). That is why the
-stager and `invokeCapability` are in `lib/staging`, which imports `lib/graph`, and not beside
+`lib/capabilities` only `lib/kinds`, `lib/travel` and `lib/jobs` only `lib/capabilities`, and
+`lib/templates` only the domains below it (`lib/kinds`, `lib/capabilities`, `lib/travel` and
+`lib/jobs`). That is why the stager and `invokeCapability` are in `lib/staging`, which imports `lib/graph`, and not beside
 the capability definitions. `tests/api-load-order.test.mjs` enforces the chain (see "Checking
 it").
 
@@ -196,11 +230,13 @@ it").
   `templateSchema`; the exports in `index.ts`.
 - `apps/api`: a domain `src/lib/<template>/` with its `TemplateDefinition` (seed, derivation,
   capabilities built from the generic builders for a `CapabilityScope` that lists its kinds,
-  decision options, prompt), one line in `TEMPLATES`, and a `KIND_BEHAVIOUR` entry for each new
-  kind. Its mock fixtures sit beside
-  travel's in `lib/ai/fixtures/`, one flat folder (`RunFixture.perception.template` is typed from
+  decision options, prompt, and as needed `gate`, `singleActive`, `lookups`, `intake` and
+  `afterBuild`), one line in `TEMPLATES`, and a `KIND_BEHAVIOUR` entry for each new kind. Its
+  mock fixtures sit beside travel's in `lib/ai/fixtures/`, one flat folder (`RunFixture.perception.template` is typed from
   `Template`).
-- `tests/`: its derive, capability and template tests, and a line for its domain in
+- `tests/`: its derive, capability and template tests, its model surface file
+  (`tests/support/<template>-model-surface.json`, which `tests/support/model-surface.mjs` writes;
+  see "Checking it"), and a line for its domain in
   `tests/api-load-order.test.mjs`'s import checks (that test loads every domain without a change).
 - `apps/mobile`: the mobile app still reads trip kinds outside the section primitives (the
   Changes feed, stop details, workspace actions), so a template's mobile side is not yet a
@@ -335,17 +371,28 @@ pinned `decision` section as the trip's length becomes known or unknown.
 as a worker with the service-role client (see "Run queue" below).
 
 - **Perception** (`src/lib/perception`): Jev (`NEXUI_MODEL_PERCEPTION`, `typesafe-ai/jev`)
-  answers one choice question within 5 seconds. A goal is a template's name (`travel`) or
+  answers one choice question within 5 seconds. A goal is a routable template's name (`travel`) or
   `unsupported`, a sentence that names no template; each template's `perception` sentence is its
-  criterion, so a new template teaches routing by existing. If Jev fails, times out or picks a
+  criterion, so a new template teaches routing by existing. A template with a `gate` is offered
+  only while that env var is `on` (`routableTemplates`). If Jev fails, times out or picks a
   choice it wasn't offered (the AI SDK refuses that answer), `chooseTemplate` throws
   `PerceptionFailedError` and `POST /api/intents` answers 503 "Nexui couldn't read that goal. Try
   again." without writing anything. An ask is `edit`, `fast` or `reasoning`; if Jev fails, it gets
   `reasoning`.
-- **Saved goals** (`startIntent`): `POST /api/intents` answers an `outcome`
+- **Create outcomes** (`startIntent`): `POST /api/intents` answers an `outcome`
   (`createIntentResponseSchema`, a union in `packages/types/src/api.ts`), and each outcome names
-  its status in `CREATE_STATUS`: `started` (201, the snapshot and the run's id) and
-  `unsupported` (201, nothing else). A saved goal is an intent with `template` null: one summary
+  its status in `CREATE_STATUS`, so a new outcome must name its own:
+  - `started` (201): the snapshot and the run's id. A trip is seeded and its run queued.
+  - `awaiting_resume` (201): the snapshot. A template with an `intake` is seeded and queues no
+    run; `POST /api/intents/[id]/start` does (see "Starting a plan that waits").
+  - `unsupported` (201): nothing else. A saved goal (below).
+  - `existing_search` (200): `intentId` of the plan already going, for a `singleActive` template.
+    `findActiveIntent` (`graph/lists.ts`) reads it with the user's client: their latest plan of
+    the template whose status isn't `completed` or `archived`, so a paused search still counts
+    and one that ended in a hire doesn't. Nothing is seeded. Two creates in the same instant
+    could both see none.
+
+  A saved goal is an intent with `template` null: one summary
   op (`UNSUPPORTED_GOAL`), no workspace and no run. `listIntents` leaves it off Home; Changes
   still shows its "started" row. Account deletion removes it through the `intents.user_id`
   cascade. To rank which use cases to build next, list the saved goals across users in the
@@ -359,6 +406,26 @@ as a worker with the service-role client (see "Run queue" below).
   ```
 
   Job-hunting goals saved before job search's template shipped appear there too.
+
+- **Starting a plan that waits** (`startPlan`, `replaceIntake`): a plan seeded with an `intake`
+  waits for `start`. Both routes read a multipart `file` through
+  `readUpload` (`lib/http/upload.ts`): at most 4 MB (413 over it), or an empty body for none.
+  - `POST /api/intents/[id]/start` (202, `maxDuration` 300): the template's `refuse` checks the
+    file first (a 400 with its message), `read` reads it once with the fast tier, and the
+    template's intake capability stores what it found with `start: true` as one changeset, which
+    marks the plan started. Then `create_run` queues the build run, which the worker claims in
+    `after()`. The answer is `startResponseSchema`: the snapshot, the run's id and `intake`
+    (`read`, `unreadable` or `none`). A read that fails still starts the plan. A plan that
+    already started is a 409 ("This plan has already started."), unless its latest build run
+    failed: then it starts again, reading only a new file and keeping what the plan has. If
+    `create_run` fails, the start is undone with `revert_event` and the error rethrown. A plan
+    with no intake, a trip or a saved goal, is a 400.
+  - `POST /api/intents/[id]/resume` (200, `maxDuration` 90): replaces a started plan's intake
+    document as one changeset, answered like `/changesets`, and no run follows. A file the
+    template can't read is a 400 that changes nothing, a plan not started a 409 ("Start this
+    plan first."), and no file a 400.
+  - The read's tokens and model go in `runs.input.intake`; the build run's opening step adds
+    them to the run's `model_usage`.
 
 - **Starting a trip** (`startIntent`): if `create_run` fails after the intent was seeded, the
   intent is deleted with `discard_intent` before the error is rethrown. A failed discard is
@@ -425,6 +492,26 @@ as a worker with the service-role client (see "Run queue" below).
   workspace (`UNSUPPORTED_GOAL`), and takes from it the capabilities that
   become the model's tools, the instructions (`instructionsFor(template, kind, route)`) and the
   route's budget (`routeBudget`: the template's `routes` entry, else the default below).
+- **Lookups** (`lookups`, `LookupTool` in `src/lib/capabilities/lookup.ts`): read-only tools a
+  template gives its runs' models beside the capabilities, such as job search's `web_search`,
+  `jobs_lookup` and `document_read`. `toModelTools` adds each after the capabilities, with the
+  context `executeRun` builds per call (the staged plan, the refs, settings, `fetch` and the
+  time). A lookup changes nothing, so step replay never repeats it, and it is not recorded in
+  `runs.progress`. Each has a per-run cap (`perRun`: 3 web searches, 10 board lookups, 5
+  document reads); past it, or when it throws, the model reads an `{ error }` answer instead of
+  the run failing. A lookup answers its own failures the same way, and its log line names only
+  the lookup, never what it was asked.
+- **After the build** (`afterBuild`, `runAfterBuild` in `src/lib/runs/execute.ts`): a `create_intent`
+  run whose template has one calls it after the last model step, while the run is still
+  `running` (a Stop that landed after the last step skips it). It gets a `TemplateWorkJob`: the
+  plan as the steps left it, the run's AI session, settings, `fetch`, the time, `call` to stage
+  one of the template's capabilities as the run, and `commit`, which commits what was staged as
+  one changeset (labelled by its calls) and adds its usage to the run's. Its calls stay out of
+  `runs.progress`, which holds the model's alone, so a recorded fixture never replays them. The
+  steps are already committed, so a failure in `afterBuild` is logged under `[runs]` and the run
+  still succeeds; only a lost lease ends it. Job search's is the build run's one scan, within a
+  45-second budget of which 25 seconds are for the find phase (see
+  [`job-search.md`](./job-search.md)).
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
   `_` in tool names). `edit` and `fast` use `NEXUI_MODEL_FAST` for one forced tool step plus one
   correction; `reasoning` and the create run use `NEXUI_MODEL_REASONING` for up to 8 steps (the
@@ -451,7 +538,9 @@ as a worker with the service-role client (see "Run queue" below).
   oldest first; or the ref they gave a new object), never by id. `trip.setPlaceDays`,
   `trip.reorderPlaces` and `decision.resolve` are also the app's buttons, through
   `POST /api/intents/[id]/capabilities` (actor `user`, `invokeCapability` in `src/lib/staging`,
-  which offers only the plan's template's capabilities). The data help the model reads (each
+  which offers only the plan's template's capabilities). `CapabilityContext.now` is the time of
+  the call as an ISO timestamp, for what a capability stamps, such as a role's date last seen
+  live; capabilities stay pure, so none reads the clock itself. The data help the model reads (each
   kind's `modelHelp` in `KIND_BEHAVIOUR`) states the schema's limits, such as place `days`
   "whole days, 0 to 365" and leg `estHours` "0 to 200", and a test keeps them in step.
 - **Decisions** (`decision.propose` and `decision.resolve` in `src/lib/capabilities/decisions.ts`,
@@ -489,7 +578,10 @@ as a worker with the service-role client (see "Run queue" below).
   `<request>` as escaped JSON, and tell the model never to follow instructions found there. The
   frame is cognition's (`instructionsFor`): only tools change the plan, and fenced data is never
   instructions. The template supplies its role, its rules and the task of each run kind and
-  route (`TemplatePrompt`). `tests/model-surface.test.mjs` pins the result for a trip.
+  route (`TemplatePrompt`), and names any fenced data beyond those three (`fences`: tags such as
+  `resume` and `posting`, and where the data comes from) so the standing rule covers it.
+  `tests/model-surface.test.mjs` pins the result for a trip and for a job search. A kind's
+  `heavyFields` reach the prompt as their length.
 - **Mock mode** (`AI_PROVIDER=mock`, the default) replays `src/lib/ai/fixtures`, recorded from
   live runs. A fixture matches when all its phrases are in the text. With no match, perception
   answers `travel` and `reasoning` and the run changes nothing. `japan-ask-free-days` matches
@@ -498,7 +590,12 @@ as a worker with the service-role client (see "Run queue" below).
   whose `extend: 'o4'` was added by hand. It replays on any trip with a free day: `o4` is Tokyo
   on the trip that `try-run.mjs goal "Plan two weeks in Japan in December"` and then `free-day`
   make, and elsewhere it names another stop or none (and is dropped). `saved-goal`, written by
-  hand, matches "wedding" and answers `unsupported`, with no steps.
+  hand, matches "wedding" and answers `unsupported`, with no steps. `job-search-staff-pm`, also
+  by hand and about a fictional person, matches "staff pm", routes to `job_search` (the app must
+  run with `JOB_SEARCH=on`), answers the resume read with `RunFixture.output` (what a
+  structured-output call returns in mock mode) and sets the search's criteria in one step.
+  `RunFixture.scores` gives Jev's probability for each scan question by question id
+  (`questionId`), or 0 for a question it doesn't list.
 - **Recording:** run the API with `AI_PROVIDER=live`, start a run with
   `node scripts/try-run.mjs goal "<goal>"` (or `ask`), then
   `node scripts/record-fixture.mjs <runId> <name> <phrase,phrase>` and add the export to
@@ -556,7 +653,12 @@ In the web preview a live browser color-scheme change only applies after a reloa
   `japan-ask-free-days`), picks a place (the free day is used, a leg reaches it, the other
   candidates are deleted), undoes the pick (every candidate is back and the decision open), and
   saves a goal ("plan my wedding next June", replaying `saved-goal`) and checks Home leaves it
-  out, and ends with a cancel of a finished run.
+  out. Its job search block creates a job search (`awaiting_resume`), checks a second create
+  answers `existing_search`, starts it with a one-line PDF (the fixture's resume is read), waits
+  for the build run, checks the criteria and the excluded employer, checks a second `start` is a
+  409, and deletes the plan. That block needs the API running with `JOB_SEARCH=on` and
+  `NEXUI_CONTACT` empty, so the build's scan reads no board. The script ends with a cancel of a
+  finished run.
 - `pnpm eval:travel` (`scripts/eval-travel.mjs`, cases in `scripts/eval-travel-cases.mjs`, pure
   checks in `scripts/lib/eval-checks.mjs`): the manual live gate for spec section H's eight trip
   prompts. Each case creates a plan, tags it in `intents.context.eval`, checks it (valid kind
@@ -566,16 +668,36 @@ In the web preview a live browser color-scheme change only applies after a reloa
   `--case <name>` runs one case and `--clean` deletes every tagged plan. Needs the API (live for
   a real eval), `.qa/session.json`, and `SUPABASE_SECRET_KEY` with `QA_SUPABASE_REF` in
   `apps/api/.env.local`.
+- `pnpm eval:jobs` (`scripts/eval-jobs.mjs`, cases in `scripts/eval-jobs-cases.mjs`, pure checks
+  in `scripts/lib/eval-jobs-checks.mjs`): the manual live gate for job search, a half of the
+  spec's eval (the scan and kit halves are not built yet).
+  - Part A asks live Jev to route 24 goals and creates nothing. Part B runs eight cases' build
+    halves as the QA user: it creates the plan, starts it with a fictional resume PDF, waits for
+    the build run, checks the plan against the case, and reads every New role again from its
+    board (zero dead links). It archives the earlier eval search before each case, since a user
+    has one search at a time.
+  - `--part routing` or `--part build` runs one part, `--case <name>` one Part B case, and
+    `--clean` deletes every plan the eval tagged in `intents.context.eval` for the QA account.
+    It prints ✓/✗ per check and exits 1 on any ✗.
+  - Part A needs `AI_GATEWAY_API_KEY` in `apps/api/.env.local`. Part B needs the API running
+    with `AI_PROVIDER=live`, `JOB_SEARCH=on` and `NEXUI_CONTACT` (and `PARALLEL_API_KEY` for web
+    search), `.qa/session.json`, and `SUPABASE_SECRET_KEY` with `QA_SUPABASE_REF`.
+- `node --experimental-strip-types scripts/check-job-search.mjs`: a manual live gate for the
+  web search. It runs ten Parallel searches over sample criteria, reads each hit from its board,
+  and prints, per search, the hits, the postings, how many are live and the time. It needs
+  `PARALLEL_API_KEY` and `NEXUI_CONTACT` in `apps/api/.env.local` and costs about $0.01.
 - `scripts/lib/qa-api.mjs` is what the scripts share: `readSession`, `qaApi` (`call`,
   `waitForRun`), `qaAdmin` (the secret-key client, refused for any project but
   `QA_SUPABASE_REF`), `printRun` and `printPlan`. `NEXUI_SESSION` and `NEXUI_API` override
   `.qa/session.json` and `http://localhost:3000`.
-- `tests/model-surface.test.mjs`: pins what models see for a trip: each tool's name,
-  description, flags and input schema, the instructions for every run kind and route, and Jev's
-  template question, against `tests/support/travel-model-surface.json`. A change to a prompt, a
-  tool description or a tool schema fails it. To change one on purpose, run
-  `node --experimental-strip-types tests/support/model-surface.mjs`, then
-  `pnpm exec prettier --write tests/support/travel-model-surface.json`, and review the diff.
+- `tests/model-surface.test.mjs`: pins what models see for a trip and for a job search: each
+  tool's name, description, flags and input schema (a lookup's `perRun` too), the instructions
+  for every run kind and route, and Jev's template question (with job search's gate on for the
+  job search), against `tests/support/travel-model-surface.json` and
+  `tests/support/job-search-model-surface.json`. A change to a prompt, a tool description or a
+  tool schema fails it. To change one on purpose, run
+  `node --experimental-strip-types tests/support/model-surface.mjs`, which rewrites both, then
+  `pnpm exec prettier --write tests/support/*-model-surface.json`, and review the diff.
 - `tests/api-load-order.test.mjs`: loads each `apps/api/src/lib/` domain first in a fresh Node
   process, so no import order hides a cycle that uses another domain's export at module top
   level, and pins the import chain behind the registries (see "Templates").

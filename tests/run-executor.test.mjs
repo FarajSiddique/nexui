@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
+import { RunLeaseLostError } from '../apps/api/src/lib/graph/errors.ts';
 import {
   executeRun,
   FAILED_RUN_ERROR,
@@ -480,4 +481,69 @@ test('a template’s own route budget replaces the default', () => {
     mode: 'single',
     maxSteps: 2,
   });
+});
+
+test("a build run adds its intake read's usage at its first step", async (t) => {
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'));
+  const intake = { inputTokens: 3_000, outputTokens: 1_000, model: 'anthropic/claude-haiku-5.5' };
+  const run = mapRunRow(
+    runRow({
+      input: {
+        text: 'A test trip',
+        route: 'reasoning',
+        template: 'travel',
+        perception: 'model',
+        intake,
+      },
+    }),
+  );
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
+
+  assert.deepEqual(fake.state.steps[0].p_usage, intake);
+  assert.equal(run.input.intake.model, 'anthropic/claude-haiku-5.5');
+});
+
+test("a template's work after the build can fail without failing the run", async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID)));
+  const run = mapRunRow(runRow());
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    {
+      ...deps(),
+      afterBuild: async () => {
+        throw new Error('a board sent something odd');
+      },
+    },
+  );
+
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+  assert.deepEqual(logged.mock.calls.at(-1).arguments, [
+    '[runs]',
+    "A build run's work after its steps failed.",
+  ]);
+});
+
+test("a lease lost during the template's work ends the run without a verdict", async (t) => {
+  t.mock.method(console, 'error', () => {});
+
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID)));
+  const run = mapRunRow(runRow());
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    {
+      ...deps(),
+      afterBuild: async () => {
+        throw new RunLeaseLostError('moved on');
+      },
+    },
+  );
+
+  assert.equal(fake.state.finished, null);
 });

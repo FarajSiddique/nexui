@@ -3,6 +3,24 @@ import { z } from 'zod';
 export const idSchema = z.uuid();
 export const timestampSchema = z.iso.datetime({ offset: true });
 
+/**
+ * True for an IANA time zone this runtime knows.
+ *
+ * @example
+ * isTimeZone('Europe/London') // true
+ */
+export function isTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const timeZoneSchema = z.string().min(1).max(64).refine(isTimeZone, 'Unknown time zone.');
+
 /** The most characters a free-form JSON field (link metadata, action input) may serialize to. */
 export const MAX_FREE_JSON_LENGTH = 2_000;
 
@@ -21,7 +39,9 @@ export const capabilityNameSchema = z
   .regex(/^[a-z]+(\.[a-zA-Z]+)+$/);
 
 // Buttons an insight offers. They never carry model output as code: `ask` opens the + sheet
-// prefilled, and `capability` names one registered, validated call.
+// prefilled, `capability` names one registered, validated call, `upload` opens the document
+// picker for a resume, `copy` copies text, and `start` starts a plan that waits for its first
+// run, with no file.
 export const insightActionSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('ask'),
@@ -34,6 +54,17 @@ export const insightActionSchema = z.discriminatedUnion('type', [
     name: capabilityNameSchema,
     input: z.record(z.string(), z.json()).refine(fitsFreeJson, 'Too much input.'),
   }),
+  z.strictObject({
+    type: z.literal('upload'),
+    label: z.string().min(1).max(40),
+    docType: z.literal('resume'),
+  }),
+  z.strictObject({
+    type: z.literal('copy'),
+    label: z.string().min(1).max(40),
+    text: z.string().min(1).max(300),
+  }),
+  z.strictObject({ type: z.literal('start'), label: z.string().min(1).max(40) }),
 ]);
 
 export type InsightAction = z.infer<typeof insightActionSchema>;

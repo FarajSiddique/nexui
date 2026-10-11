@@ -1,6 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { ChangesQuery, ChangesResponse, IntentListItem, IntentSummary } from '@nexui/types';
+import type {
+  ChangesQuery,
+  ChangesResponse,
+  IntentListItem,
+  IntentSummary,
+  Template,
+} from '@nexui/types';
 
 import { activeRunIntentIds } from '#lib/runs';
 
@@ -65,4 +71,30 @@ export async function listChanges(
     items,
     nextCursor: items.length === query.limit && last ? String(last.seq) : null,
   };
+}
+
+/**
+ * The id of the caller's most recently active plan of this template that is still going (not
+ * completed or archived), or null. It backs the one-search rule: a paused search still counts,
+ * and one that ended in a hire doesn't. Two creates in the same instant could both see none.
+ */
+export async function findActiveIntent(
+  db: SupabaseClient,
+  template: Template,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('intents')
+    .select('id')
+    .eq('template', template)
+    .not('status', 'in', '(completed,archived)')
+    .order('last_activity_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const id = (data?.[0] as { id?: unknown } | undefined)?.id;
+
+  return typeof id === 'string' ? id : null;
 }

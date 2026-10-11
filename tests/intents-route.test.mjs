@@ -4,29 +4,15 @@ import test from 'node:test';
 import { GET, OPTIONS, POST } from '../apps/api/src/app/api/intents/route.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, useMockAi } from './support/ai.mjs';
+import { useEnv } from './support/env.mjs';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import { INTENT_ID, intentRow, RUN_ID, runRow, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import { toSnapshotRow } from './support/graph-db.mjs';
+import { jobSnapshot } from './support/jobs.mjs';
 import { cacheRow } from './support/media.mjs';
 import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
 const url = 'http://localhost/api/intents';
-
-// Sets env vars for one test and restores them after; `undefined` deletes one.
-function useEnv(t, values) {
-  const assign = (entries) => {
-    for (const [name, value] of Object.entries(entries)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-  };
-  const previous = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
-
-  assign(values);
-  t.after(() => assign(previous));
-}
 
 test('the preflight allows GET and POST', () => {
   assert.equal(OPTIONS().headers.get('access-control-allow-methods'), 'GET, POST, OPTIONS');
@@ -383,4 +369,68 @@ test('bad JSON is a 400', async (t) => {
 
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, 'Invalid JSON');
+});
+
+const jobGoal = (goal, timezone) =>
+  authed(url, { method: 'POST', body: JSON.stringify({ goal, timezone }) });
+
+function jobDb(t, intents = []) {
+  let created;
+
+  mockSupabaseAuth(
+    t,
+    postgrest({
+      'table:intents': () => intents.map((id) => ({ id })),
+      create_intent: (args) => {
+        created = args;
+
+        return {};
+      },
+      get_intent_snapshot: () =>
+        toSnapshotRow(jobSnapshot({ context: { jobs: { timezone: 'Europe/London', seen: [] } } })),
+    }),
+  );
+
+  return () => created;
+}
+
+test('a job search goal answers 201 awaiting_resume with its plan, and starts no run', async (t) => {
+  useMockAi(t);
+  useEnv(t, { JOB_SEARCH: 'on' });
+
+  const tasks = captureRuns(t);
+  const created = jobDb(t);
+  const response = await POST(jobGoal('Find a Staff PM role in London', 'Europe/London'));
+  const body = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(body.outcome, 'awaiting_resume');
+  assert.equal(body.snapshot.intent.template, 'job_search');
+  assert.equal(created().p_template, 'job_search');
+  assert.deepEqual(created().p_ops.at(-1).patch.context, {
+    jobs: { timezone: 'Europe/London', seen: [] },
+  });
+  assert.equal(tasks.length, 0);
+});
+
+test('a second job search answers 200 with the plan already going', async (t) => {
+  useMockAi(t);
+  useEnv(t, { JOB_SEARCH: 'on' });
+  jobDb(t, [INTENT_ID]);
+
+  const response = await POST(jobGoal('Find a Staff PM role in Berlin', 'Europe/Berlin'));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { outcome: 'existing_search', intentId: INTENT_ID });
+});
+
+test('a time zone the server doesn’t know is dropped, and the plan reads dates in UTC', async (t) => {
+  useMockAi(t);
+  useEnv(t, { JOB_SEARCH: 'on' });
+
+  const created = jobDb(t);
+  const response = await POST(jobGoal('Find a Staff PM role in London', 'Mars/Olympus'));
+
+  assert.equal(response.status, 201);
+  assert.equal(created().p_ops.at(-1).patch.context.jobs.timezone, 'UTC');
 });

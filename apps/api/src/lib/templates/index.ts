@@ -1,4 +1,14 @@
 export { contextSchemaFor } from './context.ts';
 export { deriveForTemplate } from './derive.ts';
-export { TEMPLATES, templateFor, UNSUPPORTED_GOAL } from './registry.ts';
-export type { DeriveInput, RouteBudget, TemplateDefinition, TemplatePrompt } from './types.ts';
+export { routableTemplates, TEMPLATES, templateFor, UNSUPPORTED_GOAL } from './registry.ts';
+export type {
+  DeriveInput,
+  IntakeAi,
+  IntakeRead,
+  RouteBudget,
+  SeedInput,
+  TemplateDefinition,
+  TemplateIntake,
+  TemplatePrompt,
+  TemplateWorkJob,
+} from './types.ts';

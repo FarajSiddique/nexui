@@ -21,8 +21,11 @@ export interface KindLink {
 export interface KindBehaviour {
   /** `object.create` may make one, and `object.delete` may remove one. */
   creatable: boolean;
-  /** `object.update` may change one. An anchor is editable but never creatable. */
-  editable: boolean;
+  /**
+   * `object.update` may change one: every object of the kind, or those a predicate accepts (a
+   * document, except the resume). An anchor is editable but never creatable.
+   */
+  editable: boolean | ((object: GraphObject) => boolean);
   /** A new one joins the end of its kind's ordered list, as a place joins the route. */
   positioned: boolean;
   /** Links `object.create` makes from its inputs. A kind with links needs every one. */
@@ -35,6 +38,16 @@ export interface KindBehaviour {
   plural: string;
   /** Its data fields as models read them: in `object.create`, or `object.update` for an anchor. */
   modelHelp?: string;
+  /**
+   * Data fields too long to send on every step, such as a document's body: the prompt shows each
+   * as its length, and the template's prompt says how to read it (readiness doc, section 3.6).
+   */
+  heavyFields?: readonly string[];
+  /**
+   * Data fields `object.update` refuses, like `derived`: what code owns, such as a search's
+   * status and pass reasons, which `jobs.*` and the scans set (Decision 21).
+   */
+  readOnlyFields?: readonly string[];
   /** A sentence `object.create`'s description adds about this kind. */
   createNote?: string;
   /** A sentence `object.delete`'s description adds about this kind. */
@@ -117,6 +130,70 @@ export const KIND_BEHAVIOUR: Record<KindName, KindBehaviour> = {
     modelHelp:
       'name, placeId (a place ref), nights (1 to 365), estNightly? {amount, currency}, url? ' +
       '(absolute URL).',
+  },
+  search: {
+    creatable: false,
+    editable: true,
+    positioned: false,
+    links: [],
+    readOnlyFields: ['status', 'roleChecks', 'passReasons', 'forwardFrom', 'forwarding'],
+    plural: 'searches',
+    modelHelp:
+      'roles [string] (1 to 5 job titles), locations [string] (0 to 5 cities or regions), ' +
+      'workModes [remote|hybrid|onsite] (at least one), salaryFloor? {amount, currency}, ' +
+      'industries [string] (0 to 5), excludeCompanies [string] (up to 20 never to show).',
+  },
+  company: {
+    creatable: true,
+    editable: true,
+    positioned: false,
+    links: [],
+    plural: 'companies',
+    modelHelp:
+      'name, domain? (such as stripe.com), target (true when the user named it), about? (one ' +
+      'or two sentences).',
+    createNote: 'A company the user names gets target true.',
+  },
+  // Roles are added and moved only by `jobs.*`, which link them to their company and stamp dates.
+  opportunity: {
+    creatable: false,
+    editable: false,
+    positioned: false,
+    links: [],
+    plural: 'roles',
+  },
+  interview: {
+    creatable: false,
+    editable: true,
+    positioned: false,
+    links: [],
+    plural: 'interviews',
+    modelHelp:
+      'at (ISO date-time with offset, or a date YYYY-MM-DD), label (such as Recruiter screen), ' +
+      'with? (who), link? (https URL), notes?.',
+  },
+  person: {
+    creatable: true,
+    editable: true,
+    positioned: false,
+    links: [
+      { input: 'for', type: 'for', to: 'opportunity', help: 'People only: the role they are for' },
+    ],
+    plural: 'people',
+    modelHelp: 'name, role (recruiter|hiring_manager|referral|interviewer|other), email?, notes?.',
+    createNote: 'A person needs the role they are for.',
+    linkNote: 'for: a person, draft or interview belongs to a role.',
+  },
+  document: {
+    creatable: false,
+    editable: (object) => object.data.docType !== 'resume',
+    positioned: false,
+    links: [],
+    heavyFields: ['body'],
+    plural: 'documents',
+    modelHelp:
+      'subject?, to? (email address), body (the text, up to 8,000 characters). Change a draft ' +
+      'only when asked.',
   },
   decision: {
     creatable: false,

@@ -13,6 +13,7 @@ import {
   type StepReport,
   capabilityForTool,
   toModelTools,
+  type ModelLookups,
 } from '#lib/cognition';
 import {
   changesetLabel,
@@ -29,7 +30,7 @@ import { createStager, templateOf, type Stager } from '#lib/staging';
 import type { RouteBudget, TemplateDefinition } from '#lib/templates';
 import type { AiSession } from '#lib/ai';
 
-import { finishRun, recordRunStep } from './store.ts';
+import { finishRun, recordRunStep, type RunUsage } from './store.ts';
 
 export interface RunJob {
   /** The worker's service-role client; every run write names the run and its lease. */
@@ -43,6 +44,10 @@ export interface RunDeps {
   clock?: () => Date;
   newId?: () => string;
   capabilities?: readonly Capability[];
+  /** Settings lookups read, such as API keys: `process.env` unless a test passes its own. */
+  env?: Record<string, string | undefined>;
+  /** Replaces the template's work after a build (`afterBuild`), for tests. */
+  afterBuild?: TemplateDefinition['afterBuild'];
 }
 
 // Spec section F: edit and fast take one fast-tier step (plus one correction); reasoning plans
@@ -178,6 +183,87 @@ async function commitStep(step: StepContext, report: StepReport): Promise<StepDe
   return status === 'running' ? 'continue' : 'stop';
 }
 
+// The template's work after a build run's model steps commits as one changeset, labelled by its
+// calls. Its calls stay out of the run's progress, which holds the model's alone, so a recorded
+// fixture never replays a scan.
+async function commitWork(step: StepContext, usage: RunUsage | null): Promise<void> {
+  const ops = step.stager.takeOps();
+  const entries = step.stager.takeEntries();
+
+  if (ops.length > 0) {
+    try {
+      const committed = await commitChangeset(
+        step.db,
+        {
+          intentId: step.intentId,
+          actor: 'ai',
+          run: { id: step.runId, lease: step.leaseId },
+          ops,
+          restage: (current) => step.stager.restage(current),
+          label: () =>
+            changesetLabel(entries.filter((entry) => entry.ok).map((entry) => entry.label)),
+        },
+        step.clock(),
+        step.newId,
+      );
+
+      step.stager.reset(committed.snapshot);
+    } catch (error) {
+      if (!(error instanceof NothingToCommitError)) {
+        throw error;
+      }
+
+      step.stager.reset(await loadSnapshot(step.db, step.intentId));
+    }
+
+    step.stager.takeSkipped();
+  }
+
+  await recordRunStep(step.db, step.runId, step.leaseId, [], usage);
+}
+
+// A build run's template work (`afterBuild`), such as job search's first scan. A Stop that
+// landed after the last model step skips it. The model's steps are committed, so what the
+// template adds after them never fails the run: only a lost lease ends it, since the run is no
+// longer this worker's (Decision 11).
+async function runAfterBuild(
+  job: RunJob,
+  step: StepContext,
+  template: TemplateDefinition,
+  deps: RunDeps,
+): Promise<void> {
+  const afterBuild = deps.afterBuild ?? template.afterBuild;
+
+  if (job.run.kind !== 'create_intent' || !afterBuild) {
+    return;
+  }
+
+  if ((await recordRunStep(step.db, step.runId, step.leaseId, [], null)) !== 'running') {
+    return;
+  }
+
+  const snapshot = step.stager.graph();
+
+  try {
+    await afterBuild({
+      snapshot,
+      anchorId: snapshot.workspace?.doc.anchorId ?? '',
+      session: job.session,
+      env: deps.env ?? process.env,
+      fetch: globalThis.fetch,
+      now: step.clock(),
+      call: (name, input) => step.stager.call(name, input),
+      commit: (usage) => commitWork(step, usage),
+    });
+  } catch (error) {
+    if (error instanceof RunLeaseLostError) {
+      throw error;
+    }
+
+    console.error('[runs]', logLine(error, "A build run's work after its steps failed"));
+  }
+}
+
 /**
  * Runs one claimed AI request to the end (spec section F). Each model step's calls commit as one
  * changeset, so Undo in Changes reverts a step; Stop lets the current step commit, then the
@@ -196,7 +282,8 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       throw new GraphNotFoundError('Not found.');
     }
 
-    if ((await recordRunStep(db, run.id, leaseId, [], null)) !== 'running') {
+    // The opening step carries an intake read's usage, when one came before this build run.
+    if ((await recordRunStep(db, run.id, leaseId, [], run.input.intake ?? null)) !== 'running') {
       return;
     }
 
@@ -213,6 +300,17 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       clock,
     });
     const budget = routeBudget(template, run.input.route);
+    const lookups: ModelLookups = {
+      tools: template.lookups ?? [],
+      // Read per call: the staged plan has moved on, and tests stub `fetch` after loading.
+      context: () => ({
+        graph: stager.graph(),
+        refs: stager.refs,
+        env: deps.env ?? process.env,
+        fetch: globalThis.fetch,
+        now: clock(),
+      }),
+    };
     const step: StepContext = {
       db,
       intentId,
@@ -228,7 +326,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       providerOptions: session.providerOptions(budget.tier),
       instructions: instructionsFor(template, run.kind, run.input.route),
       prompt: promptFor(snapshot, stager.refs, run.input.text),
-      tools: toModelTools(capabilities, stager),
+      tools: toModelTools(capabilities, stager, lookups),
       mode: budget.mode,
       maxSteps: budget.maxSteps,
       onStep: (report) => commitStep(step, report),
@@ -239,6 +337,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
     } else if (outcome === 'stopped') {
       await finishRun(db, run.id, leaseId, 'cancelled', null);
     } else {
+      await runAfterBuild(job, step, template, deps);
       await finishRun(db, run.id, leaseId, 'succeeded', null);
     }
   } catch (error) {

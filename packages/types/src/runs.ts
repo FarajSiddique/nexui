@@ -52,6 +52,14 @@ export const runInputSchema = z.object({
   route: runRouteSchema,
   template: templateSchema.optional(),
   perception: z.enum(['model', 'fallback']),
+  /** The tokens and model of the intake read before a build run, added to the run's usage. */
+  intake: z
+    .object({
+      inputTokens: z.number().int().min(0),
+      outputTokens: z.number().int().min(0),
+      model: z.string().min(1).max(200),
+    })
+    .optional(),
 });
 
 export type RunInput = z.infer<typeof runInputSchema>;

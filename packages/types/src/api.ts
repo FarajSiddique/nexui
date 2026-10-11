@@ -9,21 +9,45 @@ import {
 } from './graph.ts';
 import { storageUrlSchema } from './media.ts';
 import { userOpSchema } from './ops.ts';
-import { capabilityNameSchema, fitsFreeJson, idSchema, timestampSchema } from './primitives.ts';
+import {
+  capabilityNameSchema,
+  fitsFreeJson,
+  idSchema,
+  timeZoneSchema,
+  timestampSchema,
+} from './primitives.ts';
 import { runRouteSchema } from './runs.ts';
 
-// POST /api/intents
-export const createIntentRequestSchema = z.object({ goal: z.string().trim().min(3).max(500) });
+// POST /api/intents. `timezone` is the device's IANA zone; one the server doesn't know parses
+// as absent, so a plan reads its dates in UTC rather than refusing the goal.
+export const createIntentRequestSchema = z.object({
+  goal: z.string().trim().min(3).max(500),
+  timezone: timeZoneSchema.optional().catch(undefined),
+});
 
-// What Nexui did with the goal (job search spec, section 2): a plan seeded with its run queued,
-// or a goal no template fits, saved with no plan and no run. PR 2 adds `awaiting_resume` and
-// `existing_search`.
+// What Nexui did with the goal (job search spec, section 2): a plan seeded with its run queued;
+// a plan seeded that waits for its resume (`start` queues the run); a goal no template fits,
+// saved with no plan; or a second job search, answered with the one already going.
 export const createIntentResponseSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('started'), snapshot: graphSnapshotSchema, runId: idSchema }),
+  z.object({ outcome: z.literal('awaiting_resume'), snapshot: graphSnapshotSchema }),
   z.object({ outcome: z.literal('unsupported') }),
+  z.object({ outcome: z.literal('existing_search'), intentId: idSchema }),
 ]);
 
 export type CreateIntentResponse = z.infer<typeof createIntentResponseSchema>;
+
+// POST /api/intents/:id/start: answers 202 while the build run works. `intake` says what reading
+// the upload found: a resume, one that couldn't be read, or no file.
+export const startResponseSchema = z.object({
+  snapshot: graphSnapshotSchema,
+  runId: idSchema,
+  intake: z.enum(['read', 'unreadable', 'none']),
+});
+
+export type StartResponse = z.infer<typeof startResponseSchema>;
+
+// POST /api/intents/:id/resume answers like a changeset (`commitResponseSchema`).
 
 // GET /api/intents: Home's cards, most recently active first.
 export const intentListItemSchema = z.object({

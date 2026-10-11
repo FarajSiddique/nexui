@@ -69,3 +69,29 @@ export async function invokeCapability(
 
   return commitChangeset(db, { intentId, actor: 'user', ops, label: () => label }, clock, newId);
 }
+
+/**
+ * Runs one of the plan's capabilities as the user and commits it, for a call the API makes
+ * itself, such as storing a resume it just read. Unlike `invokeCapability`, it allows a
+ * code-only capability, so its input must never come from a request body.
+ */
+export async function applyCapability(
+  db: SupabaseClient,
+  intentId: string,
+  request: { name: string; input: Record<string, unknown> },
+  clock: Date = new Date(),
+  newId: () => string = randomUUID,
+): Promise<CommitResult> {
+  const snapshot = await loadSnapshot(db, intentId);
+  const capability = templateFor(snapshot.intent.template)?.capabilities.find(
+    (candidate) => candidate.name === request.name,
+  );
+
+  if (!capability) {
+    throw new ChangesetInvalidError("That action isn't available.");
+  }
+
+  const { ops, label } = stageUserCall(capability, snapshot, request.input, clock, newId);
+
+  return commitChangeset(db, { intentId, actor: 'user', ops, label: () => label }, clock, newId);
+}

@@ -10,6 +10,9 @@ export const { MockLanguageModelV4, Experimental_EvaluationMockModelV4 } = await
   pathToFileURL(fromApi.resolve('ai/test')).href
 );
 
+// Zod, for tests that define a capability or a lookup of their own.
+export const { z } = await import(pathToFileURL(fromApi.resolve('zod')).href);
+
 /** An evaluation model that always fails, as a Gateway outage would. */
 export function failingEvaluationModel() {
   return new Experimental_EvaluationMockModelV4({

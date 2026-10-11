@@ -64,10 +64,15 @@ test('capability definitions load without the graph, so templates can build on t
 });
 
 test('a template builds on capabilities, never on the graph that runs it', () => {
-  assert.deepEqual(runtimeImports('travel'), ['capabilities']);
+  for (const domain of ['travel', 'jobs']) {
+    assert.deepEqual(runtimeImports(domain), ['capabilities'], domain);
+  }
 
   // Templates sit at the top of the chain, so they may use only the domains below them.
   for (const name of runtimeImports('templates')) {
-    assert.ok(['kinds', 'capabilities', 'travel'].includes(name), `templates imports ${name}`);
+    assert.ok(
+      ['kinds', 'capabilities', 'travel', 'jobs'].includes(name),
+      `templates imports ${name}`,
+    );
   }
 });

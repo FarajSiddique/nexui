@@ -5,7 +5,8 @@
  * (replaying `japan-ask-free-days`), pick an option and undo the pick. Needs the API running
  * and a QA session from `node scripts/qa-session.mjs > .qa/session.json`. Run the API with
  * AI_PROVIDER=mock: the goal matches no fixture, so its run changes nothing and the counts
- * below hold.
+ * below hold. Run it with JOB_SEARCH=on and NEXUI_CONTACT empty: the job search goal replays
+ * `job-search-staff-pm`, and its scan reads no board.
  *
  * node scripts/smoke-intent-graph.mjs [.qa/session.json] [http://localhost:3000]
  */
@@ -15,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { qaApi, readSession } from './lib/qa-api.mjs';
 
 const [sessionPath = '.qa/session.json', api = 'http://localhost:3000'] = process.argv.slice(2);
-const { call, waitForRun } = qaApi(readSession(sessionPath), api);
+const { call, postForm, waitForRun } = qaApi(readSession(sessionPath), api);
 
 const started = await call('POST', '/api/intents', { goal: 'Smoke test: three quiet days away' });
 
@@ -200,6 +201,45 @@ assert.ok(
   'Home lists only plans',
 );
 console.log('saved goal: unsupported, not on Home');
+
+// A job search waits for its resume, a second one points at it, and start reads the resume and
+// runs the build (mock mode's `job-search-staff-pm`, with board lookups off).
+const jobGoal = { goal: 'Smoke test: find a Staff PM role in London', timezone: 'Europe/London' };
+let job = await call('POST', '/api/intents', jobGoal);
+
+// A smoke test that failed half-way leaves its search going.
+if (job.outcome === 'existing_search') {
+  await call('DELETE', `/api/intents/${job.intentId}`);
+  job = await call('POST', '/api/intents', jobGoal);
+}
+
+assert.equal(job.outcome, 'awaiting_resume');
+
+const jobId = job.snapshot.intent.id;
+
+assert.deepEqual(await call('POST', '/api/intents', jobGoal), {
+  outcome: 'existing_search',
+  intentId: jobId,
+});
+
+const resume = new FormData();
+
+resume.set('file', new File(['%PDF-1.7\n%smoke test\n'], 'cv.pdf', { type: 'application/pdf' }));
+
+const begun = await postForm(`/api/intents/${jobId}/start`, resume);
+
+assert.equal(begun.intake, 'read');
+assert.equal((await waitForRun(begun.runId)).status, 'succeeded');
+
+const search = (await call('GET', `/api/intents/${jobId}`)).objects.find(
+  (object) => object.kind === 'search',
+);
+
+assert.deepEqual(search.data.roles, ['Staff Product Manager']);
+assert.deepEqual(search.data.excludeCompanies, ['Ledgerly']);
+await assert.rejects(postForm(`/api/intents/${jobId}/start`, null), /→ 409/);
+await call('DELETE', `/api/intents/${jobId}`);
+console.log('job search: waited for its resume, one at a time, started, criteria set');
 
 const cancelled = await call('POST', `/api/runs/${asked.runId}/cancel`);
 

@@ -26,6 +26,8 @@ export interface CapabilityContext {
   refs: RefTable;
   /** The provenance new objects get: `{ type: 'ai', runId }` or `{ type: 'user' }`. */
   source: ObjectSource;
+  /** When the call runs, as an ISO timestamp: what a capability stamps, such as an applied date. */
+  now: string;
   newId: () => string;
 }
 

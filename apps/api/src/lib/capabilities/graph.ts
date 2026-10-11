@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { ChangesetOp, GraphObject, KindName } from '@nexui/types';
+import { isKindName, type ChangesetOp, type GraphObject, type KindName } from '@nexui/types';
 
 import { KIND_BEHAVIOUR, type KindBehaviour, type KindLink } from '#lib/kinds';
 
@@ -169,10 +169,17 @@ function objectCreate(scope: CapabilityScope): Capability {
   });
 }
 
+// Whether `object.update` may change this object: its kind's flag, or its kind's predicate.
+function canEdit(behaviour: KindBehaviour, object: GraphObject): boolean {
+  return typeof behaviour.editable === 'function' ? behaviour.editable(object) : behaviour.editable;
+}
+
 function objectUpdate(scope: CapabilityScope): Capability {
-  const editable: readonly string[] = scope.kinds.filter((kind) => KIND_BEHAVIOUR[kind].editable);
+  const editable: readonly string[] = scope.kinds.filter(
+    (kind) => KIND_BEHAVIOUR[kind].editable !== false,
+  );
   const parts = scope.kinds.filter(
-    (kind) => kind !== scope.anchorKind && KIND_BEHAVIOUR[kind].editable,
+    (kind) => kind !== scope.anchorKind && KIND_BEHAVIOUR[kind].editable !== false,
   );
   const anchorHelp = KIND_BEHAVIOUR[scope.anchorKind].modelHelp ?? '';
 
@@ -198,7 +205,9 @@ function objectUpdate(scope: CapabilityScope): Capability {
     execute(input, ctx) {
       const object = resolveRef(ctx.refs, ctx.graph, input.ref);
 
-      if (!editable.includes(object.kind)) {
+      const behaviour = isKindName(object.kind) ? KIND_BEHAVIOUR[object.kind] : null;
+
+      if (!behaviour || !editable.includes(object.kind) || !canEdit(behaviour, object)) {
         throw new CapabilityError(`${nameOf(object)} can't be edited this way.`);
       }
 
@@ -213,6 +222,14 @@ function objectUpdate(scope: CapabilityScope): Capability {
 
         // `derived` belongs to the template's derivation.
         delete changes.derived;
+
+        // What code owns, such as a search's status, isn't the model's to set.
+        const owned = (behaviour.readOnlyFields ?? []).filter((field) => field in changes);
+
+        if (owned.length > 0) {
+          throw new CapabilityError(`${listOf(owned, 'and')} can't be changed this way.`);
+        }
+
         patch.data = { ...object.data, ...changes };
 
         if (typeof changes.name === 'string' && object.title === object.data.name) {

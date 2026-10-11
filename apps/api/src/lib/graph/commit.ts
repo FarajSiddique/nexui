@@ -38,6 +38,13 @@ export interface CommitResult {
   snapshot: GraphSnapshot;
 }
 
+/** A goal to plan: its template, or null for one Nexui can't plan yet, and the device's zone. */
+export interface NewIntent {
+  goal: string;
+  template: Template | null;
+  timezone: string;
+}
+
 /** Every op in the changeset was superseded by newer changes, so there is nothing to commit. */
 export class NothingToCommitError extends Error {}
 
@@ -111,8 +118,7 @@ export async function commitChangeset(
  */
 export async function createIntent(
   db: SupabaseClient,
-  goal: string,
-  template: Template | null,
+  intent: NewIntent,
   clock: Date = new Date(),
   newId: () => string = randomUUID,
 ): Promise<GraphSnapshot> {
@@ -121,8 +127,8 @@ export async function createIntent(
   const empty: GraphSnapshot = {
     intent: {
       id: intentId,
-      goal,
-      template,
+      goal: intent.goal,
+      template: intent.template,
       status: 'exploring',
       context: {},
       summary: { line: '' },
@@ -134,14 +140,15 @@ export async function createIntent(
     objects: [],
     relationships: [],
   };
-  const seed: ChangesetOp[] = templateFor(template)?.seed(goal, newId) ?? [
-    { op: 'update_intent', patch: { summary: { line: UNSUPPORTED_GOAL } }, origin: 'direct' },
-  ];
+  const seed: ChangesetOp[] = templateFor(intent.template)?.seed(
+    { goal: intent.goal, timezone: intent.timezone },
+    newId,
+  ) ?? [{ op: 'update_intent', patch: { summary: { line: UNSUPPORTED_GOAL } }, origin: 'direct' }];
   const ops = prepareChangeset(empty, seed, 'system', now, newId);
   const { error } = await db.rpc('create_intent', {
     p_intent_id: intentId,
-    p_goal: goal,
-    p_template: template,
+    p_goal: intent.goal,
+    p_template: intent.template,
     p_ops: ops,
   });
 

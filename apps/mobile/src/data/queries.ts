@@ -360,8 +360,9 @@ export function useCreateIntent(): UseMutationResult<CreateIntentResponse, Error
   return useMutation({
     mutationFn: createIntent,
     onSuccess: (result) => {
-      // A saved goal has no plan to show, and Home doesn't list it.
-      if (result.outcome !== 'started') {
+      // A saved goal has no plan to show, and Home doesn't list it; a second job search is the
+      // first, which is already cached. A plan waiting for its resume is new, so it is cached.
+      if (result.outcome === 'unsupported' || result.outcome === 'existing_search') {
         return;
       }
 

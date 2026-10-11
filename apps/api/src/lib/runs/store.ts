@@ -234,6 +234,32 @@ export async function getRun(
   return mapRunRow(data, now);
 }
 
+/**
+ * The caller's latest build run on an intent, read through RLS, or null before any. `start`
+ * consults it so a plan whose build failed can start again (Decision 20); a stale active run
+ * reads as failed, as everywhere.
+ */
+export async function latestBuildRun(
+  db: SupabaseClient,
+  intentId: string,
+  now: Date = new Date(),
+): Promise<RunRecord | null> {
+  const { data, error } = await db
+    .from('runs')
+    .select('*')
+    .eq('intent_id', intentId)
+    .eq('kind', 'create_intent')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  return data ? mapRunRow(data, now) : null;
+}
+
 /** The caller's intents with a run still working on them, for Home's "Drafting" badge. */
 export async function activeRunIntentIds(
   db: SupabaseClient,

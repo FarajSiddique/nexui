@@ -128,9 +128,22 @@ export function deleteIntent(id: string): Promise<void> {
   return callApi(`/api/intents/${id}`, noContent, { method: 'DELETE' });
 }
 
+/** The device's IANA zone, or undefined where the platform can't say (the server then has none). */
+function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Starts a plan from a goal and its run, or saves a goal Nexui can't plan yet. */
 export function createIntent(goal: string): Promise<CreateIntentResponse> {
-  return callApi('/api/intents', createIntentResponseSchema, postJson({ goal }));
+  return callApi(
+    '/api/intents',
+    createIntentResponseSchema,
+    postJson({ goal, timezone: deviceTimeZone() }),
+  );
 }
 
 /** Asks Nexui to change an intent. Answers at once with the run doing the work. */
