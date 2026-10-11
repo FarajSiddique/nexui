@@ -417,7 +417,8 @@ as a worker with the service-role client (see "Run queue" below).
   - **A forced step that fails, then answers in text, is `invalid`.** For `edit` and `fast`, a
     text answer after a step with errors means the model gave up on the change, so the run fails
     with "Nexui couldn't make a valid change.". A first forced step that answers in text still
-    finishes: the model found nothing to change.
+    finishes: the model found nothing to change. A safety refusal, which Claude Haiku 5.5 (the
+    default fast model) can return, takes the same paths.
 - **Capabilities** (`src/lib/capabilities`): named, Zod-typed functions that turn input into ops
   against a staged copy of the intent. The generic ones (`object.*`, `relationship.*`,
   `workspace.*`, `decision.*`) are built for each template from a `CapabilityScope` (its kinds,
