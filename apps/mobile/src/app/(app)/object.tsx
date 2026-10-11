@@ -180,7 +180,12 @@ export default function ObjectScreen(): ReactElement {
           react-native-screens resizing the ScrollView, which leaves an iOS form sheet blank
           (docs/architecture/mobile.md). */}
       <View collapsable={false} />
-      <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scroll}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {edit.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
             Couldn&apos;t save that. {edit.error.message}

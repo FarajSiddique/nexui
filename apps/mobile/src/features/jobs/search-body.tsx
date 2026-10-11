@@ -68,12 +68,13 @@ function SalaryFloor({
       <TextInput
         accessibilityLabel="New salary floor"
         autoFocus
-        keyboardType="numeric"
+        keyboardType="numbers-and-punctuation"
         placeholder="e.g. 130,000"
         placeholderTextColor={colors.faint}
         value={typed}
         onChangeText={setTyped}
         onSubmitEditing={save}
+        returnKeyType="done"
         selectionColor={colors.ink}
         style={styles.input}
       />
