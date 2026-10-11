@@ -4,6 +4,8 @@ export * from './kinds/money.ts';
 export * from './kinds/common.ts';
 export * from './kinds/travel/schemas.ts';
 export * from './kinds/travel/figures.ts';
+export * from './kinds/jobs/schemas.ts';
+export * from './kinds/jobs/figures.ts';
 export * from './kinds/registry.ts';
 export * from './kinds/cards.ts';
 export * from './kinds/figures.ts';

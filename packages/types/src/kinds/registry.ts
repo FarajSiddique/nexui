@@ -12,6 +12,14 @@ import {
   stayDataSchema,
   tripDataSchema,
 } from './travel/schemas.ts';
+import {
+  companyDataSchema,
+  documentDataSchema,
+  interviewDataSchema,
+  opportunityDataSchema,
+  personDataSchema,
+  searchDataSchema,
+} from './jobs/schemas.ts';
 
 /** A registered object kind: its current version, schema, and how to upgrade older data. */
 export interface KindDefinition {
@@ -23,13 +31,19 @@ export interface KindDefinition {
 const unchanged = (data: unknown): unknown => data;
 
 // Adding a kind means adding it here; the database needs no migration (spec section C). Each
-// template's kinds live in its folder (`kinds/travel/`); kinds every template uses live in
+// template's kinds live in its folder (`kinds/travel/`, `kinds/jobs/`); kinds every template uses live in
 // `common.ts`.
 export const KIND_REGISTRY = {
   trip: { version: 1, schema: tripDataSchema, upgrade: unchanged },
   place: { version: 1, schema: placeDataSchema, upgrade: unchanged },
   leg: { version: 1, schema: legDataSchema, upgrade: unchanged },
   stay: { version: 1, schema: stayDataSchema, upgrade: unchanged },
+  search: { version: 1, schema: searchDataSchema, upgrade: unchanged },
+  company: { version: 1, schema: companyDataSchema, upgrade: unchanged },
+  opportunity: { version: 1, schema: opportunityDataSchema, upgrade: unchanged },
+  interview: { version: 1, schema: interviewDataSchema, upgrade: unchanged },
+  person: { version: 1, schema: personDataSchema, upgrade: unchanged },
+  document: { version: 1, schema: documentDataSchema, upgrade: unchanged },
   decision: { version: 1, schema: decisionDataSchema, upgrade: unchanged },
   option: { version: 1, schema: optionDataSchema, upgrade: unchanged },
   insight: { version: 1, schema: insightDataSchema, upgrade: unchanged },

@@ -4,10 +4,11 @@ import type { GraphSnapshot } from '../graph.ts';
 import type { DerivedKey } from '../workspace.ts';
 import type { Money } from './money.ts';
 import type { KindName } from './registry.ts';
+import { searchFigures } from './jobs/figures.ts';
 import { tripFigures } from './travel/figures.ts';
 
 /** Kinds that anchor a workspace: a template's root object, such as the trip. */
-export const ANCHOR_KINDS = ['trip'] as const satisfies readonly KindName[];
+export const ANCHOR_KINDS = ['trip', 'search'] as const satisfies readonly KindName[];
 
 export const anchorKindSchema = z.enum(ANCHOR_KINDS);
 
@@ -33,6 +34,7 @@ export const KIND_FIGURES: Record<
 
     return { totalDays, allocatedDays, unallocatedDays, estCost };
   },
+  search: (snapshot, anchorId) => searchFigures(snapshot, anchorId),
 };
 
 /** The workspace anchor's kind and figures. A plan without an anchor has neither. */

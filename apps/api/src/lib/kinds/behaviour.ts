@@ -118,6 +118,68 @@ export const KIND_BEHAVIOUR: Record<KindName, KindBehaviour> = {
       'name, placeId (a place ref), nights (1 to 365), estNightly? {amount, currency}, url? ' +
       '(absolute URL).',
   },
+  search: {
+    creatable: false,
+    editable: true,
+    positioned: false,
+    links: [],
+    plural: 'searches',
+    modelHelp:
+      'roles [string] (1 to 5 job titles), locations [string] (0 to 5 cities or regions), ' +
+      'workModes [remote|hybrid|onsite] (at least one), salaryFloor? {amount, currency}, ' +
+      'industries [string] (0 to 5), excludeCompanies [string] (up to 20 never to show).',
+  },
+  company: {
+    creatable: true,
+    editable: true,
+    positioned: false,
+    links: [],
+    plural: 'companies',
+    modelHelp:
+      'name, domain? (such as stripe.com), target (true when the user named it), about? (one ' +
+      'or two sentences).',
+    createNote: 'A company the user names gets target true.',
+  },
+  // Roles are added and moved only by `jobs.*`, which link them to their company and stamp dates.
+  opportunity: {
+    creatable: false,
+    editable: false,
+    positioned: false,
+    links: [],
+    plural: 'roles',
+  },
+  interview: {
+    creatable: false,
+    editable: true,
+    positioned: false,
+    links: [],
+    plural: 'interviews',
+    modelHelp:
+      'at (ISO date-time with offset, or a date YYYY-MM-DD), label (such as Recruiter screen), ' +
+      'with? (who), link? (https URL), notes?.',
+  },
+  person: {
+    creatable: true,
+    editable: true,
+    positioned: false,
+    links: [
+      { input: 'for', type: 'for', to: 'opportunity', help: 'People only: the role they are for' },
+    ],
+    plural: 'people',
+    modelHelp: 'name, role (recruiter|hiring_manager|referral|interviewer|other), email?, notes?.',
+    createNote: 'A person needs the role they are for.',
+    linkNote: 'for: a person, draft or interview belongs to a role.',
+  },
+  document: {
+    creatable: false,
+    editable: true,
+    positioned: false,
+    links: [],
+    plural: 'documents',
+    modelHelp:
+      'subject?, to? (email address), body (the text, up to 8,000 characters). Change a draft ' +
+      'only when asked.',
+  },
   decision: {
     creatable: false,
     editable: false,
