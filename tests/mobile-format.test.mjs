@@ -7,12 +7,16 @@ import {
   cardText,
   countryName,
   dayLabel,
+  formatDate,
+  formatDateTime,
   formatDays,
   formatField,
   formatHours,
   formatMoney,
   formatRelative,
+  formatTime,
   humanizeKey,
+  isDateOnly,
   legFigures,
   ordinalWord,
   photoCredit,
@@ -158,4 +162,25 @@ test('a photo credit names the author and licence, via Wikimedia Commons', () =>
     photoCredit({ author: '', license: 'Public domain' }),
     'Photo: Public domain, via Wikimedia Commons',
   );
+});
+
+test('dates read with their time in the given zone; a date alone never moves a day', () => {
+  assert.equal(formatDateTime('2026-10-09T13:00:00Z', 'Europe/London'), 'Fri, Oct 9, 2:00 PM');
+  assert.equal(
+    formatDateTime('2026-10-09T23:30:00-07:00', 'Europe/London'),
+    'Sat, Oct 10, 7:30 AM',
+  );
+  assert.equal(formatDateTime('2026-10-21'), 'Wed, Oct 21');
+  assert.equal(formatDateTime('not a date'), 'not a date');
+  assert.equal(formatTime('2026-10-09T13:00:00Z', 'Europe/London'), '2:00 PM');
+  assert.equal(formatTime('2026-10-21'), '');
+  assert.equal(formatDate('2026-09-26T23:30:00Z', 'Europe/London'), 'Sep 27');
+  assert.equal(formatDate('2026-09-26'), 'Sep 26');
+  assert.deepEqual([isDateOnly('2026-10-21'), isDateOnly('2026-10-21T09:00:00Z')], [true, false]);
+  assert.equal(formatField('2026-10-21', 'dateTime'), 'Wed, Oct 21');
+  assert.equal(formatField({ amount: 120, currency: 'USD' }, 'estimate'), '≈ $120');
+  assert.deepEqual(cardText(object('interview', { at: '2026-10-21', label: 'Phone screen' })), {
+    title: 'Phone screen',
+    subtitle: 'Wed, Oct 21',
+  });
 });

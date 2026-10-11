@@ -52,8 +52,8 @@ export interface AllocationPart {
 
 export interface DecisionOption {
   option: GraphObject;
-  /** The candidate place the option would add, if any. */
-  place: GraphObject | null;
+  /** The object the option would add (its `placeId`), if the graph has it. */
+  candidate: GraphObject | null;
 }
 
 export type SectionData =
@@ -153,7 +153,7 @@ function decisionData(snapshot: GraphSnapshot, decisionId: string): SectionDataO
     const placeId = (option.data as Partial<OptionData>).placeId;
     const place = placeId ? snapshot.objects.find((object) => object.id === placeId) : undefined;
 
-    return { option, place: place ?? null };
+    return { option, candidate: place ?? null };
   });
 
   return { type: 'decision', decision, options };

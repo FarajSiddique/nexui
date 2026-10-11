@@ -100,6 +100,74 @@ function isMoney(value: unknown): value is Money {
   );
 }
 
+// Intl puts a narrow no-break space before AM and PM; cards use a plain one.
+const NARROW_SPACE = /\u202f/g;
+
+/** True for a date with no time, such as an interview "next Tuesday": `2026-10-21`. */
+export function isDateOnly(at: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(at);
+}
+
+// A date-or-time as an instant and the zone to read it in: a date alone is noon UTC that day
+// (as `interviewTime` counts it), read in UTC so it never moves a day.
+function instant(at: string, timeZone?: string): { date: Date; timeZone?: string } | null {
+  if (isDateOnly(at)) {
+    return { date: new Date(`${at}T12:00:00Z`), timeZone: 'UTC' };
+  }
+
+  const time = Date.parse(at);
+
+  return Number.isNaN(time) ? null : { date: new Date(time), timeZone };
+}
+
+function formatted(
+  at: string,
+  timeZone: string | undefined,
+  options: Intl.DateTimeFormatOptions,
+): string | null {
+  const read = instant(at, timeZone);
+
+  if (!read) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', { ...options, timeZone: read.timeZone })
+    .format(read.date)
+    .replace(NARROW_SPACE, ' ');
+}
+
+/**
+ * A date and time for a card or a sheet, in the device's time zone unless one is given. A date
+ * with no time shows the date alone. Anything unparsable shows as it is.
+ *
+ * @example
+ * formatDateTime('2026-10-09T13:00:00Z', 'Europe/London') // 'Fri, Oct 9, 2:00 PM'
+ * formatDateTime('2026-10-21') // 'Wed, Oct 21'
+ */
+export function formatDateTime(at: string, timeZone?: string): string {
+  const day = { weekday: 'short', month: 'short', day: 'numeric' } as const;
+
+  if (isDateOnly(at)) {
+    return formatted(at, timeZone, day) ?? at;
+  }
+
+  return formatted(at, timeZone, { ...day, hour: 'numeric', minute: '2-digit' }) ?? at;
+}
+
+/** @example formatTime('2026-10-09T13:00:00Z', 'Europe/London') // '2:00 PM'; '' for a date */
+export function formatTime(at: string, timeZone?: string): string {
+  if (isDateOnly(at)) {
+    return '';
+  }
+
+  return formatted(at, timeZone, { hour: 'numeric', minute: '2-digit' }) ?? '';
+}
+
+/** @example formatDate('2026-09-26T09:00:00Z') // 'Sep 26' */
+export function formatDate(at: string, timeZone?: string): string {
+  return formatted(at, timeZone, { month: 'short', day: 'numeric' }) ?? at;
+}
+
 /** One field's value as text, for cards and comparisons. Missing values read "—". */
 export function formatField(value: unknown, format: FieldFormat = 'text'): string {
   if (value === null || value === undefined || value === '') {
@@ -107,7 +175,7 @@ export function formatField(value: unknown, format: FieldFormat = 'text'): strin
   }
 
   if (isMoney(value)) {
-    return formatMoney(value);
+    return format === 'estimate' ? `≈ ${formatMoney(value)}` : formatMoney(value);
   }
 
   if (typeof value === 'number') {
@@ -127,7 +195,7 @@ export function formatField(value: unknown, format: FieldFormat = 'text'): strin
   }
 
   if (typeof value === 'string') {
-    return value;
+    return format === 'dateTime' ? formatDateTime(value) : value;
   }
 
   if (typeof value === 'boolean') {

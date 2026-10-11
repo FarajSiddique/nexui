@@ -106,7 +106,7 @@ test('pinned sections with something unresolved lift into one band under the met
 
   assert.equal(decision.decision.id, DECISION_ID);
   assert.deepEqual(
-    decision.options.map((entry) => [entry.option.title, entry.place]),
+    decision.options.map((entry) => [entry.option.title, entry.candidate]),
     [['Nara', null]],
   );
 });
