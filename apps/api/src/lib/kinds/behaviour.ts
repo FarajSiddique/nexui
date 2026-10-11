@@ -21,8 +21,11 @@ export interface KindLink {
 export interface KindBehaviour {
   /** `object.create` may make one, and `object.delete` may remove one. */
   creatable: boolean;
-  /** `object.update` may change one. An anchor is editable but never creatable. */
-  editable: boolean;
+  /**
+   * `object.update` may change one: every object of the kind, or those a predicate accepts (a
+   * document, except the resume). An anchor is editable but never creatable.
+   */
+  editable: boolean | ((object: GraphObject) => boolean);
   /** A new one joins the end of its kind's ordered list, as a place joins the route. */
   positioned: boolean;
   /** Links `object.create` makes from its inputs. A kind with links needs every one. */
@@ -35,6 +38,16 @@ export interface KindBehaviour {
   plural: string;
   /** Its data fields as models read them: in `object.create`, or `object.update` for an anchor. */
   modelHelp?: string;
+  /**
+   * Data fields too long to send on every step, such as a document's body: the prompt shows each
+   * as its length, and the template's prompt says how to read it (readiness doc, section 3.6).
+   */
+  heavyFields?: readonly string[];
+  /**
+   * Data fields `object.update` refuses, like `derived`: what code owns, such as a search's
+   * status and pass reasons, which `jobs.*` and the scans set (Decision 21).
+   */
+  readOnlyFields?: readonly string[];
   /** A sentence `object.create`'s description adds about this kind. */
   createNote?: string;
   /** A sentence `object.delete`'s description adds about this kind. */
@@ -123,6 +136,7 @@ export const KIND_BEHAVIOUR: Record<KindName, KindBehaviour> = {
     editable: true,
     positioned: false,
     links: [],
+    readOnlyFields: ['status', 'roleChecks', 'passReasons', 'forwardFrom', 'forwarding'],
     plural: 'searches',
     modelHelp:
       'roles [string] (1 to 5 job titles), locations [string] (0 to 5 cities or regions), ' +
@@ -172,9 +186,10 @@ export const KIND_BEHAVIOUR: Record<KindName, KindBehaviour> = {
   },
   document: {
     creatable: false,
-    editable: true,
+    editable: (object) => object.data.docType !== 'resume',
     positioned: false,
     links: [],
+    heavyFields: ['body'],
     plural: 'documents',
     modelHelp:
       'subject?, to? (email address), body (the text, up to 8,000 characters). Change a draft ' +

@@ -13,6 +13,7 @@ import {
   type StepReport,
   capabilityForTool,
   toModelTools,
+  type ModelLookups,
 } from '#lib/cognition';
 import {
   changesetLabel,
@@ -43,6 +44,8 @@ export interface RunDeps {
   clock?: () => Date;
   newId?: () => string;
   capabilities?: readonly Capability[];
+  /** Settings lookups read, such as API keys: `process.env` unless a test passes its own. */
+  env?: Record<string, string | undefined>;
 }
 
 // Spec section F: edit and fast take one fast-tier step (plus one correction); reasoning plans
@@ -213,6 +216,17 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       clock,
     });
     const budget = routeBudget(template, run.input.route);
+    const lookups: ModelLookups = {
+      tools: template.lookups ?? [],
+      // Read per call: the staged plan has moved on, and tests stub `fetch` after loading.
+      context: () => ({
+        graph: stager.graph(),
+        refs: stager.refs,
+        env: deps.env ?? process.env,
+        fetch: globalThis.fetch,
+        now: clock(),
+      }),
+    };
     const step: StepContext = {
       db,
       intentId,
@@ -228,7 +242,7 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       providerOptions: session.providerOptions(budget.tier),
       instructions: instructionsFor(template, run.kind, run.input.route),
       prompt: promptFor(snapshot, stager.refs, run.input.text),
-      tools: toModelTools(capabilities, stager),
+      tools: toModelTools(capabilities, stager, lookups),
       mode: budget.mode,
       maxSteps: budget.maxSteps,
       onStep: (report) => commitStep(step, report),

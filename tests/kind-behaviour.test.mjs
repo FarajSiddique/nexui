@@ -100,3 +100,17 @@ test('the generic capabilities are assembled from a template’s kinds', () => {
   assert.deepEqual(relate.input.toJSONSchema().properties.type.enum, ['part_of', 'option_of']);
   assert.deepEqual(addSection.input.toJSONSchema().properties.kind.enum, ['thing']);
 });
+
+test("a resume isn't edited through object.update, and the search's bookkeeping is code's", () => {
+  const document = (docType) => ({ id: 'x', kind: 'document', data: { docType, body: '' } });
+
+  assert.equal(KIND_BEHAVIOUR.document.editable(document('resume')), false);
+  assert.equal(KIND_BEHAVIOUR.document.editable(document('cover_letter')), true);
+  assert.deepEqual(KIND_BEHAVIOUR.search.readOnlyFields, [
+    'status',
+    'roleChecks',
+    'passReasons',
+    'forwardFrom',
+    'forwarding',
+  ]);
+});

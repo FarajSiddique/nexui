@@ -10,7 +10,7 @@ import type {
 } from '@nexui/types';
 
 import type { ModelTier } from '#lib/ai';
-import type { Capability } from '#lib/capabilities';
+import type { Capability, LookupTool } from '#lib/capabilities';
 import type { ModelMode } from '#lib/cognition';
 
 /** What a template's derivation reads: the changeset as staged, and the plan before it. */
@@ -40,6 +40,11 @@ export interface TemplatePrompt {
   anchor: string;
   /** The template's rules, after the one on fenced data and before the one on failed calls. */
   rules: readonly string[];
+  /**
+   * Fenced data beyond the goal, graph and request, such as a resume or a posting, and where it
+   * comes from: the standing rule names both. A template without any keeps the shorter rule.
+   */
+  fences?: { tags: readonly string[]; from: string };
   /** The task of the run that fills in a new plan. */
   create: string;
   /** Each ask route's task. */
@@ -77,6 +82,8 @@ export interface TemplateDefinition {
   derive: (input: DeriveInput) => ChangesetOp[];
   /** What runs and the app's buttons may call on the template's plans, in the order models see. */
   capabilities: readonly Capability[];
+  /** Read-only tools its runs' models get beside the capabilities (`toModelTools`). */
+  lookups?: readonly LookupTool[];
   /** How models plan it. */
   prompt: TemplatePrompt;
   /** Budgets that replace the default for some routes (`routeBudget` in `runs/execute.ts`). */

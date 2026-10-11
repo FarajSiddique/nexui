@@ -304,6 +304,7 @@ export function createStager(options: StagerOptions): Stager {
 
       return id;
     };
+    const now = clock().toISOString();
     const result = capability.execute(parsed.data, {
       actor: options.actor,
       runId: options.runId,
@@ -312,9 +313,9 @@ export function createStager(options: StagerOptions): Stager {
       anchorId,
       refs,
       source,
+      now,
       newId,
     });
-    const now = clock().toISOString();
     const ops = validateOps(
       staged,
       result.ops.map((op) => changesetOpSchema.parse(op)),

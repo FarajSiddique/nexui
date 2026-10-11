@@ -5,11 +5,14 @@ export {
   dayCount,
   insertObject,
   link,
+  listOf,
   nameOf,
   nextPosition,
   requireKind,
   unlinkOps,
 } from './helpers.ts';
+export { defineLookup } from './lookup.ts';
+export type { LookupContext, LookupTool } from './lookup.ts';
 export { buildRefTable, claimRefs, compareObjects, refOf } from './refs.ts';
 export type { RefTable } from './refs.ts';
 export { CapabilityError, defineCapability } from './types.ts';
