@@ -102,6 +102,8 @@ Other departures, each small:
 16. **Only `company` and `person` are creatable through `object.create`.** Roles, documents and interviews are made by `jobs.*`, which link and stamp them.
 17. **No `emptySummary` field.** The readiness doc's status line put it off until something used it; nothing does, because `derive.jobSearch` writes a summary from the seed on ("Setting up your search", "Ready to start"), as `derive.trip` does. `lookups`, the other deferred field, lands in Task 3.
 18. **The pipeline's collapsed stages are `collapsedStages`**, not the spec's `collapsed`: every section already has `collapsed: boolean` (folding the whole section), and a section type that redefined it as an array would mislead any code reading it generically.
+19. **`seen` holds what a scan showed or dropped**, not every key it considered (spec 5.4, step 7): a strong or partial fit the daily caps left out stays unseen, so the next scan can surface it (Decision 19).
+20. **`start` is refused once started, unless the build failed** (spec 4, step 4's "409 once the build has started"): a plan whose build run failed can be started again, with or without a new file, keeping the resume it has (Decision 20).
 
 ## Decisions this plan makes (flagged for review)
 
@@ -120,7 +122,7 @@ The handoff's open decisions first:
 And the plan's own:
 
 10. **Five template fields, read by generic code:** `gate`, `singleActive`, `intake`, `lookups`, `afterBuild`, plus `prompt.fences` and `KindBehaviour.heavyFields`. The orchestrator says `existing_search` and `awaiting_resume` because those are the contract's names, never because the template is job search.
-11. **The scan runs in the build run, after its model steps** (`afterBuild`), within a 45-second budget, so the model loop's 240 seconds and the scan fit the function's 300. A Stop before the scan skips it. A failed scan never fails the build: the criteria are already committed. The worst case doesn't fit: a read that hits its 60 seconds in `start`, then a model loop that hits its 240, leaves the scan no time. The function stops, the reaper retries the run, and the retry's scan dedupes against what the first committed. Both limits are rare (reads took 4.5–11 seconds in the spikes); a worker outside the API function (readiness 3.9, after the beta) removes the overlap.
+11. **The scan runs in the build run, after its model steps** (`afterBuild`), within a 45-second budget, so the model loop's 240 seconds and the scan fit the function's 300. A Stop before the scan skips it. A failed scan never fails the build: the criteria are already committed, so `runAfterBuild` lets only a lost lease (`RunLeaseLostError`) through and logs anything else with the run still succeeding. The find phase (the named boards and the search's hits, read at once) gets 25 of the 45 seconds (`FIND_BUDGET_MS`), so a slow board can't starve the two model calls. The worst case doesn't fit: a read that hits its 60 seconds in `start`, then a model loop that hits its 240, leaves the scan no time. The function stops, the reaper retries the run, and the retry's scan dedupes against what the first committed. Both limits are rare (reads took 4.5–11 seconds in the spikes); a worker outside the API function (readiness 3.9, after the beta) removes the overlap.
 12. **One code-only capability surfaces a scan** (`jobs.surfaceMatches`): companies, roles, the partial-fit insight, found boards and `seen`, as one changeset with one label ("Found 3 new roles"), validated and derived like any other.
 13. **If the explain call fails, nothing surfaces** and `seen` is unchanged, so the next scan tries again; every New role has 1–3 reasons.
 14. **`start` commits the read, then queues the run; if the run can't be queued, it undoes that commit** (`revertEvent`), so a plan never sits "started" with no run.
@@ -128,6 +130,9 @@ And the plan's own:
 16. **Capabilities get a clock** (`CapabilityContext.now`), for applied dates, contact dates and pass reasons; replay restamps them.
 17. **The one-search rule reads `intents`** under RLS: the newest plan of that template not `completed` or `archived`. Two creates in the same instant could both pass; acceptable for the beta.
 18. **A job search mock fixture, `job-search-staff-pm`,** written by hand: Jev answers `job_search` for any goal with "staff pm", the build run sets criteria, and a mock read answers a fictional resume (`RunFixture.output`). The smoke test runs on it with board lookups off.
+19. **`seen` records what a scan showed or dropped.** A candidate below 0.6 joins `seen` with the roles that surfaced; a strong or partial fit the caps left out doesn't, so the next scan scores it again (about $0.0002 a Jev call) and can surface it. Spec 5.4 step 7 says every considered key, which would lose a fourth strong fit for good.
+20. **A failed build can be started again.** `startPlan` answers 409 only while the plan's latest build run isn't `failed` (`latestBuildRun`; a stale active run reads as failed, as `mapRunRow` does). Starting again with no file skips the intake and only queues the run; with a file it replaces the resume first. Without this, a Gateway outage during the build left a search that could never get its criteria.
+21. **What a model says about a role is checked, by actor.** `jobs.addRole` from a model stores no `fit` (the scan's judgement) and takes the role's `source` from its URL (`parseBoardUrl`), or for a careers-site URL the Greenhouse source the lookup confirmed, never the model's word; `lastSeenLiveAt` is stamped only by the scan and the app's buttons, which carry what code confirmed. `jobs.setStage` refuses `accepted` from a model: Accept offer is the user's, in the role sheet. `object.update` refuses the resume document and the search's bookkeeping (`status`, `roleChecks`, `passReasons`, `forwardFrom`, `forwarding`) through two registry fields, `KindBehaviour.readOnlyFields` and `editable` as a predicate, so no capability code names a template.
 
 ## Review Focus
 
@@ -136,6 +141,8 @@ And the plan's own:
 3. **A URL that isn't a board's**, from a user or a model: LinkedIn, `http://169.254.169.254/…`, `user@` before the host, `jobs.lever.co.evil.example`, `evil.example/?gh_jid=1`. Expected: the refusal copy, and no request to that host; a careers-site URL is accepted only when the Greenhouse posting's `absolute_url` has its host. Pinned by Task 10's URL tests, which assert every fetched host.
 4. **Start pressed twice, or on the wrong plan.** Expected: the second answers 409 `This plan has already started.` with no second run; on a trip or a saved goal, 400 `That action isn't available.`; a non-PDF, 400 `That file isn't a PDF.`; over 4 MB, 413. Pinned by Task 9.
 5. **A second job search goal**, while the first is active or paused, and after it ended in a hire. Expected: `existing_search` (200) with the first's id while active or paused; a new search after a hire. Pinned by Task 8.
+6. **A build run that failed after `start`.** Expected: `start` answers 202 again and queues a new build; with no file the resume the plan has is kept and nothing is read; while the build is queued, running or succeeded, 409. Pinned by Task 9's start-route tests.
+7. **A model's word on a role.** `jobs_addRole` with a `fit`, or a `source` its URL doesn't name; `jobs_setStage` to `accepted`; `object_update` on the resume or the search's `status`. Expected: the fit is dropped, the source follows the URL (or the confirmed careers link) and nothing is stamped live; the other three are refused with a message the model can read. Pinned by Tasks 3, 4, 5 and 10.
 
 ## File Structure
 
@@ -145,8 +152,8 @@ And the plan's own:
 | `packages/types/src/kinds/{registry,cards,figures,common}.ts`, `packages/types/src/index.ts`                                                                                                                                          | Register the kinds, cards, `search` anchor (1); option `criteria` (4)                                                                              |
 | `packages/types/src/{workspace,primitives,graph}.ts`                                                                                                                                                                                  | `pipeline`, `timeline`, card actions, insight actions, summary (2); `timeZoneSchema`, `job_search` (4)                                             |
 | `packages/types/src/{templates,api,runs}.ts`                                                                                                                                                                                          | Nullable examples (4); outcomes, timezone (8); `startResponseSchema`, `RunInput.intake` (9)                                                        |
-| `apps/api/src/lib/kinds/behaviour.ts`                                                                                                                                                                                                 | The kinds' behaviour (1); `heavyFields` (3)                                                                                                        |
-| `apps/api/src/lib/capabilities/{types,lookup,index}.ts`, `apps/api/src/lib/staging/stage.ts`                                                                                                                                          | `CapabilityContext.now`, `LookupTool`, `listOf` exported (3); `checkNewRef`, `resolveRef` exported (5)                                             |
+| `apps/api/src/lib/kinds/behaviour.ts`                                                                                                                                                                                                 | The kinds' behaviour (1); `heavyFields`, `readOnlyFields`, `editable` as a predicate (3)                                                           |
+| `apps/api/src/lib/capabilities/{types,lookup,graph,index}.ts`, `apps/api/src/lib/staging/stage.ts`                                                                                                                                    | `CapabilityContext.now`, `LookupTool`, `listOf` exported, `object.update` honours read-only fields (3); `checkNewRef`, `resolveRef` exported (5)   |
 | `apps/api/src/lib/cognition/{tools,prompts,index}.ts`                                                                                                                                                                                 | Lookups as tools, heavy fields, fences (3)                                                                                                         |
 | `apps/api/src/lib/templates/{types,registry,index}.ts`                                                                                                                                                                                | `fences`, `lookups` (3); `SeedInput`, `gate`, `routableTemplates` (4); `intake` (7); `singleActive` (8); `afterBuild` (14)                         |
 | `apps/api/src/lib/jobs/`                                                                                                                                                                                                              | New domain: template, seed, derive, prompt, context, decisions (4); capabilities (5, 7, 14); boards (10); search (11); lookups (12); scan (13, 14) |
@@ -154,7 +161,7 @@ And the plan's own:
 | `apps/api/src/lib/orchestrator/{orchestrate,index}.ts`                                                                                                                                                                                | `startIntent`'s time zone (4); outcomes (8); `startPlan`, `replaceIntake` (9)                                                                      |
 | `apps/api/src/lib/http/{with-user,parse-body,upload,index}.ts`                                                                                                                                                                        | New helpers (8, 9)                                                                                                                                 |
 | `apps/api/src/lib/staging/{invoke,index}.ts`                                                                                                                                                                                          | `applyCapability` (9)                                                                                                                              |
-| `apps/api/src/lib/runs/execute.ts`                                                                                                                                                                                                    | Lookups (3); intake usage (9); `afterBuild` (14)                                                                                                   |
+| `apps/api/src/lib/runs/execute.ts`                                                                                                                                                                                                    | Lookups (3); intake usage, `latestBuildRun` in `store.ts` (9); `afterBuild` and its failure policy (14)                                            |
 | `apps/api/src/lib/ai/{mock,fixtures/*}.ts`                                                                                                                                                                                            | `output` (7); the job search fixture (8); `scores` (14)                                                                                            |
 | `apps/api/src/app/api/intents/route.ts`, `apps/api/src/app/api/intents/[id]/{start,resume}/route.ts`                                                                                                                                  | Outcomes (8); new routes (9)                                                                                                                       |
 | `apps/mobile/src/features/workspace/{workspace-layout.ts,sections/*}`, `apps/mobile/src/ui/pill.tsx`, `apps/mobile/src/features/compose/goal-examples.ts`, `apps/mobile/src/app/(app)/compose.tsx`, `apps/mobile/src/data/queries.ts` | Stand-ins (2); examples (4); outcomes (8)                                                                                                          |
@@ -1385,7 +1392,7 @@ Spec section 5.5 ("Lookups are not capabilities", "Heavy fields stay out of prom
 
 **Files:**
 
-- Modify: `apps/api/src/lib/capabilities/types.ts`, `apps/api/src/lib/capabilities/index.ts`, `apps/api/src/lib/staging/stage.ts`
+- Modify: `apps/api/src/lib/capabilities/types.ts`, `apps/api/src/lib/capabilities/graph.ts`, `apps/api/src/lib/capabilities/index.ts`, `apps/api/src/lib/staging/stage.ts`
 - Create: `apps/api/src/lib/capabilities/lookup.ts`
 - Modify: `apps/api/src/lib/kinds/behaviour.ts`
 - Modify: `apps/api/src/lib/cognition/tools.ts`, `apps/api/src/lib/cognition/prompts.ts`, `apps/api/src/lib/cognition/index.ts`
@@ -1396,7 +1403,7 @@ Spec section 5.5 ("Lookups are not capabilities", "Heavy fields stay out of prom
 **Interfaces:**
 
 - Produces, from `#lib/capabilities`: `CapabilityContext.now: string` (an ISO timestamp from the stager's clock); `LookupContext` (`{ graph; refs; env; fetch; now: Date }`); `LookupTool` (`{ name; description; input; perRun: number; execute(input, ctx): Promise<Record<string, unknown>> }`); `defineLookup<I>(spec): LookupTool`; `listOf` (now exported).
-- Produces, from `#lib/kinds`: `KindBehaviour.heavyFields?: readonly string[]`; `document` declares `['body']`.
+- Produces, from `#lib/kinds`: `KindBehaviour.heavyFields?: readonly string[]`; `KindBehaviour.readOnlyFields?: readonly string[]` and `editable: boolean | ((object: GraphObject) => boolean)`, which `object.update` honours (Decision 21); `document` declares `heavyFields: ['body']` and is editable except a resume; `search` owns `status`, `roleChecks`, `passReasons`, `forwardFrom` and `forwarding`.
 - Produces, from `#lib/cognition`: `ModelLookups` (`{ tools: readonly LookupTool[]; context: () => LookupContext }`); `toModelTools(capabilities, stager, lookups?: ModelLookups): ToolSet`.
 - Produces, from `#lib/templates`: `TemplateDefinition.lookups?: readonly LookupTool[]`; `TemplatePrompt.fences?: { tags: readonly string[]; from: string }`.
 - Produces: `RunDeps.env?`; `tests/support/ai.mjs` exports `z` (Zod from the API's dependencies).
@@ -1541,10 +1548,28 @@ test('a template can fence more data, and the standing rule names it', () => {
 });
 ```
 
+In `tests/kind-behaviour.test.mjs`, add:
+
+```js
+test("a resume isn't edited through object.update, and the search's bookkeeping is code's", () => {
+  const document = (docType) => ({ id: 'x', kind: 'document', data: { docType, body: '' } });
+
+  assert.equal(KIND_BEHAVIOUR.document.editable(document('resume')), false);
+  assert.equal(KIND_BEHAVIOUR.document.editable(document('cover_letter')), true);
+  assert.deepEqual(KIND_BEHAVIOUR.search.readOnlyFields, [
+    'status',
+    'roleChecks',
+    'passReasons',
+    'forwardFrom',
+    'forwarding',
+  ]);
+});
+```
+
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `node --experimental-strip-types --test tests/cognition.test.mjs`
-Expected: FAIL: `lookup.ts` doesn't exist.
+Run: `node --experimental-strip-types --test tests/cognition.test.mjs tests/kind-behaviour.test.mjs`
+Expected: FAIL: `lookup.ts` doesn't exist, and `document.editable` isn't a function.
 
 - [ ] **Step 3: Give capabilities a clock**
 
@@ -1709,7 +1734,17 @@ export type { ModelLookups } from './tools.ts';
 
 - [ ] **Step 6: Keep heavy fields out of prompts, and fence more data**
 
-In `apps/api/src/lib/kinds/behaviour.ts`, in `KindBehaviour`, after `modelHelp`:
+In `apps/api/src/lib/kinds/behaviour.ts`, in `KindBehaviour`, change `editable: boolean;` and its comment to:
+
+```ts
+/**
+ * `object.update` may change one: every object of the kind, or those a predicate accepts (a
+ * document, except the resume). An anchor is editable but never creatable.
+ */
+editable: boolean | ((object: GraphObject) => boolean);
+```
+
+and after `modelHelp`:
 
 ```ts
   /**
@@ -1717,9 +1752,57 @@ In `apps/api/src/lib/kinds/behaviour.ts`, in `KindBehaviour`, after `modelHelp`:
    * as its length, and the template's prompt says how to read it (readiness doc, section 3.6).
    */
   heavyFields?: readonly string[];
+  /**
+   * Data fields `object.update` refuses, like `derived`: what code owns, such as a search's
+   * status and pass reasons, which `jobs.*` and the scans set (Decision 21).
+   */
+  readOnlyFields?: readonly string[];
 ```
 
-and add `heavyFields: ['body'],` to `document` after `links: [],`.
+In `KIND_BEHAVIOUR`, add `readOnlyFields: ['status', 'roleChecks', 'passReasons', 'forwardFrom', 'forwarding'],` to `search` after `links: [],`; in `document`, change `editable: true,` to `editable: (object) => object.data.docType !== 'resume',` and add `heavyFields: ['body'],` after `links: [],`. The resume's text is what the read returned (`jobs.setResume`, Task 7), never a model's rewrite.
+
+In `apps/api/src/lib/capabilities/graph.ts`, change the `@nexui/types` import to `import { isKindName, type ChangesetOp, type GraphObject, type KindName } from '@nexui/types';`, add before `objectUpdate`:
+
+```ts
+// Whether `object.update` may change this object: its kind's flag, or its kind's predicate.
+function canEdit(behaviour: KindBehaviour, object: GraphObject): boolean {
+  return typeof behaviour.editable === 'function' ? behaviour.editable(object) : behaviour.editable;
+}
+```
+
+in `objectUpdate`, change both `KIND_BEHAVIOUR[kind].editable` filters to `KIND_BEHAVIOUR[kind].editable !== false`, replace
+
+```ts
+const object = resolveRef(ctx.refs, ctx.graph, input.ref);
+
+if (!editable.includes(object.kind)) {
+  throw new CapabilityError(`${nameOf(object)} can't be edited this way.`);
+}
+```
+
+with
+
+```ts
+const object = resolveRef(ctx.refs, ctx.graph, input.ref);
+const behaviour = isKindName(object.kind) ? KIND_BEHAVIOUR[object.kind] : null;
+
+if (!behaviour || !editable.includes(object.kind) || !canEdit(behaviour, object)) {
+  throw new CapabilityError(`${nameOf(object)} can't be edited this way.`);
+}
+```
+
+and after `delete changes.derived;` add:
+
+```ts
+// What code owns, such as a search's status, isn't the model's to set.
+const owned = (behaviour.readOnlyFields ?? []).filter((field) => field in changes);
+
+if (owned.length > 0) {
+  throw new CapabilityError(`${listOf(owned, 'and')} can't be changed this way.`);
+}
+```
+
+The trip's model surface doesn't move: travel declares neither field, and `object.update`'s description still names the same kinds.
 
 In `apps/api/src/lib/templates/types.ts`, in `TemplatePrompt`, after `rules`:
 
@@ -1842,15 +1925,15 @@ and change `tools: toModelTools(capabilities, stager),` to `tools: toModelTools(
 
 - [ ] **Step 8: Run the tests**
 
-Run: `node --experimental-strip-types --test tests/cognition.test.mjs tests/model-surface.test.mjs tests/run-executor.test.mjs tests/capabilities-travel.test.mjs tests/api-load-order.test.mjs`
-Expected: PASS. `model-surface` passes unchanged: trips have no lookups, no fences and no heavy fields.
+Run: `node --experimental-strip-types --test tests/cognition.test.mjs tests/kind-behaviour.test.mjs tests/capabilities-graph.test.mjs tests/templates.test.mjs tests/model-surface.test.mjs tests/run-executor.test.mjs tests/capabilities-travel.test.mjs tests/api-load-order.test.mjs`
+Expected: PASS. `model-surface` passes unchanged: trips have no lookups, no fences, no heavy fields and no read-only fields.
 
 - [ ] **Step 9: Commit**
 
 ```bash
 pnpm fix && pnpm lint && pnpm typecheck && pnpm test
-git add apps/api/src/lib tests/support/ai.mjs tests/cognition.test.mjs
-git commit -F .qa/COMMIT_MSG   # "Give capabilities a clock and runs lookup tools, and keep heavy fields out of prompts"
+git add apps/api/src/lib tests/support/ai.mjs tests/cognition.test.mjs tests/kind-behaviour.test.mjs
+git commit -F .qa/COMMIT_MSG   # "Give capabilities a clock and runs lookup tools, and keep heavy and code-owned fields from models"
 ```
 
 ---
@@ -1888,6 +1971,7 @@ Create `tests/jobs-template.test.mjs`:
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { CapabilityError } from '../apps/api/src/lib/capabilities/types.ts';
 import { prepareChangeset } from '../apps/api/src/lib/graph/prepare.ts';
 import { deriveJobSearch } from '../apps/api/src/lib/jobs/derive.ts';
 import { jobSearchWorkspace, seedJobSearchOps } from '../apps/api/src/lib/jobs/seed.ts';
@@ -1902,6 +1986,7 @@ import {
   jobObject,
   jobSnapshot,
   OTHER_ROLE_ID,
+  RESUME_ID,
   ROLE_ID,
   roleData,
   SEARCH_ID,
@@ -2090,6 +2175,49 @@ test('picking a decision option sets the criteria it carries', () => {
   const search = stager.graph().objects.find((object) => object.id === SEARCH_ID);
 
   assert.deepEqual(search.data.workModes, ['remote']);
+});
+
+test("object.update sets criteria, and refuses the resume and the search's bookkeeping", () => {
+  const DRAFT_ID = 'f2000000-0000-4000-8000-000000000009';
+  const stager = createStager({
+    capabilities: TEMPLATES.job_search.capabilities,
+    snapshot: jobSnapshot({
+      doc: jobSearchWorkspace(SEARCH_ID),
+      objects: [
+        jobObject(
+          RESUME_ID,
+          'document',
+          { docType: 'resume', body: 'Priya Rao', profile: { skills: [], pastRoles: [] } },
+          { title: 'Your resume' },
+        ),
+        jobObject(DRAFT_ID, 'document', { docType: 'cover_letter', body: 'Dear Halyard,' }),
+      ],
+    }),
+    actor: 'ai',
+    runId: RUN_ID,
+    newId: idSequence(),
+    clock: () => new Date(NOW),
+  });
+  const refused = (message) => (error) =>
+    error instanceof CapabilityError && message.test(error.message);
+
+  stager.call('object.update', { ref: 'search', data: { roles: ['Staff PM'] } });
+  stager.call('object.update', { ref: DRAFT_ID, data: { body: 'Dear Halyard team,' } });
+  assert.deepEqual(stager.graph().objects.find((object) => object.id === SEARCH_ID).data.roles, [
+    'Staff PM',
+  ]);
+  assert.throws(
+    () => stager.call('object.update', { ref: RESUME_ID, data: { body: 'Rewritten' } }),
+    refused(/^Your resume can't be edited this way\.$/),
+  );
+  assert.throws(
+    () =>
+      stager.call('object.update', {
+        ref: 'search',
+        data: { status: 'hired', roleChecks: 'paused' },
+      }),
+    refused(/^status and roleChecks can't be changed this way\.$/),
+  );
 });
 ```
 
@@ -3195,7 +3323,7 @@ Spec section 5.5, "Write capabilities", with departure 16. Seven pure capabiliti
 
 - Consumes: Task 3's `CapabilityContext.now`; Task 4's `JOBS_SCOPE`, `companyName`, `compact`.
 - Produces, from `#lib/capabilities`: `checkNewRef`, `resolveRef` (now exported).
-- Produces, in `lib/jobs/roles.ts`: `roleInputSchema` (`RoleInput`: `{ company: { name; domain?; board? }; title; url?; source?; location?; workMode?; salary?; postedAt?; fit? }`); `isExcluded(search: SearchData, company: string): boolean`; `findRole(ctx, role: Pick<RoleInput, 'source' | 'url'>): GraphObject | undefined`; `addRoleOps(ctx, role: RoleInput, stage: Stage): { ops: ChangesetOp[]; roleId: string }`; `ROLE_CAPABILITIES`.
+- Produces, in `lib/jobs/roles.ts`: `roleInputSchema` (`RoleInput`: `{ company: { name; domain?; board? }; title; url?; source?; location?; workMode?; salary?; postedAt?; fit? }`); `isExcluded(search: SearchData, company: string): boolean`; `findRole(ctx, role: Pick<RoleInput, 'source' | 'url'>): GraphObject | undefined`; `addRoleOps(ctx, role: RoleInput, stage: Stage, confirmed: boolean): { ops: ChangesetOp[]; roleId: string }` (`confirmed`: code read the posting from its board, so it is stamped live); `ROLE_CAPABILITIES`. A model's `jobs.addRole` stores no `fit` and stamps nothing live, and `jobs.setStage` refuses `accepted` from a model (Decision 21); Task 10 adds the source rule.
 - Produces, as capabilities (model / button): `jobs.addRole` (yes / yes), `jobs.setStage` (yes / yes), `jobs.pass` (no / yes), `jobs.logContact` (yes / yes), `jobs.addInterview` (yes / no), `jobs.draft` (yes / no), `jobs.setSearchStatus` (yes / yes).
 
 - [ ] **Step 1: Write the failing tests**
@@ -3267,7 +3395,7 @@ function commitsAsOne(before, s) {
   assert.doesNotThrow(() => prepareChangeset(before, s.takeOps(), 'ai', NOW, idSequence()));
 }
 
-test("adding a role reuses the plan's company, links the role to it and stamps it live", () => {
+test("adding a role reuses the plan's company and links the role to it; a model's fit is dropped", () => {
   const plan = planWith();
   const s = stager(plan);
 
@@ -3278,6 +3406,7 @@ test("adding a role reuses the plan's company, links the role to it and stamps i
     ref: 'group-pm',
     source: { provider: 'greenhouse', token: 'halyard', job: '202' },
     url: 'https://job-boards.greenhouse.io/halyard/jobs/202',
+    fit: { score: 0.9, reasons: ['Made up'], gaps: [] },
   });
 
   const graph = s.graph();
@@ -3292,7 +3421,6 @@ test("adding a role reuses the plan's company, links the role to it and stamps i
     workMode: 'remote',
     stage: 'new',
     followUps: 0,
-    lastSeenLiveAt: NOW,
   });
   assert.deepEqual(role.source, { type: 'ai', runId: RUN_ID });
   assert.ok(
@@ -3302,6 +3430,30 @@ test("adding a role reuses the plan's company, links the role to it and stamps i
   );
   assert.equal(graph.objects.filter((object) => object.kind === 'company').length, 1);
   commitsAsOne(plan, s);
+});
+
+test("the app's Add it keeps what the scan found: the fit, and the role stamped live", () => {
+  const plan = planWith();
+  const s = stager(plan, 'user');
+  const fit = { score: 0.7, reasons: ['Strong on payments'], gaps: ['On-site four days'] };
+
+  s.call('jobs.addRole', { ...posting, fit });
+
+  const role = s.graph().objects.find((object) => object.title === posting.title);
+
+  assert.deepEqual(role.data.fit, fit);
+  assert.equal(role.data.lastSeenLiveAt, NOW);
+  assert.deepEqual(role.source, { type: 'user' });
+  commitsAsOne(plan, s);
+});
+
+test("accepting an offer is the user's call", () => {
+  const s = stager(planWith({ role: roleData({ stage: 'offer' }) }));
+
+  assert.throws(
+    () => s.call('jobs.setStage', { objectId: ROLE_ID, stage: 'closed', outcome: 'accepted' }),
+    refused(/^Accepting an offer is the user's call/),
+  );
 });
 
 test('a role at a new company adds it, not as a target; a duplicate or an excluded one is refused', () => {
@@ -3706,12 +3858,15 @@ export function findRole(
 /**
  * Ops that add a role to the search, `at` its company: the plan's when it has it (given the
  * board if it lacked one), else a new company that isn't a target. A role from a board is
- * stamped live now. Refused for a company the search never shows, or a role the plan has.
+ * stamped live now when `confirmed`: code read it from its board (the scan, or a button carrying
+ * what a scan found), never on a model's word (Decision 21). Refused for a company the search
+ * never shows, or a role the plan has.
  */
 export function addRoleOps(
   ctx: CapabilityContext,
   role: RoleInput,
   stage: Stage,
+  confirmed: boolean,
 ): { ops: ChangesetOp[]; roleId: string } {
   if (isExcluded(searchOf(ctx).data, role.company.name)) {
     throw new CapabilityError(`${role.company.name} is on this search's never-show list.`);
@@ -3767,7 +3922,7 @@ export function addRoleOps(
     fit: role.fit,
     stage,
     followUps: 0,
-    lastSeenLiveAt: role.source ? ctx.now : undefined,
+    lastSeenLiveAt: confirmed && role.source ? ctx.now : undefined,
   });
 
   ops.push(
@@ -3797,7 +3952,13 @@ const addRole = defineCapability({
       checkNewRef(ctx.refs, ref);
     }
 
-    const { ops, roleId } = addRoleOps(ctx, role, 'new');
+    // A model's word on a role is its title and where it is: the fit is the scan's judgement,
+    // and liveness is what code checked (Decision 21). The app's buttons carry what a scan found.
+    if (ctx.actor === 'ai') {
+      delete role.fit;
+    }
+
+    const { ops, roleId } = addRoleOps(ctx, role, 'new', ctx.actor !== 'ai');
     const refs: Record<string, string> = {};
 
     if (ref !== undefined) {
@@ -3817,7 +3978,8 @@ const setStage = defineCapability({
   name: 'jobs.setStage',
   description:
     'Move a role to another stage. Closing it needs an outcome: passed, rejected, withdrew, ' +
-    'no_reply, posting_closed, declined or accepted. Accepted ends the search as hired.',
+    'no_reply, posting_closed, declined or accepted. Accepted ends the search as hired, and only ' +
+    'the user may set it.',
   input: z.strictObject({
     objectId: refInput,
     stage: stageSchema,
@@ -3836,6 +3998,12 @@ const setStage = defineCapability({
 
     if (input.stage !== 'closed' && input.outcome) {
       throw new CapabilityError('Only a closed role has an outcome.');
+    }
+
+    // Accept offer lives in the role sheet (spec section 8); it ends the search, so no model
+    // decides it (Decision 21).
+    if (input.outcome === 'accepted' && ctx.actor === 'ai') {
+      throw new CapabilityError("Accepting an offer is the user's call, from the role's sheet.");
     }
 
     if (data.stage === input.stage && data.outcome === input.outcome) {
@@ -6470,7 +6638,7 @@ Spec section 4, steps 4–5, "When the read fails" and "Later uploads", with the
 - Modify: `apps/api/src/lib/staging/invoke.ts`, `apps/api/src/lib/staging/index.ts`
 - Modify: `apps/api/src/lib/orchestrator/orchestrate.ts`, `apps/api/src/lib/orchestrator/index.ts`
 - Modify: `packages/types/src/api.ts`, `packages/types/src/runs.ts`
-- Modify: `apps/api/src/lib/runs/execute.ts`
+- Modify: `apps/api/src/lib/runs/execute.ts`, `apps/api/src/lib/runs/store.ts`, `apps/api/src/lib/runs/index.ts`
 - Create: `apps/api/src/app/api/intents/[id]/start/route.ts`, `apps/api/src/app/api/intents/[id]/resume/route.ts`
 - Modify: `scripts/lib/qa-api.mjs`, `scripts/try-run.mjs`
 - Modify: `tests/support/graph-db.mjs`
@@ -6482,13 +6650,14 @@ Spec section 4, steps 4–5, "When the read fails" and "Later uploads", with the
 - Consumes: Task 7's `TemplateIntake` and `RESUME_INTAKE`; Task 8's `withUser`.
 - Produces, from `#lib/http`: `MAX_UPLOAD_BYTES` (4 MB); `readUpload(request, headers): Promise<{ file: Upload | null } | Response>` (multipart field `file`; an empty body is no file).
 - Produces, from `#lib/staging`: `applyCapability(db, intentId, request: { name; input }, clock?, newId?): Promise<CommitResult>`: any of the plan's capabilities, as the user, for the API's own calls.
-- Produces, from `#lib/orchestrator`: `startPlan(deps, intentId, file: Upload | null): Promise<StartedPlan>` (`{ snapshot; runId; intake: 'read' | 'unreadable' | 'none' }`); `replaceIntake(deps: Pick<Orchestrator, 'db' | 'openSession'>, intentId, file: Upload): Promise<CommitResult>`.
+- Produces, from `#lib/orchestrator`: `startPlan(deps, intentId, file: Upload | null): Promise<StartedPlan>` (`{ snapshot; runId; intake: 'read' | 'unreadable' | 'none' }`), which accepts a plan again once its build failed (Decision 20); `replaceIntake(deps: Pick<Orchestrator, 'db' | 'openSession'>, intentId, file: Upload): Promise<CommitResult>`.
+- Produces, from `#lib/runs`: `latestBuildRun(db, intentId, now?): Promise<RunRecord | null>`, the caller's latest `create_intent` run on an intent, read through RLS.
 - Produces, from `@nexui/types`: `startResponseSchema` (`StartResponse`); `RunInput.intake?: { inputTokens; outputTokens; model }`.
-- Produces: `qaApi(session).postForm(path, form | null)` in `scripts/lib/qa-api.mjs`; `node scripts/try-run.mjs start <intentId> [resume.pdf]`; `graphDb` answers `revert_event` and records it in `state.reverted`.
+- Produces: `qaApi(session).postForm(path, form | null)` in `scripts/lib/qa-api.mjs`; `node scripts/try-run.mjs start <intentId> [resume.pdf]`; `graphDb` answers `revert_event` and records it in `state.reverted`, and answers a read of `runs` with its one run, recorded in `state.runQueries`.
 
 - [ ] **Step 1: Let the fake database undo**
 
-In `tests/support/graph-db.mjs`, add `reverted: null,` to `state`, and to the handlers:
+In `tests/support/graph-db.mjs`, add `reverted: null,` and `runQueries: [],` to `state`, and to the handlers:
 
 ```js
     revert_event: (args) => {
@@ -6496,7 +6665,15 @@ In `tests/support/graph-db.mjs`, add `reverted: null,` to `state`, and to the ha
 
       return { ...eventRow, id: randomUUID(), reverts_event_id: args.p_event_id, ops: null };
     },
+    // The build run `start` consults (Decision 20); the filters are recorded, not applied.
+    'table:runs': (url) => {
+      state.runQueries.push(Object.fromEntries(url.searchParams));
+
+      return [state.run];
+    },
 ```
+
+Add to its doc comment: ``A read of `runs` answers the one run.``
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -6512,7 +6689,7 @@ import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, useMockAi } from './support/ai.mjs';
 import { authed } from './support/graph-api.mjs';
 import { graphDb, toSnapshotRow } from './support/graph-db.mjs';
-import { INTENT_ID, RUN_ID, snapshotRow, TRIP_ID } from './support/graph.mjs';
+import { INTENT_ID, RUN_ID, runRow, snapshotRow, TRIP_ID } from './support/graph.mjs';
 import { jobObject, jobSnapshot, SEARCH_ID } from './support/jobs.mjs';
 import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
@@ -6621,7 +6798,8 @@ test('a resume that can’t be read still starts the build, and the card says so
   assert.equal(tasks.length, 1);
 });
 
-test('a plan already started answers 409, and nothing is read, written or queued', async (t) => {
+test('a plan already started answers 409 while its build is going; nothing is read, written or queued', async (t) => {
+  // The fake's one run is the build, queued.
   const { fake, tasks } = setup(t, waiting({ startedAt: '2026-10-20T12:00:00.000Z' }));
   const response = await withFile(PDF);
 
@@ -6629,6 +6807,20 @@ test('a plan already started answers 409, and nothing is read, written or queued
   assert.deepEqual(await response.json(), { error: 'This plan has already started.' });
   assert.equal(fake.state.applied.length, 0);
   assert.equal(tasks.length, 0);
+});
+
+test('a plan whose build failed starts again: no new read, the resume kept, a new run', async (t) => {
+  const { fake, tasks } = setup(t, waiting({ startedAt: '2026-10-20T12:00:00.000Z' }), {
+    run: runRow({ status: 'failed', error: "Nexui couldn't finish this." }),
+  });
+  const response = await withoutFile();
+
+  assert.equal(response.status, 202);
+  assert.equal((await response.json()).intake, 'none');
+  assert.equal(fake.state.runQueries[0].kind, 'eq.create_intent');
+  assert.equal(fake.state.applied.length, 0);
+  assert.equal(fake.state.createdRun.p_input.intake, undefined);
+  assert.equal(tasks.length, 1);
 });
 
 test('a file that isn’t a PDF is a 400, one over 4 MB a 413, and nothing is written', async (t) => {
@@ -6947,6 +7139,38 @@ In `apps/api/src/lib/runs/execute.ts`, in `executeRun`, change `if ((await recor
     if ((await recordRunStep(db, run.id, leaseId, [], run.input.intake ?? null)) !== 'running') {
 ```
 
+In `apps/api/src/lib/runs/store.ts`, add after `getRun`:
+
+```ts
+/**
+ * The caller's latest build run on an intent, read through RLS, or null before any. `start`
+ * consults it so a plan whose build failed can start again (Decision 20); a stale active run
+ * reads as failed, as everywhere.
+ */
+export async function latestBuildRun(
+  db: SupabaseClient,
+  intentId: string,
+  now: Date = new Date(),
+): Promise<RunRecord | null> {
+  const { data, error } = await db
+    .from('runs')
+    .select('*')
+    .eq('intent_id', intentId)
+    .eq('kind', 'create_intent')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  return data ? mapRunRow(data, now) : null;
+}
+```
+
+and in `apps/api/src/lib/runs/index.ts`, change the store line to `export { activeRunIntentIds, cancelRun, createRun, getRun, latestBuildRun } from './store.ts';`.
+
 - [ ] **Step 7: Start and replace, in the orchestrator**
 
 In `apps/api/src/lib/orchestrator/orchestrate.ts`, change the imports to:
@@ -6969,7 +7193,7 @@ import {
 } from '#lib/graph';
 import type { Upload } from '#lib/http';
 import { chooseTemplate, routeAsk } from '#lib/perception';
-import { createRun, scheduleRun, workRun, type RunWorker } from '#lib/runs';
+import { createRun, latestBuildRun, scheduleRun, workRun, type RunWorker } from '#lib/runs';
 import { applyCapability } from '#lib/staging';
 import {
   TEMPLATES,
@@ -7042,9 +7266,10 @@ async function undoStart(db: SupabaseClient, eventId: string): Promise<void> {
  * Starts a plan that waited for its intake (job search spec, section 4): reads the upload, if
  * there is one, once; stores what it found as one changeset, which marks the plan started; then
  * queues the build run, which the worker claims after the response, with the read's usage in
- * its input. A read that fails still starts the plan. A plan already started is a 409; a plan
- * without an intake, or a file the intake refuses, a 400. If the run can't be queued, the start
- * is undone and the error rethrown.
+ * its input. A read that fails still starts the plan. A plan already started is a 409, unless its
+ * build failed: then it starts again, reading only a new file and keeping what the plan has
+ * (Decision 20); a plan without an intake, or a file the intake refuses, a 400. If the run can't
+ * be queued, the start is undone and the error rethrown.
  */
 export async function startPlan(
   deps: Orchestrator,
@@ -7053,16 +7278,28 @@ export async function startPlan(
 ): Promise<StartedPlan> {
   const snapshot = await loadSnapshot(deps.db, intentId);
   const { template, intake } = intakeOf(snapshot);
+  const started = intake.started(snapshot);
 
-  if (intake.started(snapshot)) {
-    throw new ChangesetConflictError('This plan has already started.');
+  if (started) {
+    const build = await latestBuildRun(deps.db, intentId);
+
+    if (build && build.status !== 'failed') {
+      throw new ChangesetConflictError('This plan has already started.');
+    }
   }
 
-  const read = await readIntake(deps, snapshot, intake, file);
-  const committed = await applyCapability(deps.db, intentId, {
-    name: intake.capability,
-    input: { ...read.input, start: true },
-  });
+  // The first start always reads; a later one reads only a new file.
+  let read: IntakeRead = { outcome: 'none', input: {}, usage: null };
+  let committed: CommitResult | null = null;
+
+  if (!started || file) {
+    read = await readIntake(deps, snapshot, intake, file);
+    committed = await applyCapability(deps.db, intentId, {
+      name: intake.capability,
+      input: { ...read.input, start: true },
+    });
+  }
+
   const input: RunInput = {
     text: snapshot.intent.goal,
     route: 'reasoning',
@@ -7084,14 +7321,16 @@ export async function startPlan(
       input,
     });
   } catch (error) {
-    await undoStart(deps.db, committed.event.id);
+    if (committed) {
+      await undoStart(deps.db, committed.event.id);
+    }
 
     throw error;
   }
 
   scheduleRun(() => workRun(deps.worker, run.id));
 
-  return { snapshot: committed.snapshot, runId: run.id, intake: read.outcome };
+  return { snapshot: committed?.snapshot ?? snapshot, runId: run.id, intake: read.outcome };
 }
 
 /**
@@ -7337,6 +7576,7 @@ Before writing the parsers, open the three API docs in the spikes note's section
 - Produces, in `lib/jobs/text.ts`: `plainText(html)`, `titleCase(token)`, `quote(value)`, `roleTerms(title)`, `matchesRole(title, roles)`.
 - Produces, in `lib/jobs/boards.ts`: `Posting` (`{ key; board; job; company; title; url; location?; workMode?; salary?; postedAt?; text }`), `BoardDeps` (`{ contact; fetch; signal?; cache? }`), `BoardError` (`status?: number`), `listPostings(board, deps, limit = 300): Promise<Posting[]>` (newest first), `readPosting(board, job, deps): Promise<Posting | null>` (null when gone), `findBoard(name, deps): Promise<Board | null>`, `postingSource(posting): JobSource`.
 - Produces, in `lib/jobs/board-urls.ts`: `NOT_A_BOARD`, `BoardLink`, `parseBoardUrl(raw): BoardLink | null`, `careersTokens(host)`, `resolveCareersLink(link, deps): Promise<Posting | null>`, `postingFor(link, deps): Promise<Posting | null>`.
+- Changes, in `lib/jobs/roles.ts`: a model's `jobs.addRole` takes the role's `source` from its URL, or keeps the confirmed Greenhouse source behind a careers-site URL (Decision 21).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -8608,17 +8848,104 @@ In `apps/api/.env.example`, after `WIKIMEDIA_CONTACT`, add:
 NEXUI_CONTACT=
 ```
 
-- [ ] **Step 6: Run the tests**
+- [ ] **Step 6: A model's role takes its source from its URL**
 
-Run: `node --experimental-strip-types --test tests/jobs-boards.test.mjs tests/jobs-board-urls.test.mjs tests/api-load-order.test.mjs`
+In `tests/jobs-capabilities.test.mjs`, add:
+
+```js
+test("a model's role takes its source from its URL or the confirmed careers link, never its word", () => {
+  const LEVER_JOB = 'a1b2c3d4-0000-4000-8000-000000000001';
+  const s = stager(planWith());
+  const added = (title, url, source) => {
+    s.call('jobs.addRole', { company: { name: 'Corvid' }, title, url, source });
+
+    return s.graph().objects.find((object) => object.title === title).data.source;
+  };
+
+  // A board URL names the source; a source that disagrees is ignored.
+  assert.deepEqual(
+    added('Lead PM', `https://jobs.lever.co/corvid/${LEVER_JOB}/apply`, {
+      provider: 'greenhouse',
+      token: 'elsewhere',
+      job: '1',
+    }),
+    { provider: 'lever', token: 'corvid', job: LEVER_JOB },
+  );
+  // A careers-site URL keeps the Greenhouse source a lookup confirmed for that host.
+  assert.deepEqual(
+    added('Group PM', 'https://corvid.com/jobs?gh_jid=77', {
+      provider: 'greenhouse',
+      token: 'corvid',
+      job: '77',
+    }),
+    { provider: 'greenhouse', token: 'corvid', job: '77' },
+  );
+  // Any other URL, or none, gives no source.
+  assert.equal(
+    added('Head of Product', 'https://www.linkedin.com/jobs/view/1', {
+      provider: 'ashby',
+      token: 'corvid',
+      job: CORVID_JOB,
+    }),
+    undefined,
+  );
+});
+```
+
+Run it to see it fail, then in `apps/api/src/lib/jobs/roles.ts` add `type JobSource` to the `@nexui/types` import, add `import { parseBoardUrl } from './board-urls.ts';` before the `./parts.ts` import, and add before `addRole`:
+
+```ts
+/**
+ * The source a model's role may carry (Decision 21): the one its board URL names, or, for a
+ * careers-site URL with `gh_jid`, the Greenhouse posting a lookup confirmed for that host (its
+ * token is one the host suggests). Any other URL, or none, gives no source: a model's word isn't
+ * a board's.
+ */
+function sourceFromUrl(
+  url: string | undefined,
+  given: JobSource | undefined,
+): JobSource | undefined {
+  const link = url ? parseBoardUrl(url) : null;
+
+  if (link?.kind === 'posting') {
+    return { ...link.board, job: link.job };
+  }
+
+  if (
+    link?.kind === 'careers' &&
+    given?.provider === 'greenhouse' &&
+    given.job === link.job &&
+    link.tokens.includes(given.token)
+  ) {
+    return given;
+  }
+
+  return undefined;
+}
+```
+
+In `addRole`'s `execute`, change the model's guard to:
+
+```ts
+if (ctx.actor === 'ai') {
+  delete role.fit;
+  role.source = sourceFromUrl(role.url, role.source);
+}
+```
+
+(`addRoleOps` compacts the data, so an undefined `source` is left out, and `findRole` already handles a role without one.) `board-urls.ts` imports `boards.ts`, `parts.ts` and `text.ts`, none of which import `roles.ts`, so there is no cycle.
+
+- [ ] **Step 7: Run the tests**
+
+Run: `node --experimental-strip-types --test tests/jobs-boards.test.mjs tests/jobs-board-urls.test.mjs tests/jobs-capabilities.test.mjs tests/api-load-order.test.mjs`
 Expected: PASS. If the 4-at-a-time test hangs, the slot hand-off isn't releasing: each finished request must wake the next one waiting.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 pnpm fix && pnpm lint && pnpm typecheck && pnpm test
-git add apps/api/src/lib/jobs apps/api/.env.example tests/jobs-boards.test.mjs tests/jobs-board-urls.test.mjs
-git commit -F .qa/COMMIT_MSG   # "Read Greenhouse, Lever and Ashby boards, and map URLs to them"
+git add apps/api/src/lib/jobs apps/api/.env.example tests/jobs-boards.test.mjs tests/jobs-board-urls.test.mjs tests/jobs-capabilities.test.mjs
+git commit -F .qa/COMMIT_MSG   # "Read Greenhouse, Lever and Ashby boards, map URLs to them, and source a model's roles from them"
 ```
 
 ---
@@ -9406,7 +9733,7 @@ Spec section 5.4, steps 1–5 and 7, with the spikes note's 4.1 list and Decisio
 - Consumes: Task 10's `listPostings`, `readPosting`, `findBoard`, `postingSource`; Task 11's `searchQuery`, `searchBoards`; Task 5's `isExcluded`, `RoleInput`.
 - Produces, in `score.ts`: `STRONG_FIT` (0.85), `PARTIAL_FIT` (0.6), `Person`, `personOf(search, profile)`, `questionId(key)`, `roleCard(posting)`, `scoreRoles(person, candidates, ai, budget?): Promise<Map<string, number>>`.
 - Produces, in `explain.ts`: `FitWords` (`{ reasons; gaps }`), `explainFits(person, chosen, ai, budget?): Promise<{ fits: Map<string, FitWords>; usage: RunUsage }>`. Both take the scan's `AbortSignal` as `budget`, so the scan's budget covers its two model calls.
-- Produces, in `scan.ts`: `MAX_CANDIDATES` (25), `MAX_NEW` (3), `ScanInput`, `ScanDeps`, `FoundRole` (`RoleInput & { fit: Fit }`), `ScanResult` (`{ roles; partial; seen; boards; usage }`), `scanInput(snapshot, searchId, sinceDays)`, `rankRoles(candidates, scores)`, `scanForRoles(input, deps)`.
+- Produces, in `scan.ts`: `MAX_CANDIDATES` (25), `MAX_NEW` (3), `FIND_BUDGET_MS` (25,000: the find phase's share of the scan's budget), `ScanInput`, `ScanDeps`, `FoundRole` (`RoleInput & { fit: Fit }`), `ScanResult` (`{ roles; partial; seen; boards; usage }`), `scanInput(snapshot, searchId, sinceDays)`, `rankRoles(candidates, scores)`, `scanForRoles(input, deps)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -9417,7 +9744,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { questionId } from '../apps/api/src/lib/jobs/score.ts';
-import { rankRoles, scanForRoles, scanInput } from '../apps/api/src/lib/jobs/scan.ts';
+import {
+  FIND_BUDGET_MS,
+  rankRoles,
+  scanForRoles,
+  scanInput,
+} from '../apps/api/src/lib/jobs/scan.ts';
 import {
   Experimental_EvaluationMockModelV4,
   failingEvaluationModel,
@@ -9753,6 +10085,85 @@ test('a board that never answers is dropped when the scan’s time runs out', as
   assert.ok(Date.now() - started < 2_000);
 });
 
+test('a strong fit the daily three leave out stays unseen; a dropped one is seen', async () => {
+  const halyardJob = (id) => ({
+    id,
+    title: `Staff Product Manager, ${id}`,
+    absolute_url: `https://job-boards.greenhouse.io/halyard/jobs/${id}`,
+    location: { name: 'London' },
+    first_published: '2026-10-18T09:00:00Z',
+    content: 'Payments.',
+  });
+  const more = {
+    ...boards,
+    'https://boards-api.greenhouse.io/v1/boards/halyard/jobs': {
+      jobs: [101, 103, 104, 105].map(halyardJob),
+    },
+  };
+
+  for (const id of [103, 104, 105]) {
+    more[`https://boards-api.greenhouse.io/v1/boards/halyard/jobs/${id}`] = halyardJob(id);
+  }
+
+  const scores = {
+    [HALYARD]: 0.95,
+    [questionId('greenhouse:halyard:103')]: 0.9,
+    [questionId('greenhouse:halyard:104')]: 0.88,
+    [TESSERA]: 0.86,
+    [CORVID]: 0.7,
+    [questionId('greenhouse:halyard:105')]: 0.2,
+  };
+  const result = await scanForRoles(
+    scanInput(plan(), SEARCH_ID, null),
+    deps(
+      network(more),
+      jev(scores),
+      explainer(Object.keys(scores).map((id) => ({ id, reasons: ['Fits'], gaps: [] }))),
+    ),
+  );
+
+  assert.deepEqual(
+    result.roles.map((role) => role.source.job),
+    ['101', '103', '104'],
+  );
+  assert.equal(result.partial.source.job, ASHBY_JOB);
+  // Tessera scored strong but came fourth: not shown, so not seen, and scored again tomorrow.
+  // The role at 0.2 was dropped, so it is seen.
+  assert.deepEqual(result.seen.sort(), [
+    `ashby:corvid:${ASHBY_JOB}`,
+    'greenhouse:halyard:101',
+    'greenhouse:halyard:103',
+    'greenhouse:halyard:104',
+    'greenhouse:halyard:105',
+  ]);
+});
+
+test('named companies are read at once, inside the find phase’s own share of the budget', async () => {
+  let open = 0;
+  let most = 0;
+  const slow = (answer) => async () => {
+    open += 1;
+    most = Math.max(most, open);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    open -= 1;
+
+    return Response.json(answer);
+  };
+  const net = network({
+    ...boards,
+    'https://boards-api.greenhouse.io/v1/boards/halyard/jobs': slow(
+      boards['https://boards-api.greenhouse.io/v1/boards/halyard/jobs'],
+    ),
+    'https://boards-api.greenhouse.io/v1/boards/corvid/jobs': slow({ jobs: [] }),
+  });
+
+  await scanForRoles(scanInput(plan(), SEARCH_ID, null), deps(net, jev({}), explainer([])));
+
+  // Halyard's list and Corvid's first probe were in flight together.
+  assert.equal(most, 2);
+  assert.ok(FIND_BUDGET_MS < 45_000);
+});
+
 test('ranking is by probability, ties to the newer posting', () => {
   const posting = (key, postedAt) => ({ key, postedAt });
   const { strong, partial } = rankRoles(
@@ -10051,7 +10462,7 @@ import {
 import type { GatewayOptions } from '#lib/ai';
 import type { RunUsage } from '#lib/runs';
 
-import { parseBoardUrl } from './board-urls.ts';
+import { parseBoardUrl, type BoardLink } from './board-urls.ts';
 import {
   BoardError,
   findBoard,
@@ -10075,6 +10486,12 @@ export const MAX_CANDIDATES = 25;
 
 /** The most roles a scan puts in New (spec section 0: at most 3 a day). */
 export const MAX_NEW = 3;
+
+/**
+ * The find phase's share of the scan's budget (Decision 11): the named boards and the search's
+ * hits stop here, so Jev and the explain call keep the rest.
+ */
+export const FIND_BUDGET_MS = 25_000;
 
 const MAX_NAMED = 5;
 const PER_COMPANY = 10;
@@ -10110,7 +10527,10 @@ export interface ScanResult {
   roles: FoundRole[];
   /** The best from 0.6 up to 0.85, for the partial-fit card. */
   partial: FoundRole | null;
-  /** The keys this scan considered, for `context.jobs.seen`. */
+  /**
+   * The keys this scan showed or dropped, for `context.jobs.seen`. A fit the caps left out stays
+   * unseen, so the next scan can surface it (Decision 19).
+   */
   seen: string[];
   /** Boards found for named companies. */
   boards: { companyId: string; board: Board }[];
@@ -10182,19 +10602,43 @@ function fresh(posting: Posting, sinceDays: number | null, now: Date): boolean {
   );
 }
 
+type PostingLink = Extract<BoardLink, { kind: 'posting' }>;
+
+// Step 1a: one named company's open roles that match a target role, with its board when this
+// scan found it. A company whose board can't be read contributes nothing.
+async function namedRoles(
+  target: ScanInput['targets'][number],
+  input: ScanInput,
+  deps: ScanDeps,
+  boardDeps: BoardDeps,
+): Promise<{ found: ScanResult['boards'][number] | null; postings: Posting[] }> {
+  const board = target.board ?? (await safely(() => findBoard(target.name, boardDeps)));
+
+  if (!board) {
+    return { found: null, postings: [] };
+  }
+
+  const listed = (await safely(() => listPostings(board, boardDeps))) ?? [];
+  const postings = listed
+    .filter((posting) => matchesRole(posting.title, input.search.roles))
+    .filter((posting) => fresh(posting, input.sinceDays, deps.now))
+    .slice(0, PER_COMPANY)
+    .map((posting) => ({ ...posting, company: target.name }));
+
+  return { found: target.board ? null : { companyId: target.id, board }, postings };
+}
+
 // Steps 1–3: named companies' boards, then one web search's hits, each confirmed on its board,
-// minus what the plan has seen and the companies it never shows.
+// minus what the plan has seen and the companies it never shows. The companies are read at once,
+// and so are the hits, within the find phase's own budget (Decision 11), so one slow board
+// can't use up the scan's time.
 async function findCandidates(
   input: ScanInput,
   deps: ScanDeps,
   contact: string,
 ): Promise<{ candidates: Posting[]; boards: ScanResult['boards'] }> {
-  const boardDeps: BoardDeps = {
-    contact,
-    fetch: deps.fetch,
-    signal: deps.signal,
-    cache: new Map(),
-  };
+  const signal = AbortSignal.any([deps.signal, AbortSignal.timeout(FIND_BUDGET_MS)]);
+  const boardDeps: BoardDeps = { contact, fetch: deps.fetch, signal, cache: new Map() };
   const boards: ScanResult['boards'] = [];
   const pool: Posting[] = [];
   const add = (posting: Posting): void => {
@@ -10208,30 +10652,17 @@ async function findCandidates(
       pool.push(posting);
     }
   };
+  const named = await Promise.all(
+    input.targets.slice(0, MAX_NAMED).map((target) => namedRoles(target, input, deps, boardDeps)),
+  );
 
-  for (const target of input.targets.slice(0, MAX_NAMED)) {
-    let board = target.board ?? null;
-
-    if (!board) {
-      board = await safely(() => findBoard(target.name, boardDeps));
-
-      if (board) {
-        boards.push({ companyId: target.id, board });
-      }
+  // In the user's order, so the cap favours the companies they named first.
+  for (const { found, postings } of named) {
+    if (found) {
+      boards.push(found);
     }
 
-    if (!board) {
-      continue;
-    }
-
-    const found = board;
-    const listed = (await safely(() => listPostings(found, boardDeps))) ?? [];
-
-    listed
-      .filter((posting) => matchesRole(posting.title, input.search.roles))
-      .filter((posting) => fresh(posting, input.sinceDays, deps.now))
-      .slice(0, PER_COMPANY)
-      .forEach((posting) => add({ ...posting, company: target.name }));
+    postings.forEach(add);
   }
 
   const query = searchQuery(input.search);
@@ -10240,24 +10671,26 @@ async function findCandidates(
   if (key && query && pool.length < MAX_CANDIDATES) {
     const urls =
       (await safely(() =>
-        searchBoards(query, { key, fetch: deps.fetch, now: deps.now, signal: deps.signal }),
+        searchBoards(query, { key, fetch: deps.fetch, now: deps.now, signal }),
       )) ?? [];
+    const links: PostingLink[] = [];
 
     for (const url of urls) {
       const link = parseBoardUrl(url);
 
-      if (pool.length >= MAX_CANDIDATES || link?.kind !== 'posting') {
-        continue;
+      if (link?.kind === 'posting' && !input.known.has(jobKey({ ...link.board, job: link.job }))) {
+        links.push(link);
       }
+    }
 
-      if (input.known.has(jobKey({ ...link.board, job: link.job }))) {
-        continue;
-      }
+    // Every hit at once; `add` keeps the relevance order and the cap.
+    const hits = await Promise.all(
+      links.map((link) => safely(() => readPosting(link.board, link.job, boardDeps))),
+    );
 
-      const found = await safely(() => readPosting(link.board, link.job, boardDeps));
-
-      if (found) {
-        add(found);
+    for (const hit of hits) {
+      if (hit) {
+        add(hit);
       }
     }
   }
@@ -10350,8 +10783,13 @@ export async function scanForRoles(input: ScanInput, deps: ScanDeps): Promise<Sc
   }
 
   const { strong, partial } = rankRoles(candidates, scores);
-  const seen = candidates.map((candidate) => candidate.key);
   const chosen = partial ? [...strong, partial] : strong;
+  // Shown or dropped goes into `seen`. A fit the caps left out, strong or partial, stays unseen,
+  // so the next scan scores it again and can surface it (Decision 19).
+  const shown = new Set(chosen.map((one) => one.key));
+  const seen = candidates
+    .filter((one) => shown.has(one.key) || (scores.get(one.key) ?? 0) < PARTIAL_FIT)
+    .map((one) => one.key);
 
   if (chosen.length === 0) {
     return { roles: [], partial: null, seen, boards, usage: null };
@@ -10420,6 +10858,7 @@ Spec section 4 ("What the build run does … runs the scan pipeline once") and s
 - Produces, from `#lib/templates`: `TemplateWorkJob` (`{ snapshot; anchorId; session: AiSession; env; fetch; now: Date; call(name, input); commit(usage: RunUsage | null): Promise<void> }`); `TemplateDefinition.afterBuild?: (job: TemplateWorkJob) => Promise<void>`.
 - Produces, in `lib/jobs/`: `jobs.surfaceMatches` (`surface.ts`, code-only); `PARTIAL_INSIGHT_KEY` (`seed.ts`, `'search.partial'`); `SCAN_BUDGET_MS` (45,000) and `scanAfterBuild(job)` (`scan.ts`).
 - Produces: `RunFixture.scores?: Readonly<Record<string, number>>`, by Jev question id (`questionId`).
+- Produces: `RunDeps.afterBuild?`, which replaces the template's for a test; `runAfterBuild` lets only `RunLeaseLostError` through and logs anything else, the run still succeeding (Decision 11).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -10744,10 +11183,55 @@ test('adding the partial fit from its card clears the card in the same changeset
 });
 ```
 
+In `tests/run-executor.test.mjs`, add `import { RunLeaseLostError } from '../apps/api/src/lib/graph/errors.ts';` and:
+
+```js
+test("a template's work after the build can fail without failing the run", async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID)));
+  const run = mapRunRow(runRow());
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    {
+      ...deps(),
+      afterBuild: async () => {
+        throw new Error('a board sent something odd');
+      },
+    },
+  );
+
+  assert.equal(fake.state.finished.p_status, 'succeeded');
+  assert.deepEqual(logged.mock.calls.at(-1).arguments, [
+    '[runs]',
+    "A build run's work after its steps failed.",
+  ]);
+});
+
+test("a lease lost during the template's work ends the run without a verdict", async (t) => {
+  t.mock.method(console, 'error', () => {});
+
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID)));
+  const run = mapRunRow(runRow());
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    {
+      ...deps(),
+      afterBuild: async () => {
+        throw new RunLeaseLostError('moved on');
+      },
+    },
+  );
+
+  assert.equal(fake.state.finished, null);
+});
+```
+
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `node --experimental-strip-types --test tests/jobs-build.test.mjs`
-Expected: FAIL: no role is surfaced, `jobs.surfaceMatches` isn't available, and mock Jev answers no `boolean` question.
+Run: `node --experimental-strip-types --test tests/jobs-build.test.mjs tests/run-executor.test.mjs`
+Expected: FAIL: no role is surfaced, `jobs.surfaceMatches` isn't available, mock Jev answers no `boolean` question, and `RunDeps.afterBuild` is ignored.
 
 - [ ] **Step 3: The work seam**
 
@@ -10785,7 +11269,14 @@ and in `TemplateDefinition`, after `intake`:
 
 In `apps/api/src/lib/templates/index.ts`, add `TemplateWorkJob` to the type exports.
 
-In `apps/api/src/lib/runs/execute.ts`, add `type RunUsage` to the `./store.ts` import, and add after `commitStep`:
+In `apps/api/src/lib/runs/execute.ts`, add `type RunUsage` to the `./store.ts` import, add to `RunDeps`:
+
+```ts
+  /** Replaces the template's work after a build (`afterBuild`), for tests. */
+  afterBuild?: TemplateDefinition['afterBuild'];
+```
+
+and add after `commitStep`:
 
 ```ts
 // The template's work after a build run's model steps commits as one changeset, labelled by its
@@ -10828,14 +11319,18 @@ async function commitWork(step: StepContext, usage: RunUsage | null): Promise<vo
 }
 
 // A build run's template work (`afterBuild`), such as job search's first scan. A Stop that
-// landed after the last model step skips it.
+// landed after the last model step skips it. The model's steps are committed, so what the
+// template adds after them never fails the run: only a lost lease ends it, since the run is no
+// longer this worker's (Decision 11).
 async function runAfterBuild(
   job: RunJob,
   step: StepContext,
   template: TemplateDefinition,
   deps: RunDeps,
 ): Promise<void> {
-  if (job.run.kind !== 'create_intent' || !template.afterBuild) {
+  const afterBuild = deps.afterBuild ?? template.afterBuild;
+
+  if (job.run.kind !== 'create_intent' || !afterBuild) {
     return;
   }
 
@@ -10845,16 +11340,24 @@ async function runAfterBuild(
 
   const snapshot = step.stager.graph();
 
-  await template.afterBuild({
-    snapshot,
-    anchorId: snapshot.workspace?.doc.anchorId ?? '',
-    session: job.session,
-    env: deps.env ?? process.env,
-    fetch: globalThis.fetch,
-    now: step.clock(),
-    call: (name, input) => step.stager.call(name, input),
-    commit: (usage) => commitWork(step, usage),
-  });
+  try {
+    await afterBuild({
+      snapshot,
+      anchorId: snapshot.workspace?.doc.anchorId ?? '',
+      session: job.session,
+      env: deps.env ?? process.env,
+      fetch: globalThis.fetch,
+      now: step.clock(),
+      call: (name, input) => step.stager.call(name, input),
+      commit: (usage) => commitWork(step, usage),
+    });
+  } catch (error) {
+    if (error instanceof RunLeaseLostError) {
+      throw error;
+    }
+
+    console.error('[runs]', logLine(error, "A build run's work after its steps failed"));
+  }
 }
 ```
 
@@ -10867,7 +11370,7 @@ and in `executeRun`, replace `} else { await finishRun(db, run.id, leaseId, 'suc
     }
 ```
 
-A trip has no `afterBuild`, so a trip's run records no extra step; `tests/run-executor.test.mjs` passes unchanged.
+A trip has no `afterBuild`, so a trip's run records no extra step; `tests/run-executor.test.mjs`'s earlier tests pass unchanged, and its two new ones pin the failure policy.
 
 - [ ] **Step 4: Surface a scan**
 
@@ -11030,7 +11533,7 @@ export const surfaceMatches = defineCapability({
 
     for (const role of input.roles) {
       try {
-        stage(addRoleOps(here(), role, 'new').ops);
+        stage(addRoleOps(here(), role, 'new', true).ops);
         added += 1;
       } catch (error) {
         if (!(error instanceof CapabilityError)) {
@@ -11089,7 +11592,10 @@ In `apps/api/src/lib/jobs/capabilities.ts`, add `import { surfaceMatches } from 
 In `apps/api/src/lib/jobs/scan.ts`, add `import type { TemplateWorkJob } from '#lib/templates';` and `import { readJobsConfig } from './config.ts';` (changing the `JobsConfig` type import to come from the same line), and at the end:
 
 ```ts
-/** How long the build run's scan may take, so the run fits its function (Decision 11). */
+/**
+ * How long the build run's scan may take, so the run fits its function (Decision 11): 25 seconds
+ * of it for the find phase (`FIND_BUDGET_MS`), the rest for Jev and the explain call.
+ */
 export const SCAN_BUDGET_MS = 45_000;
 
 let warnedOff = false;
@@ -12316,10 +12822,10 @@ Dispatch the `docs-keeper` agent with this brief:
 >
 > 1. `docs/architecture/intent-graph.md`:
 >    - "Templates": add rows to the field table for `gate`, `singleActive`, `intake`, `lookups` and `afterBuild` (what each holds, which code reads it: `routableTemplates`/`chooseTemplate`, `startIntent`, `startPlan`/`replaceIntake`, `toModelTools` in `executeRun`, `runAfterBuild`), and `prompt.fences`; `seed` now takes `{ goal, timezone }`. Add the `lib/jobs` domain beside `lib/travel` (its files by role), and the load chain's new rule (`lib/travel` and `lib/jobs` import only `lib/capabilities`). "Adding a template" gains the new optional fields and a model surface file per template.
->    - "Kinds": job search's six kinds (`kinds/jobs/`), `KindBehaviour.heavyFields` (a document's body reaches prompts as its length; `document_read` returns it), and that only companies and people are creatable through `object.create`.
->    - "AI runs": the create outcomes and statuses (`started` 201, `awaiting_resume` 201, `unsupported` 201, `existing_search` 200), the one-search rule's read; `POST /api/intents/[id]/start` (multipart `file`, 4 MB, 202, 409 once started, `maxDuration` 300) and `/resume` (200, 400 unreadable, 409 before start, `maxDuration` 90); the read's usage in `runs.input.intake`; lookups as tools (per-run caps, `{ error }` answers, not in progress); `afterBuild` and the build run's scan (45-second budget, its changeset out of progress); `CapabilityContext.now`; mock mode's `job-search-staff-pm` fixture and `RunFixture.output` and `scores`.
+>    - "Kinds": job search's six kinds (`kinds/jobs/`), `KindBehaviour.heavyFields` (a document's body reaches prompts as its length; `document_read` returns it), `readOnlyFields` and `editable` as a predicate (`object.update` refuses the resume and the search's bookkeeping), and that only companies and people are creatable through `object.create`.
+>    - "AI runs": the create outcomes and statuses (`started` 201, `awaiting_resume` 201, `unsupported` 201, `existing_search` 200), the one-search rule's read; `POST /api/intents/[id]/start` (multipart `file`, 4 MB, 202, 409 once started, `maxDuration` 300) and `/resume` (200, 400 unreadable, 409 before start, `maxDuration` 90); the read's usage in `runs.input.intake`; lookups as tools (per-run caps, `{ error }` answers, not in progress); `afterBuild` and the build run's scan (45-second budget, 25 of it for the find phase, its changeset out of progress, a failure after the steps logged with the run still succeeding); `start` accepted again once a build failed; `CapabilityContext.now`; mock mode's `job-search-staff-pm` fixture and `RunFixture.output` and `scores`.
 >    - "Checking it": the two model surface files, `pnpm eval:jobs` (Part A, Part B's build half, `--part`, `--case`, `--clean`, what it needs), `scripts/check-job-search.mjs`, and the smoke script's job search block (it needs `JOB_SEARCH=on` and `NEXUI_CONTACT` empty).
-> 2. Create `docs/architecture/job-search.md`, like `place-media.md`: the boards (endpoints, Lever's EU host, Ashby read whole, liveness, posted dates), the URL rules (only board hosts fetched, careers-site `gh_jid` confirmed by host, the refusal copy), the 4-per-host and 10-second limits, Parallel (hosts, `after_date`, `fast`, 10 results; criteria-only queries; output per plan), the scan's steps and caps (25 candidates, one Jev call with a question per role, 0.85 and 0.6, at most 3 New and 1 partial, `seen` 300), the resume read (fast tier, 16,000 tokens, 60 s, any failure is "Couldn't read that PDF", the file never stored), privacy (what is never logged), the env vars (`JOB_SEARCH`, `NEXUI_CONTACT`, `PARALLEL_API_KEY`) and the rollout gate.
+> 2. Create `docs/architecture/job-search.md`, like `place-media.md`: the boards (endpoints, Lever's EU host, Ashby read whole, liveness, posted dates), the URL rules (only board hosts fetched, careers-site `gh_jid` confirmed by host, the refusal copy), the 4-per-host and 10-second limits, Parallel (hosts, `after_date`, `fast`, 10 results; criteria-only queries; output per plan), the scan's steps and caps (25 candidates, one Jev call with a question per role, 0.85 and 0.6, at most 3 New and 1 partial, `seen` 300 and holding only what a scan showed or dropped, so a capped strong fit returns), what a model may say about a role (`jobs.addRole`'s fit dropped and its source taken from the URL; `accepted` the user's), the resume read (fast tier, 16,000 tokens, 60 s, any failure is "Couldn't read that PDF", the file never stored), privacy (what is never logged), the env vars (`JOB_SEARCH`, `NEXUI_CONTACT`, `PARALLEL_API_KEY`) and the rollout gate.
 > 3. `docs/architecture/mobile.md`: `pipeline` and `timeline` draw `PendingSection` (nothing) until job search's mobile PR; insight actions `upload`, `copy` and `start` are hidden; a `quiet` badge draws as the plain pill; the + sheet opens the plan for `awaiting_resume` and `existing_search`; `GOAL_EXAMPLES` skips a null `TEMPLATE_EXAMPLES` entry.
 > 4. Root `AGENTS.md`: `src/lib/jobs/` in "Project Structure", and `pnpm eval:jobs` and `node --experimental-strip-types scripts/check-job-search.mjs` in the commands, each marked as a manual live gate.
 >
