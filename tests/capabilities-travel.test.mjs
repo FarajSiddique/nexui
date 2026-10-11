@@ -171,7 +171,7 @@ test('the registry holds the slice-1 capabilities, and only three are for button
     CAPABILITIES.filter((capability) => capability.callableByUser)
       .map((c) => c.name)
       .sort(),
-    ['decision.resolve', 'trip.reorderPlaces', 'trip.setPlaceDays'],
+    ['decision.resolve', 'object.update', 'trip.reorderPlaces', 'trip.setPlaceDays'],
   );
   assert.equal(findCapability('derive.trip'), undefined);
 });

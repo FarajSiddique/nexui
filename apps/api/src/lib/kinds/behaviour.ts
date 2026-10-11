@@ -48,6 +48,11 @@ export interface KindBehaviour {
    * status and pass reasons, which `jobs.*` and the scans set (Decision 21).
    */
   readOnlyFields?: readonly string[];
+  /**
+   * The data field the object's title follows when `object.update` changes it, as a place's title
+   * follows `name` (the default). A role's is `title`.
+   */
+  nameField?: string;
   /** A sentence `object.create`'s description adds about this kind. */
   createNote?: string;
   /** A sentence `object.delete`'s description adds about this kind. */
@@ -154,13 +159,31 @@ export const KIND_BEHAVIOUR: Record<KindName, KindBehaviour> = {
       'or two sentences).',
     createNote: 'A company the user names gets target true.',
   },
-  // Roles are added and moved only by `jobs.*`, which link them to their company and stamp dates.
+  // Roles are added and moved by `jobs.*`, which link them to their company and stamp dates; a
+  // user (or a model, when asked) may rename one or correct where it is (Decision 2).
   opportunity: {
     creatable: false,
-    editable: false,
+    editable: true,
     positioned: false,
     links: [],
+    nameField: 'title',
+    readOnlyFields: [
+      'url',
+      'source',
+      'fit',
+      'postedAt',
+      'lastSeenLiveAt',
+      'postingClosedAt',
+      'stage',
+      'outcome',
+      'appliedAt',
+      'lastContactAt',
+      'followUps',
+    ],
     plural: 'roles',
+    modelHelp:
+      'title (the role as the user names it), location?, workMode? (remote|hybrid|onsite), ' +
+      'salary? {min?, max?, currency}. Stages, dates, links and fit are set by the jobs tools.',
   },
   interview: {
     creatable: false,

@@ -358,15 +358,17 @@ test('the search pauses and resumes, and new-role checks resume; a hired search 
   );
 });
 
-test('buttons may add, move, pass, log contact and pause; only models add interviews and drafts', () => {
+test('buttons may add, move, pass, forget a pass, log contact, pause and edit; only models add interviews and drafts', () => {
   const expected = {
     'jobs.addRole': [true, true],
     'jobs.setStage': [true, true],
     'jobs.pass': [false, true],
+    'jobs.forgetPass': [false, true],
     'jobs.logContact': [true, true],
     'jobs.addInterview': [true, false],
     'jobs.draft': [true, false],
     'jobs.setSearchStatus': [true, true],
+    'object.update': [true, true],
   };
   const flags = (name) => {
     const capability = TEMPLATES.job_search.capabilities.find(
@@ -457,5 +459,56 @@ test("a model's role gets its source from the board URL a lookup gave when its o
         boardUrl,
       }),
     refused(/already in this search/),
+  );
+});
+
+test("a user renames a role through object.update; what code stamped stays code's", () => {
+  const plan = planWith({ role: roleData({ title: 'Role', stage: 'interviewing' }) });
+  const s = stager(plan, 'user');
+
+  s.call('object.update', { ref: ROLE_ID, data: { title: 'Staff PM, Lending' } });
+
+  const role = s.graph().objects.find((object) => object.id === ROLE_ID);
+
+  assert.deepEqual(
+    [role.title, role.data.title, role.data.stage],
+    ['Staff PM, Lending', 'Staff PM, Lending', 'interviewing'],
+  );
+  assert.throws(
+    () =>
+      s.call('object.update', {
+        ref: ROLE_ID,
+        data: { stage: 'offer', url: 'https://apply.example.net/1' },
+      }),
+    refused(/^url and stage can't be changed this way\.$/),
+  );
+  commitsAsOne(plan, s);
+});
+
+test('forgetting a pass removes that reason only', () => {
+  const passes = [
+    {
+      reason: 'too_junior',
+      company: 'Northbeam',
+      title: 'Lead PM, Risk',
+      at: '2026-10-12T09:00:00.000Z',
+    },
+    {
+      reason: 'not_this_company',
+      company: 'Pennant',
+      title: 'Senior PM',
+      at: '2026-10-13T09:00:00.000Z',
+    },
+  ];
+  const plan = planWith({ search: { ...searchData, passReasons: passes } });
+  const s = stager(plan, 'user');
+
+  s.call('jobs.forgetPass', { at: passes[0].at });
+
+  assert.deepEqual(dataOf(s, SEARCH_ID).passReasons, [passes[1]]);
+  assert.equal(s.takeEntries().at(-1).label, 'Removed “Too junior” for Northbeam');
+  assert.throws(
+    () => s.call('jobs.forgetPass', { at: passes[0].at }),
+    refused(/^That pass reason is already gone\.$/),
   );
 });

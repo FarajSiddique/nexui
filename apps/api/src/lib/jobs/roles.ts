@@ -6,6 +6,7 @@ import {
   jobSourceSchema,
   OUTCOME_LABELS,
   outcomeSchema,
+  PASS_REASONS,
   passReasonSchema,
   salarySchema,
   STAGES,
@@ -447,5 +448,45 @@ const logContact = defineCapability({
   },
 });
 
-/** The capabilities that add a role and move it along. */
-export const ROLE_CAPABILITIES: readonly Capability[] = [addRole, setStage, pass, logContact];
+const forgetPass = defineCapability({
+  name: 'jobs.forgetPass',
+  description: 'Remove one pass reason, by when it was given, so the scans stop learning from it.',
+  input: z.strictObject({ at: timestampSchema }),
+  policy: 'internal',
+  exposeToModel: false,
+  callableByUser: true,
+  execute(input, ctx) {
+    const search = searchOf(ctx);
+    const entry = search.data.passReasons.find((pass) => pass.at === input.at);
+
+    if (!entry) {
+      throw new CapabilityError('That pass reason is already gone.');
+    }
+
+    const reason =
+      PASS_REASONS.find((option) => option.value === entry.reason)?.label ?? entry.reason;
+    const passReasons = search.data.passReasons.filter((pass) => pass !== entry);
+
+    return {
+      output: {},
+      ops: [
+        {
+          op: 'update_object',
+          id: search.object.id,
+          patch: { data: { ...search.data, passReasons } },
+          origin: 'direct',
+        },
+      ],
+      label: `Removed “${reason}” for ${entry.company}`,
+    };
+  },
+});
+
+/** The capabilities that add a role, move it along, and forget why one was passed. */
+export const ROLE_CAPABILITIES: readonly Capability[] = [
+  addRole,
+  setStage,
+  pass,
+  forgetPass,
+  logContact,
+];

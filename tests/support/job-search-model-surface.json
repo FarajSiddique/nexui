@@ -44,10 +44,10 @@
     },
     {
       "name": "object.update",
-      "description": "Change fields of the search or of one of its companies, people, interviews, documents or things. Send only the data fields to change; the rest keep their values.",
+      "description": "Change fields of the search or of one of its companies, roles, people, interviews, documents or things. Send only the data fields to change; the rest keep their values.",
       "policy": "internal",
       "exposeToModel": true,
-      "callableByUser": false,
+      "callableByUser": true,
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -374,6 +374,26 @@
           }
         },
         "required": ["objectId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobs.forgetPass",
+      "description": "Remove one pass reason, by when it was given, so the scans stop learning from it.",
+      "policy": "internal",
+      "exposeToModel": false,
+      "callableByUser": true,
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": ["at"],
         "additionalProperties": false
       }
     },

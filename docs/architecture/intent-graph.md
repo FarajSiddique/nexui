@@ -134,7 +134,10 @@ fails typecheck:
   fields `object.update` refuses because code owns them, such as a search's `status`, `roleChecks`
   and `passReasons`. Of job search's kinds only companies and people are creatable through
   `object.create`; roles are added and moved by `jobs.*`, which link them to their company and
-  stamp their dates, and `object.update` refuses a role, the resume and the search's bookkeeping.
+  stamp their dates. `object.update` may rename a role or correct where it is, and refuses the
+  fields `jobs.*` owns (its URL, source, fit, stage, outcome and dates), the resume and the
+  search's bookkeeping. The app calls `object.update` too, for renames and criteria, with the same
+  checks.
   A template's capability scope lists its kinds and the capabilities
   read the rest here, so a new kind needs no capability code. `lib/kinds` imports no other domain.
 
