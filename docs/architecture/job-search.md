@@ -76,6 +76,8 @@ Models read through three lookups (`lookups.ts`), all answering `{ error }` inst
 - its `source` is taken from the URL, never from the model: the one a board URL names, or for a careers-site `gh_jid` URL the Greenhouse source a lookup confirmed for that host. The role's `url` is tried first, then its `boardUrl`. Any other URL gives none;
 - it is not stamped live.
 
+A goal that mentions an interview gets its role and the interview in the build: the role titled as the user put it, or just "Role" when they don't say, so it reads "Role at Datadog" (they can rename it), and the interview dated from the goal and the run's date, which every run's message opens with in the plan's time zone.
+
 A role added from a button carries what a scan found, so it keeps its fit and is stamped live. `accepted`, the outcome that ends a search as hired, is the user's: `jobs.setStage` refuses it from a model.
 
 ## The resume read

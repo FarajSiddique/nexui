@@ -144,6 +144,12 @@ export interface TemplateDefinition {
    */
   context: Record<string, z.ZodType>;
   /**
+   * The plan's IANA time zone, for the date its runs are told is today (`promptFor`), such as
+   * job search's `context.jobs.timezone`. Without one, or when it answers `undefined`, runs use
+   * UTC.
+   */
+  timeZone?: (snapshot: GraphSnapshot) => string | undefined;
+  /**
    * The anchor's `data.derived` figures that a changeset event's payload reports when a change
    * moves them.
    */

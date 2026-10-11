@@ -13,7 +13,12 @@ import {
 import { mapRunRow } from '../apps/api/src/lib/runs/store.ts';
 import { getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
-import { failingEvaluationModel, MockLanguageModelV4, toolStep } from './support/ai.mjs';
+import {
+  failingEvaluationModel,
+  MockLanguageModelV4,
+  scriptedModel,
+  toolStep,
+} from './support/ai.mjs';
 import { editObject, graphDb, removeObject } from './support/graph-db.mjs';
 import {
   idSequence,
@@ -345,6 +350,23 @@ test('a model error fails the run, keeps the steps before it and logs no detail'
   for (const call of logged.mock.calls) {
     assert.doesNotMatch(call.arguments.join(' '), /secret detail/);
   }
+});
+
+test("a run's message opens with today's date, in UTC for a trip", async (t) => {
+  const { db } = start(t, snapshotRow(travelWorkspace(TRIP_ID)));
+  const run = askRun('reasoning');
+  const seen = [];
+  const session = {
+    evaluationModel: failingEvaluationModel(),
+    languageModel: () => scriptedModel([], seen),
+    providerOptions: () => undefined,
+  };
+
+  await executeRun({ db, run, leaseId: LEASE_ID, session }, deps());
+
+  const message = seen[0].prompt.find((part) => part.role === 'user').content[0].text;
+
+  assert.match(message, /^Today is Tuesday, 2026-09-29 \(UTC\)\.\n\n<goal>/);
 });
 
 // Load 1 is the run's first snapshot; load 2 is the one step 0 commits against.

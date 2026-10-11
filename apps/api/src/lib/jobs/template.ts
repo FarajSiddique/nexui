@@ -3,7 +3,7 @@ import type { TemplateDefinition } from '#lib/templates';
 import { JOB_SEARCH_CAPABILITIES, JOBS_SCOPE } from './capabilities.ts';
 import { JOB_SEARCH_LOOKUPS } from './lookups.ts';
 import { RESUME_INTAKE } from './resume.ts';
-import { jobsContextSchema } from './context.ts';
+import { jobsContext, jobsContextSchema } from './context.ts';
 import { deriveJobSearch } from './derive.ts';
 import { JOB_SEARCH_PROMPT } from './prompt.ts';
 import { scanAfterBuild } from './scan.ts';
@@ -21,6 +21,7 @@ export const JOB_SEARCH_TEMPLATE: TemplateDefinition = {
   gate: 'JOB_SEARCH',
   singleActive: true,
   context: { jobs: jobsContextSchema },
+  timeZone: (snapshot) => jobsContext(snapshot.intent)?.timezone,
   figures: [
     { key: 'new', label: 'new roles' },
     { key: 'inPlay', label: 'roles in play' },

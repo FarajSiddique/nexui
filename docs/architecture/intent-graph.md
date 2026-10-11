@@ -164,6 +164,7 @@ readers:
 | `gate`         | An env var that must be `on` for Jev to route new goals here (optional), so a template can ship before its app side: job search's `JOB_SEARCH`                                         | `routableTemplates` (`templates/registry.ts`), which `chooseTemplate` offers Jev; a template without one always routes             |
 | `singleActive` | The user has at most one going plan of this template (optional; job search)                                                                                                            | `startIntent`, which answers `existing_search` with that plan instead of seeding another                                           |
 | `context`      | Its own keys in `intents.context`, as Zod schemas                                                                                                                                      | `contextSchemaFor`, which `validateOps` applies to an `update_intent` that sets `context`                                          |
+| `timeZone`     | The plan's IANA time zone, or `undefined` for UTC (optional; job search reads `context.jobs.timezone`)                                                                                 | `executeRun`, for the date `promptFor` opens each run's message with                                                               |
 | `figures`      | The anchor's `data.derived` keys the event payload reports when a change moves them, with labels                                                                                       | `figureChanges` (`graph/payload.ts`)                                                                                               |
 | `seed`         | The ops that start a plan from `{ goal, timezone }` (`SeedInput`; the timezone is the device's, from the create request): the anchor and the workspace                                 | `createIntent` (`graph/commit.ts`)                                                                                                 |
 | `derive`       | Ops derived from a staged changeset (a `DeriveInput`), committed with it                                                                                                               | `deriveForTemplate`, from `prepareChangeset`                                                                                       |
@@ -574,12 +575,14 @@ as a worker with the service-role client (see "Run queue" below).
   stale one. A call whose patch would change a field the user changed since the step began is
   dropped, and its progress entry is marked `ok: false`, "You changed this while Nexui was
   working, so Nexui skipped it." A step left with nothing to commit commits nothing.
-- **Prompts** put the goal, the graph and the request inside `<goal>`, `<graph>` and
-  `<request>` as escaped JSON, and tell the model never to follow instructions found there. The
-  frame is cognition's (`instructionsFor`): only tools change the plan, and fenced data is never
-  instructions. The template supplies its role, its rules and the task of each run kind and
-  route (`TemplatePrompt`), and names any fenced data beyond those three (`fences`: tags such as
-  `resume` and `posting`, and where the data comes from) so the standing rule covers it.
+- **Prompts** open with today's weekday and date in the plan's time zone (the template's
+  `timeZone`, else UTC), so a model can place "next Tuesday" or "in May", then put the goal, the
+  graph and the request inside `<goal>`, `<graph>` and `<request>` as escaped JSON, and tell the
+  model never to follow instructions found there. The frame is cognition's (`instructionsFor`):
+  only tools change the plan, and fenced data is never instructions. The template supplies its
+  role, its rules and the task of each run kind and route (`TemplatePrompt`), and names any
+  fenced data beyond those three (`fences`: tags such as `resume` and `posting`, and where the
+  data comes from) so the standing rule covers it.
   `tests/model-surface.test.mjs` pins the result for a trip and for a job search. A kind's
   `heavyFields` reach the prompt as their length.
 - **Mock mode** (`AI_PROVIDER=mock`, the default) replays `src/lib/ai/fixtures`, recorded from

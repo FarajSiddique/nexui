@@ -325,7 +325,10 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       model: session.languageModel(budget.tier),
       providerOptions: session.providerOptions(budget.tier),
       instructions: instructionsFor(template, run.kind, run.input.route),
-      prompt: promptFor(snapshot, stager.refs, run.input.text),
+      prompt: promptFor(snapshot, stager.refs, run.input.text, {
+        now: clock(),
+        timeZone: template.timeZone?.(snapshot) ?? 'UTC',
+      }),
       tools: toModelTools(capabilities, stager, lookups),
       mode: budget.mode,
       maxSteps: budget.maxSteps,
