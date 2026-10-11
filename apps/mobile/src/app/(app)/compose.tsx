@@ -2,37 +2,53 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { intakeRoute, TEMPLATE_EXAMPLES, TEMPLATE_INTAKES } from '@nexui/types';
+
 import {
+  choosePdf,
   isRunActive,
   useAsk,
   useCancelRun,
   useCreateIntent,
   useIntent,
+  useIntents,
+  useReplaceResume,
   useRun,
   useIntentLive,
+  useStartPlan,
+  type PickedPdf,
 } from '#data';
 import { fonts, createThemedStyles, useColors } from '#theme';
 import { Button } from '#ui';
 import {
+  ExistingPlanReply,
+  ResumeStep,
   RunCard,
   SavedGoalReply,
   afterAsk,
   nextGoalPlaceholder,
+  replyFor,
+  targetOf,
   useKeyboardOverlap,
+  type Reply,
 } from '#features/compose';
 import { revealOpenBand } from '#features/workspace';
 
 interface Sent {
+  /** What the user typed; empty when they only sent a file. */
   text: string;
-  /** The run working on it, or null for a goal Nexui saved because it can't plan it yet. */
-  runId: string | null;
+  /** The PDF sent with it, by name. */
+  file: string | null;
+  reply: Reply;
 }
 
 /**
  * The + sheet. Opened on a workspace it asks about that plan; opened anywhere else it starts a
- * new plan, then keeps acting on it. The run streams in as a card, and closing the sheet
- * doesn't stop it. After an ask about the plan underneath, it offers See the choice (when Nexui
- * proposed one) or Back to plan.
+ * new plan, then keeps acting on it. A trip's run streams in as a card; a job search first asks
+ * for its resume (spec section 4), and a second job search offers the first. On a plan that takes
+ * a document, the PDF button adds or replaces it. Closing the sheet doesn't stop a run. After an
+ * ask about the plan underneath, it offers See the choice (when Nexui proposed one) or Back to
+ * plan.
  */
 export default function ComposeSheet(): ReactElement {
   const styles = useStyles();
@@ -43,10 +59,14 @@ export default function ComposeSheet(): ReactElement {
   const [sent, setSent] = useState<Sent | null>(null);
   const [goalPlaceholder] = useState(() => (params.intentId ? '' : nextGoalPlaceholder()));
   const context = useIntent(target);
-  const run = useRun(sent?.runId ?? null);
+  const run = useRun(sent?.reply.type === 'run' ? sent.reply.runId : null);
   const create = useCreateIntent();
   const ask = useAsk();
   const cancel = useCancelRun();
+  const intents = useIntents();
+  const start = useStartPlan();
+  const replace = useReplaceResume();
+  const [notice, setNotice] = useState<string | null>(null);
   const keyboardOverlap = useKeyboardOverlap();
   const inputRef = useRef<TextInput>(null);
 
@@ -54,27 +74,46 @@ export default function ComposeSheet(): ReactElement {
   // it started.
   useIntentLive(params.intentId ? null : target);
 
-  const working = isRunActive(run.data) || create.isPending || ask.isPending;
+  const plan = context.data?.intent;
+  // Home's list is almost always cached, so a second search's reply needn't wait on its plan.
+  const template =
+    intents.data?.find((item) => item.id === target)?.template ?? plan?.template ?? null;
+  const intake = template ? TEMPLATE_INTAKES[template] : null;
+  const example = template ? TEMPLATE_EXAMPLES[template] : null;
+  const reading = replace.isPending || (start.isPending && Boolean(start.variables?.pdf));
+  const working =
+    isRunActive(run.data) ||
+    create.isPending ||
+    ask.isPending ||
+    start.isPending ||
+    replace.isPending;
   const canSend = text.trim().length >= (target ? 2 : 3) && !working;
-  const error = create.error ?? ask.error ?? cancel.error;
-  const goal = context.data?.intent.goal;
+  const canAttach = intake !== null && sent?.reply.type !== 'resume' && !working;
+  const error = create.error ?? ask.error ?? cancel.error ?? start.error ?? replace.error;
+  const goal = plan?.goal;
   const next = params.intentId ? afterAsk(run.data) : null;
 
   // A "Try one" example only fills the composer; focusing it shows the text landed.
-  const tryExample = (example: string): void => {
-    setText(example);
+  const tryExample = (exampleGoal: string): void => {
+    setText(exampleGoal);
     inputRef.current?.focus();
   };
 
   const send = (message: string): void => {
     const trimmed = message.trim();
 
+    setNotice(null);
+
     if (target) {
       ask.mutate(
         { intentId: target, text: trimmed },
         {
           onSuccess: (result) => {
-            setSent({ text: trimmed, runId: result.runId });
+            setSent({
+              text: trimmed,
+              file: null,
+              reply: { type: 'run', runId: result.runId, restart: false },
+            });
             setText('');
           },
         },
@@ -86,30 +125,88 @@ export default function ComposeSheet(): ReactElement {
     create.mutate(trimmed, {
       onSuccess: (result) => {
         setText('');
-
-        // A saved goal opens no plan, so the next send starts a new one.
-        if (result.outcome === 'unsupported') {
-          setSent({ text: trimmed, runId: null });
-
-          return;
-        }
-
-        // A job search waits for its resume, and a second one is the first. The sheet draws
-        // both in job search's mobile PR; until then it opens the plan.
-        if (result.outcome === 'awaiting_resume' || result.outcome === 'existing_search') {
-          const id =
-            result.outcome === 'existing_search' ? result.intentId : result.snapshot.intent.id;
-
-          router.dismiss();
-          router.push({ pathname: '/intent/[id]', params: { id } });
-
-          return;
-        }
-
-        setTarget(result.snapshot.intent.id);
-        setSent({ text: trimmed, runId: result.runId });
+        setTarget(targetOf(result));
+        setSent({ text: trimmed, file: null, reply: replyFor(result) });
       },
     });
+  };
+
+  // Starts the plan waiting for its document, with the file or without, then streams its build.
+  // A failed build starts again the same way (job search PR 2, Decision 20).
+  const startPlan = (pdf: PickedPdf | null): void => {
+    if (!target) {
+      return;
+    }
+
+    start.mutate(
+      { intentId: target, pdf },
+      {
+        onSuccess: (result) => {
+          setSent((current) => ({
+            text: current?.text ?? '',
+            file: pdf?.name ?? current?.file ?? null,
+            reply: { type: 'run', runId: result.runId, restart: true },
+          }));
+
+          if (result.intake === 'unreadable' && intake) {
+            setNotice(intake.unreadable);
+          }
+        },
+      },
+    );
+  };
+
+  // Picks a PDF and sends it where the plan's intake takes it (spec section 4).
+  const attach = async (): Promise<void> => {
+    if (!plan) {
+      return;
+    }
+
+    setNotice(null);
+
+    try {
+      const choice = await choosePdf();
+
+      if (!choice) {
+        return;
+      }
+
+      if ('problem' in choice) {
+        setNotice(choice.problem);
+
+        return;
+      }
+
+      if (intakeRoute(plan) === 'resume') {
+        replace.mutate(
+          { intentId: plan.id, pdf: choice.pdf },
+          { onSuccess: () => setNotice('Replaced your resume.') },
+        );
+
+        return;
+      }
+
+      startPlan(choice.pdf);
+    } catch {
+      setNotice("Couldn't open your files. Try again.");
+    }
+  };
+
+  // Open my search: the goal goes back in the composer, to send to the plan already going.
+  const openExisting = (): void => {
+    setText(sent?.text ?? '');
+    setSent(null);
+    inputRef.current?.focus();
+  };
+
+  const retry = (current: Sent): void => {
+    if (current.reply.type === 'run' && current.reply.restart) {
+      startPlan(null);
+
+      return;
+    }
+
+    send(current.text);
   };
 
   const openPlan = (): void => {
@@ -150,19 +247,32 @@ export default function ComposeSheet(): ReactElement {
             {target ? 'Asking about this plan' : 'Say what you’re trying to do'}
           </Text>
         </View>
-        {sent ? <Text style={styles.bubble}>{sent.text}</Text> : null}
-        {sent && sent.runId === null ? <SavedGoalReply onTry={tryExample} /> : null}
-        {sent?.runId ? (
+        {sent?.text ? <Text style={styles.bubble}>{sent.text}</Text> : null}
+        {sent?.file ? <Text style={styles.file}>{sent.file} · PDF</Text> : null}
+        {sent?.reply.type === 'saved' ? <SavedGoalReply onTry={tryExample} /> : null}
+        {sent?.reply.type === 'resume' && intake ? (
+          <ResumeStep
+            intake={intake}
+            reading={reading}
+            busy={start.isPending}
+            onAdd={() => void attach()}
+            onSkip={() => startPlan(null)}
+          />
+        ) : null}
+        {sent?.reply.type === 'existing' ? (
+          <ExistingPlanReply example={example} onOpen={openExisting} />
+        ) : null}
+        {sent?.reply.type === 'run' ? (
           <RunCard
             run={run.data}
             stopping={cancel.isPending}
             onStop={(runId) => cancel.mutate(runId)}
-            onRetry={() => send(sent.text)}
-            retrying={ask.isPending || create.isPending}
+            onRetry={() => retry(sent)}
+            retrying={ask.isPending || create.isPending || start.isPending}
             onSeeChanges={seeChanges}
           />
         ) : null}
-        {sent && target && !params.intentId ? (
+        {sent?.reply.type === 'run' && target && !params.intentId ? (
           <Button label="Open plan" variant="primary" onPress={openPlan} />
         ) : null}
       </ScrollView>
@@ -174,12 +284,32 @@ export default function ComposeSheet(): ReactElement {
         {next === 'plan' ? (
           <Button label="Back to plan" variant="primary" onPress={() => router.dismiss()} />
         ) : null}
+        {reading && sent?.reply.type !== 'resume' && intake ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            {intake.reading}
+          </Text>
+        ) : null}
+        {notice ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            {notice}
+          </Text>
+        ) : null}
         {error ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
             {error.message}
           </Text>
         ) : null}
         <View style={styles.inputRow}>
+          {canAttach && intake ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={intake.add}
+              onPress={() => void attach()}
+              style={styles.attach}
+            >
+              <Text style={styles.attachText}>PDF</Text>
+            </Pressable>
+          ) : null}
           <TextInput
             ref={inputRef}
             accessibilityLabel={target ? 'Ask about this plan' : 'Describe your plan'}
@@ -228,6 +358,22 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.card,
     backgroundColor: colors.userMark,
   },
+  file: {
+    alignSelf: 'flex-end',
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: colors.muted,
+  },
+  notice: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
+  attach: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.soft,
+  },
+  attachText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.ink },
   composer: {
     gap: 6,
     padding: 12,
