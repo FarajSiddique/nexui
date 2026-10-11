@@ -199,7 +199,8 @@ export async function executeRun(job: RunJob, deps: RunDeps = {}): Promise<void>
       throw new GraphNotFoundError('Not found.');
     }
 
-    if ((await recordRunStep(db, run.id, leaseId, [], null)) !== 'running') {
+    // The opening step carries an intake read's usage, when one came before this build run.
+    if ((await recordRunStep(db, run.id, leaseId, [], run.input.intake ?? null)) !== 'running') {
       return;
     }
 

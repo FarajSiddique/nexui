@@ -50,7 +50,23 @@ export function qaApi(session, api = process.env.NEXUI_API ?? 'http://localhost:
     throw new Error(`run ${runId} did not finish in ${seconds} seconds`);
   }
 
-  return { call, waitForRun };
+  // A multipart POST, such as a resume upload; `form` null sends an empty body.
+  async function postForm(path, form) {
+    const response = await fetch(`${api}${path}`, {
+      method: 'POST',
+      headers: { Authorization: headers.Authorization },
+      body: form ?? undefined,
+    });
+    const json = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`POST ${path} → ${response.status} ${JSON.stringify(json)}`);
+    }
+
+    return json;
+  }
+
+  return { call, postForm, waitForRun };
 }
 
 /**

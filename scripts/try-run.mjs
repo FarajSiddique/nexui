@@ -6,15 +6,18 @@
  * node scripts/try-run.mjs goal "<goal>"               create an intent and wait for its run
  * node scripts/try-run.mjs ask <intentId> "<request>"   ask, and wait for the run
  * node scripts/try-run.mjs free-day <intentId>          fix the trip's length, then free a day
+ * node scripts/try-run.mjs start <intentId> [resume.pdf]     start a job search, and wait for its run
  *
  * NEXUI_SESSION and NEXUI_API override .qa/session.json and http://localhost:3000.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 
 import { printPlan, printRun, qaApi, readSession } from './lib/qa-api.mjs';
 
 const [command, ...args] = process.argv.slice(2);
-const { call, waitForRun } = qaApi(readSession());
+const { call, postForm, waitForRun } = qaApi(readSession());
 
 // Gives a trip without dates a length equal to its days so far, then takes a day from its
 // first stop, which leaves one unallocated day and the "Ask Nexui for ideas" insight.
@@ -96,9 +99,25 @@ switch (command) {
   case 'free-day':
     await freeDay(args[0]);
     break;
+  case 'start': {
+    const [intentId, pdf] = args;
+    let form = null;
+
+    if (pdf) {
+      form = new FormData();
+      form.set('file', new File([readFileSync(pdf)], basename(pdf), { type: 'application/pdf' }));
+    }
+
+    const started = await postForm(`/api/intents/${intentId}/start`, form);
+
+    console.log(`intent ${intentId}: resume ${started.intake}`);
+    printRun(await waitForRun(started.runId));
+    await printPlan(call, intentId);
+    break;
+  }
   default:
     console.error(
-      'Usage: try-run.mjs goal "<goal>" | ask <intentId> "<request>" | free-day <intentId>',
+      'Usage: try-run.mjs goal "<goal>" | ask <intentId> "<request>" | free-day <intentId> | start <intentId> [resume.pdf]',
     );
     process.exit(1);
 }

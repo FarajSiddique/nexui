@@ -109,7 +109,8 @@ export function editObject(state, id, changes) {
  * `apply_changeset` call with that SQLSTATE (e.g. `'NXU08'`) instead of applying it, so a test can
  * exercise `commitChangeset`'s single automatic retry; every later call applies as normal.
  * `failCreateRun` makes `create_run` fail with that SQLSTATE.
- * `activeIntents` is what a read of `intents` answers (the one-search rule).
+ * `activeIntents` is what a read of `intents` answers (the one-search rule). A read of `runs`
+ * answers the one run.
  */
 export function graphDb(
   initialRow = null,
@@ -138,6 +139,8 @@ export function graphDb(
     createdRun: null,
     discarded: null,
     finished: null,
+    reverted: null,
+    runQueries: [],
   };
   let pendingFailure = failApplyOnce ?? null;
   const active = () => ['queued', 'running', 'stopping'].includes(state.run.status);
@@ -239,6 +242,17 @@ export function graphDb(
       };
 
       return state.run;
+    },
+    revert_event: (args) => {
+      state.reverted = args;
+
+      return { ...eventRow, id: randomUUID(), reverts_event_id: args.p_event_id, ops: null };
+    },
+    // The build run `start` consults (Decision 20); the filters are recorded, not applied.
+    'table:runs': (url) => {
+      state.runQueries.push(Object.fromEntries(url.searchParams));
+
+      return [state.run];
     },
     discard_intent: (args) => {
       state.discarded = args;

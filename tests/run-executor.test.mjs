@@ -481,3 +481,27 @@ test('a template’s own route budget replaces the default', () => {
     maxSteps: 2,
   });
 });
+
+test("a build run adds its intake read's usage at its first step", async (t) => {
+  const { fake, db } = start(t, seedRow(travelWorkspace(TRIP_ID), 'A test trip'));
+  const intake = { inputTokens: 3_000, outputTokens: 1_000, model: 'anthropic/claude-haiku-5.5' };
+  const run = mapRunRow(
+    runRow({
+      input: {
+        text: 'A test trip',
+        route: 'reasoning',
+        template: 'travel',
+        perception: 'model',
+        intake,
+      },
+    }),
+  );
+
+  await executeRun(
+    { db, run, leaseId: LEASE_ID, session: mockSession(run, [createFixture]) },
+    deps(),
+  );
+
+  assert.deepEqual(fake.state.steps[0].p_usage, intake);
+  assert.equal(run.input.intake.model, 'anthropic/claude-haiku-5.5');
+});

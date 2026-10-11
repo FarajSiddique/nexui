@@ -37,6 +37,18 @@ export const createIntentResponseSchema = z.discriminatedUnion('outcome', [
 
 export type CreateIntentResponse = z.infer<typeof createIntentResponseSchema>;
 
+// POST /api/intents/:id/start: answers 202 while the build run works. `intake` says what reading
+// the upload found: a resume, one that couldn't be read, or no file.
+export const startResponseSchema = z.object({
+  snapshot: graphSnapshotSchema,
+  runId: idSchema,
+  intake: z.enum(['read', 'unreadable', 'none']),
+});
+
+export type StartResponse = z.infer<typeof startResponseSchema>;
+
+// POST /api/intents/:id/resume answers like a changeset (`commitResponseSchema`).
+
 // GET /api/intents: Home's cards, most recently active first.
 export const intentListItemSchema = z.object({
   id: idSchema,
