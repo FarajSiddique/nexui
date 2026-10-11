@@ -9,7 +9,7 @@ export default function AppLayout(): ReactElement {
   const styles = useStyles();
   const colors = useColors();
 
-  // The + sheet and a stop's details rise over everything, tab bar included. iOS gets a tall
+  // The + sheet and an object's details rise over everything, tab bar included. iOS gets a tall
   // form sheet (a run streams into +); Android and web get a modal, which keeps the keyboard
   // behavior predictable.
   const sheetOptions =
@@ -30,7 +30,7 @@ export default function AppLayout(): ReactElement {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="compose" options={sheetOptions} />
-        <Stack.Screen name="place" options={sheetOptions} />
+        <Stack.Screen name="object" options={sheetOptions} />
         <Stack.Screen name="account" />
       </Stack>
     </View>

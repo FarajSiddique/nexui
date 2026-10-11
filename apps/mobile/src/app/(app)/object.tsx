@@ -1,26 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 
-import {
-  mediaPlaceIds,
-  useIntent,
-  usePlaceAbout,
-  usePlacePhotos,
-  useUndo,
-  useWorkspaceEdit,
-} from '#data';
+import { useIntent, useUndo, useWorkspaceEdit } from '#data';
 import { fonts, createThemedStyles } from '#theme';
 import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
-import {
-  PlaceSheet,
-  daysAction,
-  placeName,
-  rememberDays,
-  stopDetails,
-  useEditMemoryStore,
-} from '#features/travel';
-import { UndoToast } from '#features/workspace';
+import { DetailView } from '#features/registry';
+import { UndoToast, type WorkspaceAction } from '#features/workspace';
 
 // Closes the sheet onto its plan. A sheet opened from a link or a reload on web has no history
 // to go back to, so it opens the plan instead.
@@ -33,56 +19,48 @@ function close(intentId: string): void {
 }
 
 /**
- * A route stop's details, opened from its row on the workspace (spec section 5). It reads the
- * plan from the workspace's cache and the place's Wikipedia details and photo from the media
- * query. Day
- * changes go through the same capability, optimistic op and Undo as the route; Next stop
- * swaps in the next stop's details.
+ * One object's details (job search spec, section 6): a stop, a role, a draft or the search, the
+ * body `DETAIL_REGISTRY` picks by kind. It reads the plan from the workspace's cache. Bodies
+ * report actions: edits go through the same capability, optimistic ops and Undo as the
+ * workspace; `open` swaps the body in place (Next stop, a role's draft); an ask closes the sheet
+ * onto + with the prompt filled in.
  */
-export default function PlaceScreen(): ReactElement {
+export default function ObjectScreen(): ReactElement {
   const styles = useStyles();
-  const { intentId, placeId } = useLocalSearchParams<{ intentId: string; placeId: string }>();
+  const { intentId, objectId } = useLocalSearchParams<{ intentId: string; objectId: string }>();
   const intent = useIntent(intentId);
-  const snapshot = intent.data;
-  const placeIds = useMemo(() => (snapshot ? mediaPlaceIds(snapshot) : []), [snapshot]);
-  const about = usePlaceAbout(intentId, placeIds, placeId);
-  const photo = usePlacePhotos(intentId, placeIds)[placeId] ?? null;
   const edit = useWorkspaceEdit(intentId);
   const undo = useUndo();
-  const wasDays = useEditMemoryStore((state) => state.wasDays);
   const [undoable, setUndoable] = useState<string | null>(null);
   const hideUndo = useCallback(() => setUndoable(null), []);
   const scroll = useRef<ScrollView>(null);
-  const details = snapshot ? stopDetails(snapshot, placeId) : null;
+  const object = intent.data?.objects.find((candidate) => candidate.id === objectId);
 
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
-  }, [placeId]);
+  }, [objectId]);
 
-  const setDays = (days: number): void => {
-    const action = details ? daysAction(details.place, days) : null;
+  const handleAction = (action: WorkspaceAction): void => {
+    switch (action.type) {
+      case 'open':
+        router.setParams({ objectId: action.objectId });
 
-    if (!details || !action) {
-      return;
+        return;
+      case 'ask':
+        router.dismiss();
+        router.push({ pathname: '/compose', params: { intentId, prompt: action.prompt } });
+
+        return;
+      case 'capability':
+        edit.mutate(
+          { request: action.request, optimistic: action.optimistic },
+          { onSuccess: (result) => setUndoable(result.event.id) },
+        );
+
+        return;
+      case 'link':
+        void Linking.openURL(action.url).catch(() => undefined);
     }
-
-    rememberDays(details.place.id, details.data.days, days);
-    edit.mutate(
-      { request: action.request, optimistic: action.optimistic },
-      { onSuccess: (result) => setUndoable(result.event.id) },
-    );
-  };
-
-  const findStay = (): void => {
-    if (!details) {
-      return;
-    }
-
-    router.dismiss();
-    router.push({
-      pathname: '/compose',
-      params: { intentId, prompt: `Find a stay in ${placeName(details.place)}` },
-    });
   };
 
   const renderBody = (): ReactElement => {
@@ -94,26 +72,22 @@ export default function PlaceScreen(): ReactElement {
       return <ListError message={intent.error.message} onRetry={() => void intent.refetch()} />;
     }
 
-    if (!details) {
+    if (!object) {
       return (
         <View style={styles.gone}>
-          <ListEmpty text="This stop is no longer on your route." />
+          <ListEmpty text="This is no longer in your plan." />
           <Button label="Done" onPress={() => close(intentId)} />
         </View>
       );
     }
 
     return (
-      <PlaceSheet
-        details={details}
-        about={about}
-        photo={photo}
-        was={wasDays[details.place.id]}
+      <DetailView
+        object={object}
+        snapshot={intent.data}
+        onAction={handleAction}
         onDone={() => close(intentId)}
-        onDays={setDays}
-        onNext={(next) => router.setParams({ placeId: next })}
-        onFindStay={findStay}
-        onOpenLink={(url) => void Linking.openURL(url).catch(() => undefined)}
+        busy={edit.isPending}
       />
     );
   };
@@ -154,7 +128,7 @@ export default function PlaceScreen(): ReactElement {
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.card },
   scroll: { flex: 1, width: '100%', maxWidth: 488, alignSelf: 'center' },
-  // PlaceSheet's photo bleeds through this padding.
+  // The place body's photo bleeds through this padding.
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 96 },
   gone: { gap: 12 },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },

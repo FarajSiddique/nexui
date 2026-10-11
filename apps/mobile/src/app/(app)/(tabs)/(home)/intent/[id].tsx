@@ -26,7 +26,7 @@ import {
   type WorkspaceAction,
   layoutWorkspace,
 } from '#features/workspace';
-import { SectionView } from '#features/registry';
+import { SectionView, hasDetail } from '#features/registry';
 
 function goBack(): void {
   if (router.canGoBack()) {
@@ -96,7 +96,7 @@ export default function WorkspaceScreen(): ReactElement {
   const handleAction = (action: WorkspaceAction): void => {
     switch (action.type) {
       case 'open':
-        router.push({ pathname: '/place', params: { intentId: id, placeId: action.objectId } });
+        router.push({ pathname: '/object', params: { intentId: id, objectId: action.objectId } });
 
         return;
       case 'ask':
@@ -140,7 +140,17 @@ export default function WorkspaceScreen(): ReactElement {
           <Text accessibilityRole="header" style={styles.title}>
             {data.intent.goal}
           </Text>
-          {meta ? <Text style={styles.meta}>{meta.text}</Text> : null}
+          {meta && hasDetail(meta.kind) ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${meta.text}. Show details`}
+              onPress={() => handleAction({ type: 'open', objectId: meta.objectId })}
+              style={({ pressed }) => [styles.metaButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.meta}>{meta.text} ›</Text>
+            </Pressable>
+          ) : null}
+          {meta && !hasDetail(meta.kind) ? <Text style={styles.meta}>{meta.text}</Text> : null}
           {drafting ? <Pill text="Drafting" tone="running" /> : null}
         </View>
         {intent.isRefetchError ? (
@@ -232,6 +242,8 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.ink,
   },
   meta: { fontFamily: fonts.body, fontSize: 15, color: colors.muted },
+  metaButton: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
+  pressed: { opacity: 0.7 },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },
   open: { gap: 12 },
 }));

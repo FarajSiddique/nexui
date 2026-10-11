@@ -1,5 +1,6 @@
 export { ComparisonSection } from './sections/comparison-section';
 export { DecisionSection } from './sections/decision-section';
+export type { DetailProps } from './detail-types';
 export { InsightSection } from './sections/insight-section';
 export { MetricSection } from './sections/metric-section';
 export { ObjectListSection } from './sections/object-list-section';
