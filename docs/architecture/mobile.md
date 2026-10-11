@@ -158,6 +158,11 @@ request or a push to `+` or `/place`.
 `photos` is each place's `PhotoState` by id, which the workspace screen passes from
 `usePlacePhotos`.
 
+`pipeline` and `timeline` draw `PendingSection` (`sections/pending-section.tsx`), which renders
+nothing, until job search's mobile PR gives them primitives. An insight's `upload`, `copy` and
+`start` actions are hidden for the same reason (`toAction` in `insight-section.tsx` keeps only
+`ask` and `capability`). A summary badge with the `quiet` tone draws as the plain pill.
+
 A route row is one button per stop (`openPlace`), with the ↑↓ and the day stepper on a line below.
 `DayStepper` lives in `features/workspace/day-stepper.tsx`, shared with the place sheet.
 
@@ -268,9 +273,13 @@ otherwise **Back to plan**, which dismisses the sheet. A run that failed or stop
 only the RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer
 above the input, outside the scroll view, so they stay in view while the keyboard is up.
 
+A job search's create answers `awaiting_resume` (its plan) or `existing_search` (the plan already
+going). The sheet doesn't draw either yet: it dismisses itself and opens that plan, caching the
+new plan's snapshot for `awaiting_resume` only.
+
 A goal Nexui can't plan is saved, and the sheet shows `SavedGoalReply`
 (`apps/mobile/src/features/compose/saved-goal-reply.tsx`) instead of a run: what Nexui plans today
-(from `TEMPLATE_EXAMPLES` in `@nexui/types`) and a "Try one" button per template that fills the
+(from `TEMPLATE_EXAMPLES` in `@nexui/types`; `GOAL_EXAMPLES` skips a template whose entry is null, one whose app side hasn't shipped) and a "Try one" button per template that fills the
 composer with its example goal. There is no "Open plan", and the next send starts a new plan. The
 new-plan placeholder takes turns across the templates' examples (`nextGoalPlaceholder`). A 503
 shows its message above the composer and keeps the typed goal.
