@@ -4,6 +4,7 @@ import test from 'node:test';
 import { sessionOpener } from '../apps/api/src/lib/ai/session.ts';
 import { ChangesetInvalidError } from '../apps/api/src/lib/graph/errors.ts';
 import { startAsk, startIntent } from '../apps/api/src/lib/orchestrator/orchestrate.ts';
+import { PerceptionFailedError } from '../apps/api/src/lib/perception/perceive.ts';
 import { getAdminClient, getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, failingEvaluationModel } from './support/ai.mjs';
@@ -44,11 +45,11 @@ const tripFixture = {
     ],
   ],
 };
-const jobFixture = {
-  name: 'test-job',
+const savedFixture = {
+  name: 'test-saved',
   kind: 'create_intent',
-  match: ['new job'],
-  perception: { template: 'none' },
+  match: ['wedding'],
+  perception: { template: 'unsupported' },
   steps: [],
 };
 const askFixture = {
@@ -58,7 +59,7 @@ const askFixture = {
   perception: { route: 'edit' },
   steps: [[{ capability: 'trip.setPlaceDays', input: { placeId: 'o1', days: 3 } }]],
 };
-const fixtures = [tripFixture, jobFixture, askFixture];
+const fixtures = [tripFixture, savedFixture, askFixture];
 
 function orchestrator() {
   const openSession = sessionOpener({ AI_PROVIDER: 'mock' }, fixtures);
@@ -138,9 +139,9 @@ test('a trip whose run cannot start is discarded, and the error stands', async (
   assert.equal(tasks.length, 0);
 });
 
-test('a goal that is not a trip gets a plain intent and no run', async (t) => {
+test('a goal no template fits gets a plain intent and no run', async (t) => {
   const { fake, tasks, deps } = setup(t);
-  const started = await startIntent(deps, 'Find a new job');
+  const started = await startIntent(deps, 'Plan my wedding next June');
 
   assert.equal(started.runId, null);
   assert.equal(started.snapshot.intent.template, null);
@@ -150,20 +151,21 @@ test('a goal that is not a trip gets a plain intent and no run', async (t) => {
   assert.equal(tasks.length, 0);
 });
 
-test('when Jev is down, the goal is treated as a trip', async (t) => {
+test('when Jev is down, nothing is created and the goal is not guessed', async (t) => {
   t.mock.method(console, 'error', () => {});
 
-  const { fake, deps } = setup(t);
+  const { fake, tasks, deps } = setup(t);
   const openMock = deps.openSession;
 
   deps.openSession = (kind, text) => ({
     ...openMock(kind, text),
     evaluationModel: failingEvaluationModel(),
   });
-  await startIntent(deps, 'Find a new job');
 
-  assert.equal(fake.state.created.p_template, 'travel');
-  assert.equal(fake.state.createdRun.p_input.perception, 'fallback');
+  await assert.rejects(startIntent(deps, 'Plan Japan in December'), PerceptionFailedError);
+  assert.equal(fake.state.created, null);
+  assert.equal(fake.state.createdRun, null);
+  assert.equal(tasks.length, 0);
 });
 
 test('an ask is routed by Jev and runs after the response', async (t) => {

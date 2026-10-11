@@ -11,6 +11,23 @@ import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
 const url = 'http://localhost/api/intents';
 
+// Sets env vars for one test and restores them after; `undefined` deletes one.
+function useEnv(t, values) {
+  const assign = (entries) => {
+    for (const [name, value] of Object.entries(entries)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  };
+  const previous = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
+
+  assign(values);
+  t.after(() => assign(previous));
+}
+
 test('the preflight allows GET and POST', () => {
   assert.equal(OPTIONS().headers.get('access-control-allow-methods'), 'GET, POST, OPTIONS');
 });
@@ -240,6 +257,39 @@ test('a goal must be 3 to 500 characters', async (t) => {
   );
 });
 
+test('a goal Jev can’t read is a 503, and nothing is written', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+
+  useEnv(t, { AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: 'vck_test' });
+
+  // The Gateway refuses at once (a 401 isn't retried); the database must never be reached.
+  const upstream = mockSupabaseAuth(t, async () =>
+    Response.json(
+      { error: { message: 'unauthorized', type: 'authentication_error' } },
+      {
+        status: 401,
+      },
+    ),
+  );
+  const response = await POST(
+    authed(url, { method: 'POST', body: JSON.stringify({ goal: 'Plan Japan' }) }),
+  );
+  const hosts = upstream.mock.calls.map(
+    ({ arguments: [input] }) =>
+      new URL(input instanceof Request ? input.url : String(input)).hostname,
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "Nexui couldn't read that goal. Try again." });
+  assert.ok(hosts.length > 0, 'Jev was asked');
+  assert.ok(
+    hosts.every((host) => host === 'ai-gateway.vercel.sh'),
+    'nothing reached the database',
+  );
+  assert.equal(logged.mock.callCount(), 1);
+  assert.deepEqual(logged.mock.calls[0].arguments, ['[perception]', 'Template routing failed.']);
+});
+
 test('a database failure returns a safe 500 and logs only its code', async (t) => {
   useMockAi(t);
 
@@ -261,22 +311,7 @@ test('a database failure returns a safe 500 and logs only its code', async (t) =
 
 test('a misconfigured AI provider is a safe 500 that names the variable in the log', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
-  const previous = { provider: process.env.AI_PROVIDER, key: process.env.AI_GATEWAY_API_KEY };
-
-  process.env.AI_PROVIDER = 'live';
-  delete process.env.AI_GATEWAY_API_KEY;
-  t.after(() => {
-    for (const [name, value] of [
-      ['AI_PROVIDER', previous.provider],
-      ['AI_GATEWAY_API_KEY', previous.key],
-    ]) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-  });
+  useEnv(t, { AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: undefined });
   mockSupabaseAuth(t);
 
   const response = await POST(

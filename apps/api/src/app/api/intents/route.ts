@@ -9,6 +9,7 @@ import { graphErrorResponse, listIntents } from '#lib/graph';
 import { readJsonBody, corsHeaders, jsonError, preflight } from '#lib/http';
 import { withHomePhotos } from '#lib/media';
 import { startIntent } from '#lib/orchestrator';
+import { PerceptionFailedError } from '#lib/perception';
 import { runWorker } from '#lib/runs';
 import { getAdminClient, getUserClient, verifyRequest } from '#lib/supabase';
 
@@ -43,6 +44,7 @@ export async function GET(request: Request): Promise<Response> {
 /**
  * Starts a plan from a goal (spec section F): Jev picks the template, the trip and workspace are
  * seeded at once, and a run fills them in after the response. Answers `{ snapshot, runId }`.
+ * If Jev can't read the goal, it answers 503 and writes nothing.
  */
 export async function POST(request: Request): Promise<Response> {
   const user = await verifyRequest(request, headers);
@@ -76,6 +78,11 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json(createIntentResponseSchema.parse(started), { status: 201, headers });
   } catch (error) {
+    // Nexui doesn't guess a template; the + sheet keeps the goal so a retry is one tap.
+    if (error instanceof PerceptionFailedError) {
+      return jsonError(error.message, 503, headers);
+    }
+
     return graphErrorResponse(error, '[intents]', 'Could not start that plan', headers);
   }
 }
