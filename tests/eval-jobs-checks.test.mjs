@@ -69,6 +69,31 @@ test('a dead or wrong build fails the checks it should', () => {
   ]);
 });
 
+test('only a case whose goal names no role may leave the criteria without one', () => {
+  const interviewPrep = BUILD_CASES.find((testCase) => testCase.name === 'interview-prep');
+  const noRoles = jobSnapshot({
+    search: {
+      roles: [],
+      locations: [],
+      workModes: ['remote', 'hybrid', 'onsite'],
+      industries: [],
+      excludeCompanies: [],
+      passReasons: [],
+      status: 'active',
+      roleChecks: 'on',
+      forwarding: {},
+    },
+  });
+  const label = 'the criteria name a target role';
+
+  assert.equal(interviewPrep.roles, null);
+  assert.ok(failing(buildChecks(noRoles, run, pmLondon, 'read')).includes(label));
+  assert.equal(
+    failing(buildChecks(noRoles, run, interviewPrep, 'unreadable')).includes(label),
+    false,
+  );
+});
+
 test('every case’s resume renders to a PDF the start route accepts; the scan is illegible noise', () => {
   for (const testCase of BUILD_CASES.filter((one) => one.resume)) {
     const bytes = resumePdf(testCase.resume);

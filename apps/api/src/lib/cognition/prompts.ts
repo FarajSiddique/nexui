@@ -131,12 +131,41 @@ export function renderGraph(snapshot: GraphSnapshot, refs: RefTable): string {
   ].join('\n');
 }
 
+/** When a run happens and the plan's time zone, so a model can place "next Tuesday". */
+export interface RunDay {
+  now: Date;
+  timeZone: string;
+}
+
+// Today in the plan's time zone: its weekday, its ISO date and the zone.
+function todayLine({ now, timeZone }: RunDay): string {
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long' }).format(now);
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+
+  return `Today is ${weekday}, ${date} (${timeZone}).`;
+}
+
 /**
- * The user message for a run: the goal, the graph and the request, each fenced and quoted, so
- * nothing the user typed can pose as an instruction (spec section F).
+ * The user message for a run: today's date, then the goal, the graph and the request, each
+ * fenced and quoted, so nothing the user typed can pose as an instruction (spec section F).
+ *
+ * @example
+ * promptFor(snapshot, refs, 'Prep me for Tuesday', { now, timeZone: 'America/New_York' })
+ * // 'Today is Sunday, 2026-10-11 (America/New_York).\n\n<goal>…'
  */
-export function promptFor(snapshot: GraphSnapshot, refs: RefTable, text: string): string {
+export function promptFor(
+  snapshot: GraphSnapshot,
+  refs: RefTable,
+  text: string,
+  day: RunDay,
+): string {
   return [
+    todayLine(day),
     `<goal>${quote(snapshot.intent.goal)}</goal>`,
     `<graph>\n${renderGraph(snapshot, refs)}\n</graph>`,
     `<request>${quote(text)}</request>`,

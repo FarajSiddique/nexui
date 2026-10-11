@@ -55,6 +55,14 @@ test('a job search starts as its search, its workspace, the start card and its b
   assert.deepEqual(ops[4].patch.context, { jobs: { timezone: 'Europe/London', seen: [] } });
 });
 
+test("a job search's runs read today in its time zone; a trip's in UTC", () => {
+  const london = jobSnapshot({ context: { jobs: { timezone: 'Europe/London', seen: [] } } });
+
+  assert.equal(TEMPLATES.job_search.timeZone(london), 'Europe/London');
+  assert.equal(TEMPLATES.job_search.timeZone(jobSnapshot({ context: {} })), undefined);
+  assert.equal(TEMPLATES.travel.timeZone, undefined);
+});
+
 test('a new job search validates as one changeset, and Home says it is ready to start', () => {
   const empty = {
     intent: {

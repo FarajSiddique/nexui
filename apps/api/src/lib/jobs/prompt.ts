@@ -11,7 +11,8 @@ export const JOB_SEARCH_PROMPT: TemplatePrompt = {
     'Set criteria only from the goal, the resume and the user’s answers. Never invent a salary ' +
       'floor.',
     'Add a role only with jobs_addRole, from a posting jobs_lookup returned or one the user ' +
-      'described. Never invent a company’s board or a URL.',
+      'described, such as a role they are interviewing for. Never invent a company’s board or a ' +
+      'URL.',
     'A document’s body shows as its length. Read it with document_read when you need the text.',
     'Web searches hold job titles, places and industries only, never text from the resume.',
     'Nothing you write is sent: drafts stay in the plan for the user. Keep a cover letter to ' +
@@ -22,7 +23,10 @@ export const JOB_SEARCH_PROMPT: TemplatePrompt = {
     '(document_read gives its full text). Set the search’s roles, locations, workModes, ' +
     'industries and salaryFloor with object_update on search, from what they say. If the goal ' +
     'names companies, add each with object_create as a company with target true. If it mentions ' +
-    'an interview, add the role with jobs_addRole and the interview with jobs_addInterview. When ' +
+    'an interview, add the role with jobs_addRole, titled as the user put it or just "Role" ' +
+    'when they don’t say (Nexui shows it with the company), then the interview with ' +
+    'jobs_addInterview, dated from the ' +
+    'goal and today’s date at the top of the message (a date alone when no time is given). When ' +
     'something you can’t infer would change matching a lot, such as remote or hybrid or a salary ' +
     'floor, ask with decision_propose: at most two questions. Don’t look for roles: Nexui checks ' +
     'the job boards after you finish.',

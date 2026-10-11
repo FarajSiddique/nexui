@@ -99,10 +99,13 @@ export function buildChecks(snapshot, run, testCase, intake) {
       invalid.length === 0,
       invalid.map((object) => object.kind).join(', '),
     ),
+    // A goal that names no role (an interview at a company, an unreadable resume) leaves the
+    // criteria empty until the user says; `roles: null` marks such a case.
     check(
       'the criteria name a target role',
-      (search?.roles.length ?? 0) > 0 &&
-        (!testCase.roles || search.roles.some((role) => testCase.roles.test(role))),
+      testCase.roles === null ||
+        ((search?.roles.length ?? 0) > 0 &&
+          (!testCase.roles || search.roles.some((role) => testCase.roles.test(role)))),
       JSON.stringify(search?.roles),
     ),
     check(
