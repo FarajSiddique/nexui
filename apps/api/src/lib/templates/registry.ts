@@ -13,3 +13,9 @@ export const TEMPLATES: Record<Template, TemplateDefinition> = {
 export function templateFor(name: Template | null): TemplateDefinition | null {
   return name === null ? null : TEMPLATES[name];
 }
+
+/**
+ * What Nexui says about a goal no template fits: the saved goal's summary line, and the refusal
+ * to ask about it or change it (job search spec, section 2).
+ */
+export const UNSUPPORTED_GOAL = "Nexui can't plan this yet.";

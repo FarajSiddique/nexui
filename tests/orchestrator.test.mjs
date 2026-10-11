@@ -144,7 +144,7 @@ test('a goal that is not a trip gets a plain intent and no run', async (t) => {
 
   assert.equal(started.runId, null);
   assert.equal(started.snapshot.intent.template, null);
-  assert.equal(started.snapshot.intent.summary.line, 'Nexui can plan trips so far.');
+  assert.equal(started.snapshot.intent.summary.line, "Nexui can't plan this yet.");
   assert.equal(fake.state.created.p_template, null);
   assert.equal(fake.state.createdRun, null);
   assert.equal(tasks.length, 0);
@@ -193,8 +193,7 @@ test('an ask on an intent without a workspace is refused', async (t) => {
   await assert.rejects(
     startAsk(deps, INTENT_ID, 'Make Kyoto 3 days'),
     (error) =>
-      error instanceof ChangesetInvalidError &&
-      error.message === 'Nexui can only change trips so far.',
+      error instanceof ChangesetInvalidError && error.message === "Nexui can't plan this yet.",
   );
   assert.equal(fake.state.createdRun, null);
 });

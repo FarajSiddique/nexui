@@ -11,6 +11,7 @@ import {
 } from '#lib/graph';
 import { chooseTemplate, routeAsk } from '#lib/perception';
 import { createRun, scheduleRun, workRun, type RunWorker } from '#lib/runs';
+import { UNSUPPORTED_GOAL } from '#lib/templates';
 import type { OpenSession } from '#lib/ai';
 
 export interface Orchestrator {
@@ -98,7 +99,7 @@ export async function startAsk(
   const snapshot = await loadSnapshot(deps.db, intentId);
 
   if (!snapshot.workspace) {
-    throw new ChangesetInvalidError('Nexui can only change trips so far.');
+    throw new ChangesetInvalidError(UNSUPPORTED_GOAL);
   }
 
   const session = deps.openSession('ask', text);
