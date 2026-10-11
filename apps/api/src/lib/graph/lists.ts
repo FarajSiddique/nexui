@@ -10,8 +10,10 @@ import { mapChangeRow, mapIntentListRow } from './mappers.ts';
 const DRAFTING: NonNullable<IntentSummary['badge']> = { text: 'Drafting', tone: 'running' };
 
 /**
- * Home's cards: the user's intents that aren't archived, most recently active first. An intent
- * with a run still working on it shows "Drafting" instead of its own badge (spec section D).
+ * Home's cards: the user's plans that aren't archived, most recently active first. A goal saved
+ * without a template (Nexui can't plan it yet) isn't a plan, so it isn't listed (job search
+ * spec, section 2). An intent with a run still working on it shows "Drafting" instead of its
+ * own badge (spec section D).
  */
 export async function listIntents(
   db: SupabaseClient,
@@ -22,6 +24,7 @@ export async function listIntents(
       .from('intents')
       .select('id, goal, template, status, summary, last_activity_at')
       .neq('status', 'archived')
+      .not('template', 'is', null)
       .order('last_activity_at', { ascending: false })
       .limit(100),
     activeRunIntentIds(db, now),

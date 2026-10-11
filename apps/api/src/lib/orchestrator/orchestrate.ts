@@ -11,6 +11,7 @@ import {
 } from '#lib/graph';
 import { chooseTemplate, routeAsk } from '#lib/perception';
 import { createRun, scheduleRun, workRun, type RunWorker } from '#lib/runs';
+import { UNSUPPORTED_GOAL } from '#lib/templates';
 import type { OpenSession } from '#lib/ai';
 
 export interface Orchestrator {
@@ -24,11 +25,12 @@ export interface Orchestrator {
   worker: RunWorker;
 }
 
-export interface StartedIntent {
-  snapshot: GraphSnapshot;
-  /** The run filling in the trip, or null for a goal that isn't a trip. */
-  runId: string | null;
-}
+/**
+ * What `startIntent` did with a goal (job search spec, section 2): seeded a plan and queued the
+ * run that fills it in, or saved a goal no template fits, with no plan and no run.
+ */
+export type StartedIntent =
+  { outcome: 'started'; snapshot: GraphSnapshot; runId: string } | { outcome: 'unsupported' };
 
 export interface StartedAsk {
   runId: string;
@@ -47,8 +49,9 @@ async function discardTrip(db: SupabaseClient, intentId: string): Promise<void> 
 /**
  * CreateIntent (spec section F): Jev picks the template, the template seeds the intent at once,
  * and a reasoning run is queued, which the worker claims after the response to fill it in. A
- * goal that isn't a trip gets a plain intent and no run. If its run can't be created, the seeded
- * trip is deleted and the error is rethrown.
+ * goal no template fits is saved as an intent with no template, workspace or run. If Jev can't
+ * read the goal, its `PerceptionFailedError` stands and nothing is created. If the run can't be
+ * created, the seeded plan is deleted and the error is rethrown.
  */
 export async function startIntent(deps: Orchestrator, goal: string): Promise<StartedIntent> {
   const session = deps.openSession('create_intent', goal);
@@ -56,11 +59,14 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
     providerOptions: session.providerOptions('perception'),
   });
 
-  if (template.value === 'none') {
-    return { snapshot: await createIntent(deps.db, goal, null), runId: null };
+  // Saved, not planned: no workspace, no run and no model call beyond Jev.
+  if (template === 'unsupported') {
+    await createIntent(deps.db, goal, null);
+
+    return { outcome: 'unsupported' };
   }
 
-  const snapshot = await createIntent(deps.db, goal, template.value);
+  const snapshot = await createIntent(deps.db, goal, template);
   let run: RunRecord;
 
   try {
@@ -71,8 +77,8 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
       input: {
         text: goal,
         route: 'reasoning',
-        template: template.value,
-        perception: template.source,
+        template,
+        perception: 'model',
       },
     });
   } catch (error) {
@@ -83,7 +89,7 @@ export async function startIntent(deps: Orchestrator, goal: string): Promise<Sta
 
   scheduleRun(() => workRun(deps.worker, run.id));
 
-  return { snapshot, runId: run.id };
+  return { outcome: 'started', snapshot, runId: run.id };
 }
 
 /**
@@ -98,7 +104,7 @@ export async function startAsk(
   const snapshot = await loadSnapshot(deps.db, intentId);
 
   if (!snapshot.workspace) {
-    throw new ChangesetInvalidError('Nexui can only change trips so far.');
+    throw new ChangesetInvalidError(UNSUPPORTED_GOAL);
   }
 
   const session = deps.openSession('ask', text);

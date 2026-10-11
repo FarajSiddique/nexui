@@ -174,7 +174,7 @@ export default function WorkspaceScreen(): ReactElement {
           </Text>
         ) : null}
         {data.workspace ? null : (
-          <ListEmpty text={data.intent.summary.line || 'Nexui can plan trips so far.'} />
+          <ListEmpty text={data.intent.summary.line || "Nexui can't plan this yet."} />
         )}
         {blocks.map((block) =>
           block.kind === 'open' ? (

@@ -56,14 +56,17 @@ async function freeDay(intentId) {
 
 switch (command) {
   case 'goal': {
-    const { snapshot, runId } = await call('POST', '/api/intents', { goal: args[0] });
+    const started = await call('POST', '/api/intents', { goal: args[0] });
 
-    console.log(`intent ${snapshot.intent.id} (${snapshot.intent.template ?? 'no template'})`);
-
-    if (runId) {
-      printRun(await waitForRun(runId));
+    if (started.outcome !== 'started') {
+      console.log(`saved, not planned (${started.outcome})`);
+      break;
     }
 
+    const { snapshot, runId } = started;
+
+    console.log(`intent ${snapshot.intent.id} (${snapshot.intent.template})`);
+    printRun(await waitForRun(runId));
     await printPlan(call, snapshot.intent.id);
     break;
   }

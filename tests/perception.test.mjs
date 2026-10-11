@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { chooseTemplate, routeAsk } from '../apps/api/src/lib/perception/perceive.ts';
+import {
+  chooseTemplate,
+  PerceptionFailedError,
+  routeAsk,
+} from '../apps/api/src/lib/perception/perceive.ts';
 import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
 import { Experimental_EvaluationMockModelV4, failingEvaluationModel } from './support/ai.mjs';
 
@@ -15,17 +19,21 @@ function answering(answers, seen = []) {
   });
 }
 
+const unread = (error) =>
+  error instanceof PerceptionFailedError &&
+  error.message === "Nexui couldn't read that goal. Try again.";
+
 test('Jev picks the template from the goal alone', async () => {
   const seen = [];
-  const model = answering({ template: { type: 'choice', choice: 'none' } }, seen);
+  const model = answering({ template: { type: 'choice', choice: 'unsupported' } }, seen);
   const providerOptions = { gateway: { models: ['anthropic/claude-haiku-4.5'] } };
 
-  assert.deepEqual(await chooseTemplate(model, 'Find a new job', { providerOptions }), {
-    value: 'none',
-    source: 'model',
-  });
-  assert.deepEqual(seen[0].state, { goal: 'Find a new job' });
-  assert.deepEqual(Object.keys(seen[0].questions.template.criteria), ['travel', 'none']);
+  assert.equal(
+    await chooseTemplate(model, 'Plan my wedding next June', { providerOptions }),
+    'unsupported',
+  );
+  assert.deepEqual(seen[0].state, { goal: 'Plan my wedding next June' });
+  assert.deepEqual(Object.keys(seen[0].questions.template.criteria), ['travel', 'unsupported']);
   assert.deepEqual(seen[0].providerOptions, providerOptions);
 });
 
@@ -47,20 +55,16 @@ test('Jev routes an ask with the plan as context', async () => {
   assert.deepEqual(Object.keys(seen[0].questions.route.criteria), ['edit', 'fast', 'reasoning']);
 });
 
-test('when Jev fails, a goal is a trip and an ask gets the reasoning tier', async (t) => {
+test('when Jev fails, a goal is not guessed and an ask gets the reasoning tier', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
 
-  assert.deepEqual(await chooseTemplate(failingEvaluationModel(), 'Plan Japan'), {
-    value: 'travel',
-    source: 'fallback',
-  });
+  await assert.rejects(chooseTemplate(failingEvaluationModel(), 'Plan Japan'), unread);
   assert.deepEqual(
     await routeAsk(failingEvaluationModel(), { text: 'Hi there', goal: 'Plan Japan', summary: '' }),
     { value: 'reasoning', source: 'fallback' },
   );
   assert.equal(logged.mock.callCount(), 2);
-  assert.equal(logged.mock.calls[0].arguments[0], '[perception]');
-  assert.doesNotMatch(logged.mock.calls[0].arguments[1], /gateway unavailable/);
+  assert.deepEqual(logged.mock.calls[0].arguments, ['[perception]', 'Template routing failed.']);
 });
 
 test('a slow Jev is abandoned after the timeout', async (t) => {
@@ -83,10 +87,7 @@ test('a slow Jev is abandoned after the timeout', async (t) => {
   });
   const started = Date.now();
 
-  assert.deepEqual(await chooseTemplate(slow, 'Plan Japan', { timeoutMs: 20 }), {
-    value: 'travel',
-    source: 'fallback',
-  });
+  await assert.rejects(chooseTemplate(slow, 'Plan Japan', { timeoutMs: 20 }), unread);
   assert.ok(Date.now() - started < 1_000);
 });
 
@@ -120,7 +121,7 @@ test('a slow Jev is abandoned after the timeout when routing an ask', async (t) 
   assert.equal(logged.mock.calls[0].arguments[1], 'Ask routing failed; using the reasoning tier.');
 });
 
-test("Jev reads each template's own sentence, then the one for no template", async () => {
+test("Jev reads each template's own sentence, then one for goals none fits", async () => {
   const seen = [];
 
   await chooseTemplate(
@@ -130,9 +131,31 @@ test("Jev reads each template's own sentence, then the one for no template", asy
 
   const { criteria } = seen[0].questions.template;
 
-  assert.deepEqual(Object.keys(criteria), [...Object.keys(TEMPLATES), 'none']);
+  assert.deepEqual(Object.keys(criteria), [...Object.keys(TEMPLATES), 'unsupported']);
 
   for (const template of Object.values(TEMPLATES)) {
     assert.equal(criteria[template.name], template.perception);
   }
+
+  assert.equal(
+    criteria.unsupported,
+    'Anything else, such as a move, a wedding, buying a car or hiring for a team.',
+  );
+  // It names no template, so a new template never has to edit it.
+  assert.doesNotMatch(criteria.unsupported, /trip|travel|job/i);
+});
+
+test('an answer Jev was not offered is refused like a failure', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+
+  // A stale fixture's `none`, `job_search` before its template exists, a prototype key.
+  for (const choice of ['none', 'job_search', 'toString']) {
+    await assert.rejects(
+      chooseTemplate(answering({ template: { type: 'choice', choice } }), 'Find a new job'),
+      unread,
+      choice,
+    );
+  }
+
+  assert.equal(logged.mock.callCount(), 3);
 });

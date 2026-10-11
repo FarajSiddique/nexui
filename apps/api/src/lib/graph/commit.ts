@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Actor, ChangesetOp, EventRecord, GraphSnapshot, Template } from '@nexui/types';
 
-import { templateFor } from '#lib/templates';
+import { templateFor, UNSUPPORTED_GOAL } from '#lib/templates';
 
 import { GraphNotFoundError, mapRpcError } from './errors.ts';
 import { mapEventRow } from './mappers.ts';
@@ -104,11 +104,9 @@ export async function commitChangeset(
   return { event: mapEventRow(result.data), snapshot: await loadSnapshot(db, input.intentId) };
 }
 
-const NOT_A_TRIP_SUMMARY = 'Nexui can plan trips so far.';
-
 /**
  * Creates an intent in one transaction. An intent with a template gets that template's seed (its
- * anchor and workspace) and derived state; one without (Jev said no template fits) gets only a
+ * anchor and workspace) and derived state; one without (a goal Nexui can't plan yet) gets only that
  * summary line.
  */
 export async function createIntent(
@@ -137,7 +135,7 @@ export async function createIntent(
     relationships: [],
   };
   const seed: ChangesetOp[] = templateFor(template)?.seed(goal, newId) ?? [
-    { op: 'update_intent', patch: { summary: { line: NOT_A_TRIP_SUMMARY } }, origin: 'direct' },
+    { op: 'update_intent', patch: { summary: { line: UNSUPPORTED_GOAL } }, origin: 'direct' },
   ];
   const ops = prepareChangeset(empty, seed, 'system', now, newId);
   const { error } = await db.rpc('create_intent', {

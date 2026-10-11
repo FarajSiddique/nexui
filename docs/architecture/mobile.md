@@ -268,6 +268,13 @@ otherwise **Back to plan**, which dismisses the sheet. A run that failed or stop
 only the RunCard's own buttons, and a new plan shows "Open plan". Both buttons sit in the composer
 above the input, outside the scroll view, so they stay in view while the keyboard is up.
 
+A goal Nexui can't plan is saved, and the sheet shows `SavedGoalReply`
+(`apps/mobile/src/features/compose/saved-goal-reply.tsx`) instead of a run: what Nexui plans today
+(from `TEMPLATE_EXAMPLES` in `@nexui/types`) and a "Try one" button per template that fills the
+composer with its example goal. There is no "Open plan", and the next send starts a new plan. The
+new-plan placeholder takes turns across the templates' examples (`nextGoalPlaceholder`). A 503
+shows its message above the composer and keeps the typed goal.
+
 The sheet is an iOS form sheet (react-native-screens), which constrains two things. The composer
 clears the keyboard with `useKeyboardOverlap()`
 (`apps/mobile/src/features/compose/use-keyboard-overlap.ts`), which pads by the window height minus

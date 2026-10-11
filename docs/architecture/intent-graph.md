@@ -161,11 +161,13 @@ readers:
 `TEMPLATES` (`apps/api/src/lib/templates/registry.ts`) is a `Record<Template, TemplateDefinition>`,
 so a name `templateSchema` (`packages/types/src/graph.ts`) lists without a definition fails
 typecheck. `templateFor(name)` returns the definition, or null for an intent with no template (a
-goal Jev said isn't a trip): it derives nothing, no run or capability applies to it, and its
+saved goal Nexui can't plan yet): it derives nothing, no run or capability applies to it, and its
 context may hold only the eval tag. `contextSchemaFor` adds that tag (`context.eval`, written by
 `scripts/eval-travel.mjs`) to every template's keys, so a template can't forget it. The
 database's check still allows `job_search`, which `templateSchema` lists once a definition exists.
 Code reads a template through `TEMPLATES` or `templateFor` and does not compare names.
+`UNSUPPORTED_GOAL` ("Nexui can't plan this yet.", same file) is a saved goal's summary line and
+the refusal to ask about it or stage a change on it.
 
 The `lib/travel` domain (`apps/api/src/lib/travel/`) holds everything only the travel template
 knows: `template.ts` builds `TRAVEL_TEMPLATE`; `seed.ts` has `seedTravelOps` and
@@ -334,10 +336,30 @@ as a worker with the service-role client (see "Run queue" below).
 
 - **Perception** (`src/lib/perception`): Jev (`NEXUI_MODEL_PERCEPTION`, `typesafe-ai/jev`)
   answers one choice question within 5 seconds. A goal is a template's name (`travel`) or
-  `none`; each template's `perception` sentence is its criterion, so a new template teaches
-  routing by existing. An ask is `edit`, `fast` or `reasoning`. If Jev fails, the goal is a trip
-  and the ask gets `reasoning`. A `none` goal gets an intent with no template, no workspace and
-  no run.
+  `unsupported`, a sentence that names no template; each template's `perception` sentence is its
+  criterion, so a new template teaches routing by existing. If Jev fails, times out or picks a
+  choice it wasn't offered (the AI SDK refuses that answer), `chooseTemplate` throws
+  `PerceptionFailedError` and `POST /api/intents` answers 503 "Nexui couldn't read that goal. Try
+  again." without writing anything. An ask is `edit`, `fast` or `reasoning`; if Jev fails, it gets
+  `reasoning`.
+- **Saved goals** (`startIntent`): `POST /api/intents` answers an `outcome`
+  (`createIntentResponseSchema`, a union in `packages/types/src/api.ts`), and each outcome names
+  its status in `CREATE_STATUS`: `started` (201, the snapshot and the run's id) and
+  `unsupported` (201, nothing else). A saved goal is an intent with `template` null: one summary
+  op (`UNSUPPORTED_GOAL`), no workspace and no run. `listIntents` leaves it off Home; Changes
+  still shows its "started" row. Account deletion removes it through the `intents.user_id`
+  cascade. To rank which use cases to build next, list the saved goals across users in the
+  project's SQL editor:
+
+  ```sql
+  select i.created_at, i.goal
+  from public.intents i
+  where i.template is null
+  order by i.created_at desc;
+  ```
+
+  Job-hunting goals saved before job search's template shipped appear there too.
+
 - **Starting a trip** (`startIntent`): if `create_run` fails after the intent was seeded, the
   intent is deleted with `discard_intent` before the error is rethrown. A failed discard is
   logged under `[intents]` with only its error code, and the original error is still the one
@@ -400,7 +422,7 @@ as a worker with the service-role client (see "Run queue" below).
   - Home shows "Drafting" on intents with a working run.
 - **The run's template** (`executeRun`, `src/lib/runs/execute.ts`): the run reads its intent's
   template with `templateOf` (`src/lib/staging`), which refuses an intent with no template or no
-  workspace ("Nexui can only change trips so far."), and takes from it the capabilities that
+  workspace (`UNSUPPORTED_GOAL`), and takes from it the capabilities that
   become the model's tools, the instructions (`instructionsFor(template, kind, route)`) and the
   route's budget (`routeBudget`: the template's `routes` entry, else the default below).
 - **Cognition** (`src/lib/cognition`): `generateText` with the capabilities as tools (`.` becomes
@@ -475,7 +497,8 @@ as a worker with the service-role client (see "Run queue" below).
   I have free?") with a decision: Nara and Hiroshima as candidates, and "Extra day in Tokyo",
   whose `extend: 'o4'` was added by hand. It replays on any trip with a free day: `o4` is Tokyo
   on the trip that `try-run.mjs goal "Plan two weeks in Japan in December"` and then `free-day`
-  make, and elsewhere it names another stop or none (and is dropped).
+  make, and elsewhere it names another stop or none (and is dropped). `saved-goal`, written by
+  hand, matches "wedding" and answers `unsupported`, with no steps.
 - **Recording:** run the API with `AI_PROVIDER=live`, start a run with
   `node scripts/try-run.mjs goal "<goal>"` (or `ask`), then
   `node scripts/record-fixture.mjs <runId> <name> <phrase,phrase>` and add the export to
@@ -532,7 +555,8 @@ In the web preview a live browser color-scheme change only applies after a reloa
   and its run, it asks the unallocated insight's own question (replaying
   `japan-ask-free-days`), picks a place (the free day is used, a leg reaches it, the other
   candidates are deleted), undoes the pick (every candidate is back and the decision open), and
-  ends with a cancel of a finished run.
+  saves a goal ("plan my wedding next June", replaying `saved-goal`) and checks Home leaves it
+  out, and ends with a cancel of a finished run.
 - `pnpm eval:travel` (`scripts/eval-travel.mjs`, cases in `scripts/eval-travel-cases.mjs`, pure
   checks in `scripts/lib/eval-checks.mjs`): the manual live gate for spec section H's eight trip
   prompts. Each case creates a plan, tags it in `intents.context.eval`, checks it (valid kind

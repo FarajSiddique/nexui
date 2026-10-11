@@ -29,6 +29,18 @@ test('clients cannot write any graph table directly', () => {
   assert.doesNotMatch(sql, /for (insert|update|delete|all) to/i);
 });
 
+test('a saved goal is an intent with no template, and it goes with its account', () => {
+  const intents = sql.match(/create table public\.intents \(([\s\S]*?)\n\);/)?.[1] ?? '';
+
+  // Nullable: a goal Nexui can't plan yet is saved with `template` null.
+  assert.match(intents, /\n {2}template text check \(template in \('travel', 'job_search'\)\),/);
+  // Account deletion removes the auth user, and every intent with it.
+  assert.match(
+    intents,
+    /user_id uuid not null default auth\.uid\(\) references auth\.users \(id\) on delete cascade/,
+  );
+});
+
 test('every function pins search_path; definer functions check auth.uid()', () => {
   assert.ok(functions.length >= 8, `found ${functions.length} functions`);
 

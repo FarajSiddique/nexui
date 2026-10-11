@@ -19,7 +19,7 @@ const fixture = {
   name: 'test-job',
   kind: 'create_intent',
   match: ['new', 'job'],
-  perception: { template: 'none', route: 'edit' },
+  perception: { template: 'unsupported', route: 'edit' },
   steps: [[{ capability: 'object.update', input: { ref: 'trip', data: { pace: 'slow' } } }]],
 };
 
@@ -37,10 +37,7 @@ test('a mock session answers Jev from its fixture and replays its steps, then st
     'Find a new job',
   );
 
-  assert.deepEqual(await chooseTemplate(session.evaluationModel, 'Find a new job'), {
-    value: 'none',
-    source: 'model',
-  });
+  assert.equal(await chooseTemplate(session.evaluationModel, 'Find a new job'), 'unsupported');
   assert.deepEqual(
     await routeAsk(session.evaluationModel, { text: 'Find a new job', goal: '', summary: '' }),
     { value: 'edit', source: 'model' },
@@ -65,7 +62,7 @@ test('a mock session answers Jev from its fixture and replays its steps, then st
 test('without a fixture, mock perception says travel and reasoning, and the model changes nothing', async () => {
   const session = sessionOpener({}, [fixture])('ask', 'Something else entirely');
 
-  assert.equal((await chooseTemplate(session.evaluationModel, 'x')).value, 'travel');
+  assert.equal(await chooseTemplate(session.evaluationModel, 'x'), 'travel');
   assert.equal(
     (await routeAsk(session.evaluationModel, { text: 'x', goal: '', summary: '' })).value,
     'reasoning',
@@ -117,7 +114,11 @@ test('shipped fixtures are well formed', () => {
 });
 
 test('every create fixture replays cleanly against a freshly seeded trip', () => {
-  for (const shipped of FIXTURES.filter((candidate) => candidate.kind === 'create_intent')) {
+  for (const shipped of FIXTURES.filter(
+    // A saved goal starts no run, so it has nothing to replay.
+    (candidate) =>
+      candidate.kind === 'create_intent' && candidate.perception.template !== 'unsupported',
+  )) {
     const stager = createStager({
       capabilities: CAPABILITIES,
       snapshot: mapSnapshotRow(seedRow(travelWorkspace(TRIP_ID))),

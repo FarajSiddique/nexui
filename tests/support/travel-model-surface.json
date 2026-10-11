@@ -593,7 +593,7 @@
     "instructions": "Someone typed this goal to start a plan. Which template fits it?",
     "criteria": {
       "travel": "A trip: going somewhere, visiting places, a holiday, a weekend away, a road trip, or travel around an event.",
-      "none": "Anything that is not a trip, such as a job search, a project, a purchase or a habit."
+      "unsupported": "Anything else, such as a move, a wedding, buying a car or hiring for a team."
     }
   }
 }

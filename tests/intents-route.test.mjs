@@ -11,6 +11,23 @@ import { mockSupabaseAuth } from './support/supabase-auth.mjs';
 
 const url = 'http://localhost/api/intents';
 
+// Sets env vars for one test and restores them after; `undefined` deletes one.
+function useEnv(t, values) {
+  const assign = (entries) => {
+    for (const [name, value] of Object.entries(entries)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  };
+  const previous = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
+
+  assign(values);
+  t.after(() => assign(previous));
+}
+
 test('the preflight allows GET and POST', () => {
   assert.equal(OPTIONS().headers.get('access-control-allow-methods'), 'GET, POST, OPTIONS');
 });
@@ -20,7 +37,7 @@ test('listing requires a token', async (t) => {
   assert.equal((await GET(new Request(url))).status, 401);
 });
 
-test('Home lists intents, most recent first', async (t) => {
+test('Home lists plans, most recent first, and leaves out saved goals', async (t) => {
   let asked;
 
   mockSupabaseAuth(
@@ -53,6 +70,7 @@ test('Home lists intents, most recent first', async (t) => {
     ],
   });
   assert.equal(asked.searchParams.get('status'), 'neq.archived');
+  assert.equal(asked.searchParams.get('template'), 'not.is.null');
   assert.equal(asked.searchParams.get('order'), 'last_activity_at.desc');
 });
 
@@ -213,6 +231,7 @@ test('creating an intent seeds the trip, starts its run and answers at once', as
   const body = await response.json();
 
   assert.equal(response.status, 201);
+  assert.equal(body.outcome, 'started');
   assert.equal(body.snapshot.intent.goal, 'Plan Japan in December');
   assert.equal(body.runId, RUN_ID);
   assert.equal(created.p_goal, 'Plan Japan in December');
@@ -224,6 +243,43 @@ test('creating an intent seeds the trip, starts its run and answers at once', as
   assert.equal(run.p_kind, 'create_intent');
   assert.equal(run.p_input.text, 'Plan Japan in December');
   assert.equal(tasks.length, 1);
+});
+
+test('a goal no template fits is saved: a 201 with no plan and no run', async (t) => {
+  useMockAi(t);
+
+  const tasks = captureRuns(t);
+  let created;
+
+  // No `create_run` handler: a run would answer 500 and fail the test.
+  mockSupabaseAuth(
+    t,
+    postgrest({
+      create_intent: (args) => {
+        created = args;
+
+        return {};
+      },
+      get_intent_snapshot: () => ({
+        ...snapshotRow(travelWorkspace(TRIP_ID)),
+        intent: { ...intentRow, goal: 'Plan my wedding next June', template: null },
+        workspace: null,
+        objects: [],
+        relationships: [],
+      }),
+    }),
+  );
+
+  // Mock mode's `saved-goal` fixture answers `unsupported` for a wedding.
+  const response = await POST(
+    authed(url, { method: 'POST', body: JSON.stringify({ goal: 'Plan my wedding next June' }) }),
+  );
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(await response.json(), { outcome: 'unsupported' });
+  assert.equal(created.p_goal, 'Plan my wedding next June');
+  assert.equal(created.p_template, null);
+  assert.equal(tasks.length, 0);
 });
 
 test('a goal must be 3 to 500 characters', async (t) => {
@@ -238,6 +294,39 @@ test('a goal must be 3 to 500 characters', async (t) => {
     (await response.json()).error,
     'Describe what you are planning in 3 to 500 characters.',
   );
+});
+
+test('a goal Jev can’t read is a 503, and nothing is written', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+
+  useEnv(t, { AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: 'vck_test' });
+
+  // The Gateway refuses at once (a 401 isn't retried); the database must never be reached.
+  const upstream = mockSupabaseAuth(t, async () =>
+    Response.json(
+      { error: { message: 'unauthorized', type: 'authentication_error' } },
+      {
+        status: 401,
+      },
+    ),
+  );
+  const response = await POST(
+    authed(url, { method: 'POST', body: JSON.stringify({ goal: 'Plan Japan' }) }),
+  );
+  const hosts = upstream.mock.calls.map(
+    ({ arguments: [input] }) =>
+      new URL(input instanceof Request ? input.url : String(input)).hostname,
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "Nexui couldn't read that goal. Try again." });
+  assert.ok(hosts.length > 0, 'Jev was asked');
+  assert.ok(
+    hosts.every((host) => host === 'ai-gateway.vercel.sh'),
+    'nothing reached the database',
+  );
+  assert.equal(logged.mock.callCount(), 1);
+  assert.deepEqual(logged.mock.calls[0].arguments, ['[perception]', 'Template routing failed.']);
 });
 
 test('a database failure returns a safe 500 and logs only its code', async (t) => {
@@ -261,22 +350,7 @@ test('a database failure returns a safe 500 and logs only its code', async (t) =
 
 test('a misconfigured AI provider is a safe 500 that names the variable in the log', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
-  const previous = { provider: process.env.AI_PROVIDER, key: process.env.AI_GATEWAY_API_KEY };
-
-  process.env.AI_PROVIDER = 'live';
-  delete process.env.AI_GATEWAY_API_KEY;
-  t.after(() => {
-    for (const [name, value] of [
-      ['AI_PROVIDER', previous.provider],
-      ['AI_GATEWAY_API_KEY', previous.key],
-    ]) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-  });
+  useEnv(t, { AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: undefined });
   mockSupabaseAuth(t);
 
   const response = await POST(

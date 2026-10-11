@@ -293,7 +293,7 @@ test('a user call records the user as the source', () => {
 test('an intent without a workspace has nothing to stage', () => {
   assert.throws(
     () => stager({ snapshot: { ...snapshot, workspace: null } }),
-    refused(/^Nexui can only change trips so far\.$/),
+    refused(/^Nexui can't plan this yet\.$/),
   );
 });
 

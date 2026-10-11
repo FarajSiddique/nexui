@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactElement } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import {
@@ -13,11 +13,18 @@ import {
 } from '#data';
 import { fonts, createThemedStyles, useColors } from '#theme';
 import { Button } from '#ui';
-import { RunCard, afterAsk, useKeyboardOverlap } from '#features/compose';
+import {
+  RunCard,
+  SavedGoalReply,
+  afterAsk,
+  nextGoalPlaceholder,
+  useKeyboardOverlap,
+} from '#features/compose';
 import { revealOpenBand } from '#features/workspace';
 
 interface Sent {
   text: string;
+  /** The run working on it, or null for a goal Nexui saved because it can't plan it yet. */
   runId: string | null;
 }
 
@@ -34,12 +41,14 @@ export default function ComposeSheet(): ReactElement {
   const [target, setTarget] = useState<string | null>(params.intentId ?? null);
   const [text, setText] = useState(params.prompt ?? '');
   const [sent, setSent] = useState<Sent | null>(null);
+  const [goalPlaceholder] = useState(() => (params.intentId ? '' : nextGoalPlaceholder()));
   const context = useIntent(target);
   const run = useRun(sent?.runId ?? null);
   const create = useCreateIntent();
   const ask = useAsk();
   const cancel = useCancelRun();
   const keyboardOverlap = useKeyboardOverlap();
+  const inputRef = useRef<TextInput>(null);
 
   // A plan open underneath keeps its own Realtime channel, so the sheet only listens for a plan
   // it started.
@@ -50,6 +59,12 @@ export default function ComposeSheet(): ReactElement {
   const error = create.error ?? ask.error ?? cancel.error;
   const goal = context.data?.intent.goal;
   const next = params.intentId ? afterAsk(run.data) : null;
+
+  // A "Try one" example only fills the composer; focusing it shows the text landed.
+  const tryExample = (example: string): void => {
+    setText(example);
+    inputRef.current?.focus();
+  };
 
   const send = (message: string): void => {
     const trimmed = message.trim();
@@ -70,9 +85,17 @@ export default function ComposeSheet(): ReactElement {
 
     create.mutate(trimmed, {
       onSuccess: (result) => {
+        setText('');
+
+        // A saved goal opens no plan, so the next send starts a new one.
+        if (result.outcome === 'unsupported') {
+          setSent({ text: trimmed, runId: null });
+
+          return;
+        }
+
         setTarget(result.snapshot.intent.id);
         setSent({ text: trimmed, runId: result.runId });
-        setText('');
       },
     });
   };
@@ -116,9 +139,7 @@ export default function ComposeSheet(): ReactElement {
           </Text>
         </View>
         {sent ? <Text style={styles.bubble}>{sent.text}</Text> : null}
-        {sent && sent.runId === null ? (
-          <Text style={styles.note}>Nexui can plan trips so far. Your plan is saved on Home.</Text>
-        ) : null}
+        {sent && sent.runId === null ? <SavedGoalReply onTry={tryExample} /> : null}
         {sent?.runId ? (
           <RunCard
             run={run.data}
@@ -129,7 +150,7 @@ export default function ComposeSheet(): ReactElement {
             onSeeChanges={seeChanges}
           />
         ) : null}
-        {sent && !params.intentId ? (
+        {sent && target && !params.intentId ? (
           <Button label="Open plan" variant="primary" onPress={openPlan} />
         ) : null}
       </ScrollView>
@@ -148,13 +169,14 @@ export default function ComposeSheet(): ReactElement {
         ) : null}
         <View style={styles.inputRow}>
           <TextInput
+            ref={inputRef}
             accessibilityLabel={target ? 'Ask about this plan' : 'Describe your plan'}
             autoFocus={!sent}
             multiline
             maxLength={target ? 1000 : 500}
             value={text}
             onChangeText={setText}
-            placeholder={target ? 'Ask anything or change this plan' : 'A week in Portugal in May'}
+            placeholder={target ? 'Ask anything or change this plan' : goalPlaceholder}
             placeholderTextColor={colors.faint}
             selectionColor={colors.ink}
             style={styles.input}
@@ -194,7 +216,6 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.card,
     backgroundColor: colors.userMark,
   },
-  note: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   composer: {
     gap: 6,
     padding: 12,

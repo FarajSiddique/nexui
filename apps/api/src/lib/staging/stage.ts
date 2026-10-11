@@ -19,7 +19,7 @@ import {
   type RefTable,
 } from '#lib/capabilities';
 import { ChangesetInvalidError, validateOps } from '#lib/graph';
-import { templateFor, type TemplateDefinition } from '#lib/templates';
+import { templateFor, UNSUPPORTED_GOAL, type TemplateDefinition } from '#lib/templates';
 
 export interface StagerOptions {
   capabilities: readonly Capability[];
@@ -117,7 +117,7 @@ function requireAnchor(snapshot: GraphSnapshot): string {
   const anchorId = snapshot.workspace?.doc.anchorId;
 
   if (!anchorId) {
-    throw new CapabilityError('Nexui can only change trips so far.');
+    throw new CapabilityError(UNSUPPORTED_GOAL);
   }
 
   return anchorId;
@@ -131,7 +131,7 @@ export function templateOf(snapshot: GraphSnapshot): TemplateDefinition {
   const template = templateFor(snapshot.intent.template);
 
   if (!template || !snapshot.workspace) {
-    throw new CapabilityError('Nexui can only change trips so far.');
+    throw new CapabilityError(UNSUPPORTED_GOAL);
   }
 
   return template;

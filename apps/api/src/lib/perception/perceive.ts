@@ -5,10 +5,10 @@ import type { RunRoute, Template } from '@nexui/types';
 import type { GatewayOptions } from '#lib/ai';
 import { TEMPLATES } from '#lib/templates';
 
-/** A template, or `none` for a goal no template fits. */
-export type TemplateChoice = Template | 'none';
+/** A template, or `unsupported` for a goal no template fits: saved, but not planned. */
+export type TemplateChoice = Template | 'unsupported';
 
-/** A perception answer, and whether Jev gave it or the fallback did. */
+/** An ask's route, and whether Jev gave it or the fallback did. */
 export interface Perceived<T> {
   value: T;
   source: 'model' | 'fallback';
@@ -22,11 +22,13 @@ export interface PerceptionOptions {
 /** Perception runs before the response is sent, so it gets a short budget. */
 export const PERCEPTION_TIMEOUT_MS = 5_000;
 
-// The routing build (job search spec, section 2) replaces `none` with `unsupported`.
-const NO_TEMPLATE =
-  'Anything that is not a trip, such as a job search, a project, a purchase or a habit.';
+/** Jev couldn't say which template fits a goal. `message` is safe to show the user. */
+export class PerceptionFailedError extends Error {}
 
-// Each template's own sentence, then `none`: a new template teaches routing by existing.
+// The last choice. It names no template, so a new template never has to edit it.
+const UNSUPPORTED = 'Anything else, such as a move, a wedding, buying a car or hiring for a team.';
+
+// Each template's own sentence, then `unsupported`: a new template teaches routing by existing.
 function templateCriteria(): Record<TemplateChoice, string> {
   const criteria = {} as Record<TemplateChoice, string>;
 
@@ -34,21 +36,25 @@ function templateCriteria(): Record<TemplateChoice, string> {
     criteria[template.name] = template.perception;
   }
 
-  criteria.none = NO_TEMPLATE;
+  criteria.unsupported = UNSUPPORTED;
 
   return criteria;
 }
 
 /**
- * Jev's template question for a new goal (spec section F). The choices come from `TEMPLATES`:
- * each template's `perception` sentence, then the `none` sentence. If Jev can't answer, the goal
- * is treated as a trip, the default template.
+ * Jev's template question for a new goal (spec section F): each template's `perception`
+ * sentence, then `unsupported`. Nexui doesn't guess (job search spec, section 2): if Jev fails,
+ * runs out of time or picks a choice it wasn't offered (the AI SDK refuses that answer), this
+ * throws `PerceptionFailedError` and the caller creates nothing.
+ *
+ * @example
+ * await chooseTemplate(session.evaluationModel, 'Plan my wedding next June'); // 'unsupported'
  */
 export async function chooseTemplate(
   model: Experimental_EvaluationModel,
   goal: string,
   options: PerceptionOptions = {},
-): Promise<Perceived<TemplateChoice>> {
+): Promise<TemplateChoice> {
   try {
     const result = await experimental_evaluate({
       model,
@@ -65,11 +71,11 @@ export async function chooseTemplate(
       providerOptions: options.providerOptions,
     });
 
-    return { value: result.answers.template.choice, source: 'model' };
+    return result.answers.template.choice;
   } catch {
-    console.error('[perception]', 'Template routing failed; treating the goal as a trip.');
+    console.error('[perception]', 'Template routing failed.');
 
-    return { value: 'travel', source: 'fallback' };
+    throw new PerceptionFailedError("Nexui couldn't read that goal. Try again.");
   }
 }
 

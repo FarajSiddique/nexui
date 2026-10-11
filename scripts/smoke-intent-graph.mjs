@@ -17,9 +17,11 @@ import { qaApi, readSession } from './lib/qa-api.mjs';
 const [sessionPath = '.qa/session.json', api = 'http://localhost:3000'] = process.argv.slice(2);
 const { call, waitForRun } = qaApi(readSession(sessionPath), api);
 
-const { snapshot: created, runId } = await call('POST', '/api/intents', {
-  goal: 'Smoke test: three quiet days away',
-});
+const started = await call('POST', '/api/intents', { goal: 'Smoke test: three quiet days away' });
+
+assert.equal(started.outcome, 'started', `the goal was ${started.outcome}`);
+
+const { snapshot: created, runId } = started;
 const createRun = await waitForRun(runId);
 
 assert.equal(createRun.status, 'succeeded', `the create run ${createRun.status}`);
@@ -185,6 +187,19 @@ assert.equal(
   'undo reopens the decision',
 );
 console.log('undone: decision open again, candidates back');
+
+// A goal no template fits is saved, and Home leaves it out (mock mode's `saved-goal` fixture).
+const saved = await call('POST', '/api/intents', { goal: 'Smoke test: plan my wedding next June' });
+
+assert.deepEqual(saved, { outcome: 'unsupported' });
+
+const home = await call('GET', '/api/intents');
+
+assert.ok(
+  home.items.every((item) => item.template !== null),
+  'Home lists only plans',
+);
+console.log('saved goal: unsupported, not on Home');
 
 const cancelled = await call('POST', `/api/runs/${asked.runId}/cancel`);
 

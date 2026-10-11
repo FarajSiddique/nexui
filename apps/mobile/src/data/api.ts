@@ -128,7 +128,7 @@ export function deleteIntent(id: string): Promise<void> {
   return callApi(`/api/intents/${id}`, noContent, { method: 'DELETE' });
 }
 
-/** Starts a plan from a goal; a trip also starts the run that fills it in. */
+/** Starts a plan from a goal and its run, or saves a goal Nexui can't plan yet. */
 export function createIntent(goal: string): Promise<CreateIntentResponse> {
   return callApi('/api/intents', createIntentResponseSchema, postJson({ goal }));
 }
