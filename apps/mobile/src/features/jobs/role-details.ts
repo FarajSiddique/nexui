@@ -12,7 +12,7 @@ import {
 
 import { aiMarkFor, capitalize, formatDate, formatDateTime } from '#lib';
 
-import { linkHost, outcomeLabel, placeLine, salaryText } from './job-format.ts';
+import { outcomeLabel, placeLine, postingLink, salaryText } from './job-format.ts';
 import { companyName, interviewsFor, linkedFrom } from './job-parts.ts';
 
 /** What each draft is, as a list row names it. */
@@ -45,7 +45,7 @@ export interface RoleDetails {
   line: string;
   ai: boolean;
   fit: { reasons: string[]; gaps: string[] } | null;
-  /** The posting's link, the host it opens and what's known of it, or null with no link. */
+  /** The posting's link as parsed, the host it opens and what's known of it, or null with none. */
   posting: { url: string; host: string; note: string } | null;
   /** The stage picker: every stage but Closed, the current one marked. */
   stages: { value: Stage; label: string; current: boolean }[];
@@ -104,7 +104,7 @@ export function roleDetails(
   }
 
   const data = role.data as OpportunityData;
-  const host = data.url ? linkHost(data.url) : null;
+  const link = data.url ? postingLink(data.url) : null;
   const dates: string[] = [];
 
   if (data.appliedAt) {
@@ -122,8 +122,9 @@ export function roleDetails(
     line: [placeLine(data), salaryText(data.salary)].filter((part) => part.length > 0).join(' · '),
     ai: aiMarkFor(role).highlight,
     fit: data.fit ? { reasons: data.fit.reasons, gaps: data.fit.gaps } : null,
-    posting:
-      data.url && host ? { url: data.url, host, note: postingNote(data, now, timeZone) } : null,
+    posting: link
+      ? { url: link.href, host: link.host, note: postingNote(data, now, timeZone) }
+      : null,
     stages: STAGES.filter((stage) => stage.value !== 'closed').map((stage) => ({
       value: stage.value,
       label: stage.label,

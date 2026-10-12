@@ -67,16 +67,24 @@ export function outcomeLabel(outcome: Outcome): string {
 }
 
 /**
- * The host a role's link opens, shown before the user leaves the app: a role a model added may
- * link to any https page (PR #43). Null for a link that isn't https or doesn't parse.
+ * What a role's link opens and the host shown before the user leaves the app: a role a model
+ * added may link to any https page (PR #43). The link is the parsed URL, so it opens the host it
+ * names (`https://jobs.example.com\@evil.example/x` opens `jobs.example.com`). Null for a link
+ * that isn't https, carries a user name or password, or doesn't parse.
  *
- * @example linkHost('https://apply.example.net/jobs/1?ref=x') // 'apply.example.net'
+ * @example
+ * postingLink('https://apply.example.net/jobs/1?ref=x')
+ * // { host: 'apply.example.net', href: 'https://apply.example.net/jobs/1?ref=x' }
  */
-export function linkHost(url: string): string | null {
+export function postingLink(url: string): { host: string; href: string } | null {
   try {
     const parsed = new URL(url);
 
-    return parsed.protocol === 'https:' ? parsed.hostname : null;
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+      return null;
+    }
+
+    return { host: parsed.hostname, href: parsed.href };
   } catch {
     return null;
   }

@@ -14,6 +14,7 @@ import {
   useWorkspaceEdit,
   type PickedPdf,
 } from '#data';
+import { openableUrl } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { Button, ListEmpty, ListError, SkeletonRows } from '#ui';
 import { DetailView } from '#features/registry';
@@ -110,6 +111,26 @@ export default function ObjectScreen(): ReactElement {
     }
   };
 
+  // Only an https page or a mailto: message opens (`openableUrl`); anything else, or a link the
+  // system can't open, says so.
+  const openLink = async (url: string): Promise<void> => {
+    const openable = openableUrl(url);
+
+    setNotice(null);
+
+    if (!openable) {
+      setNotice("Couldn't open that link.");
+
+      return;
+    }
+
+    try {
+      await Linking.openURL(openable);
+    } catch {
+      setNotice("Couldn't open that link.");
+    }
+  };
+
   const handleAction = (action: WorkspaceAction): void => {
     switch (action.type) {
       case 'open':
@@ -141,7 +162,7 @@ export default function ObjectScreen(): ReactElement {
 
         return;
       case 'link':
-        void Linking.openURL(action.url).catch(() => undefined);
+        void openLink(action.url);
     }
   };
 

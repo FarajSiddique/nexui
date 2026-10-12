@@ -17,3 +17,4 @@ export {
   isDateOnly,
   ordinalWord,
 } from './format.ts';
+export { openableUrl } from './links.ts';

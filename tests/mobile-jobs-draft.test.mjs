@@ -89,3 +89,10 @@ test('a mailto link leaves the address readable and needs none', () => {
     'mailto:a@b.example?subject=Re%3A%2050%25%20%26%20more&body=x',
   );
 });
+
+test('an address with a query in it adds no field to the message', () => {
+  const url = mailtoUrl({ to: 'a@b.example?bcc=x@y.example', body: 'x' });
+
+  assert.equal(url, 'mailto:a@b.example%3Fbcc%3Dx@y.example?body=x');
+  assert.deepEqual([...new URL(url).searchParams.keys()], ['body']);
+});

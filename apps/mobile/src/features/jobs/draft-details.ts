@@ -28,8 +28,8 @@ export interface DraftDetails {
 
 /**
  * A `mailto:` link the user's own mail app fills in (spec section 6: Nexui never sends). The
- * address is a validated email and stays readable; subject and body are encoded, with line
- * breaks as CRLF (RFC 6068).
+ * address is encoded but its `@` stays readable, so it can't add a field of its own; subject and
+ * body are encoded, with line breaks as CRLF (RFC 6068).
  *
  * @example mailtoUrl({ to: 'a@b.example', subject: 'Hi', body: 'x' }) // 'mailto:a@b.example?subject=Hi&body=x'
  */
@@ -42,7 +42,9 @@ export function mailtoUrl(email: { to?: string; subject?: string; body: string }
 
   params.push(`body=${encodeURIComponent(email.body.replace(/\r?\n/g, '\r\n'))}`);
 
-  return `mailto:${email.to ?? ''}?${params.join('&')}`;
+  const to = encodeURIComponent(email.to ?? '').replace(/%40/g, '@');
+
+  return `mailto:${to}?${params.join('&')}`;
 }
 
 /** A draft's sheet, or null for a resume, a missing object or another kind. */

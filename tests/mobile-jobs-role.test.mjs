@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { linkHost } from '../apps/mobile/src/features/jobs/job-format.ts';
+import { postingLink } from '../apps/mobile/src/features/jobs/job-format.ts';
 import { renameAction } from '../apps/mobile/src/features/jobs/role-actions.ts';
 import { askAbout, roleDetails } from '../apps/mobile/src/features/jobs/role-details.ts';
 import { RUN_ID } from './support/graph.mjs';
@@ -113,8 +113,30 @@ test("a model's link names the host it opens; one that isn't https names none", 
     'apply.example.net',
   );
   assert.equal(roleDetails(planWith(plainRole), ROLE_ID, NOW, ZONE).posting, null);
-  assert.equal(linkHost('http://apply.example.net/jobs/1'), null);
-  assert.equal(linkHost('not a url'), null);
+  assert.equal(postingLink('http://apply.example.net/jobs/1'), null);
+  assert.equal(postingLink('not a url'), null);
+});
+
+test('View posting opens the host it names, and a link with a user name shows no button', () => {
+  // iOS reads the backslash as the end of a user name and would open evil.example.
+  const tricky = role(
+    roleData({ url: 'https://jobs.example.com\\@evil.example/x', source: undefined }),
+  );
+  const withUser = role(roleData({ url: 'https://user:pw@jobs.example.com/x', source: undefined }));
+
+  assert.deepEqual(
+    [
+      roleDetails(planWith(tricky), ROLE_ID, NOW, ZONE).posting.host,
+      roleDetails(planWith(tricky), ROLE_ID, NOW, ZONE).posting.url,
+    ],
+    ['jobs.example.com', 'https://jobs.example.com/@evil.example/x'],
+  );
+  assert.equal(roleDetails(planWith(withUser), ROLE_ID, NOW, ZONE).posting, null);
+  assert.equal(postingLink('https://user@jobs.example.com/x'), null);
+  assert.deepEqual(postingLink('https://apply.example.net/jobs/1?ref=x'), {
+    host: 'apply.example.net',
+    href: 'https://apply.example.net/jobs/1?ref=x',
+  });
 });
 
 test('a closed role says how, and offers its outcomes to close by', () => {
