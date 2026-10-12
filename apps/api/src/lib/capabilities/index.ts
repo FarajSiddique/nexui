@@ -30,6 +30,5 @@ export type {
   CapabilityResult,
   CapabilityScope,
   DecisionOptions,
-  OptionInput,
 } from './types.ts';
 export { workspaceCapabilities } from './workspace.ts';

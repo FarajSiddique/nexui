@@ -12,9 +12,5 @@ export {
 } from './auth';
 export { ProviderButton } from './provider-button';
 export { startSessionLifecycle } from './session-lifecycle';
-export {
-  dismissAppleAccessNotice,
-  showAppleAccessNotice,
-  useAuthNoticeStore,
-} from './use-auth-notice-store';
+export { dismissAppleAccessNotice, showAppleAccessNotice } from './use-auth-notice-store';
 export { updateSession, useSessionStore } from './use-session-store';

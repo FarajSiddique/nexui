@@ -33,6 +33,7 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `node scripts/check-place-media.mjs`: run the place media lookup (text and photos) against live Wikipedia and Commons for eight places and print pass or fail per case, a manual live gate; needs `WIKIMEDIA_CONTACT`.
 - `pnpm lint:fix`: apply ESLint fixes across the workspaces.
 - `pnpm lint:prune`: remove `eslint-suppressions.json` entries for violations that are gone.
+- `pnpm knip`: report unused files, exports and dependencies (configured in `knip.jsonc`).
 - `pnpm fix`: apply ESLint fixes, then Prettier formatting.
 - `pnpm format` / `pnpm format:check`: apply or verify formatting.
 - `pnpm db:new <name>` / `pnpm db:push`: create a migration / apply migrations to the linked Supabase project (`supabase link` once first).
@@ -52,7 +53,7 @@ Size and complexity limits live in `packages/config/eslint-complexity.js`: compl
 
 Claude Code runs `.claude/hooks/format.sh` after every edit. The hook runs Prettier, then ESLint `--fix` in the file's owning workspace, and reports any errors ESLint can't fix back to Claude.
 
-After code changes, run `pnpm fix`, inspect the diff for unrelated changes, then run `pnpm lint` and `pnpm format:check` before handing off. Keep formatting-only changes separate from behavioral edits when practical. These instructions apply to Codex and Claude Code; `CLAUDE.md` imports this file.
+After code changes, run `pnpm fix`, inspect the diff for unrelated changes, then run `pnpm lint`, `pnpm knip` and `pnpm format:check` before handing off. Keep formatting-only changes separate from behavioral edits when practical. These instructions apply to Codex and Claude Code; `CLAUDE.md` imports this file.
 
 Prefer `async`/`await` with `try`/`catch`. Expand nested ternaries and conditional object spreads; keep simple ternaries, `map`/`filter`, and `??` defaults when readable. Prefer functions; use classes only for meaningful state/lifecycle ownership or standard error subclasses. Give exported functions explicit parameter and return types, infer obvious local types, and name complex shapes. Continue deriving shared contracts from Zod.
 
@@ -62,7 +63,7 @@ This is a prototype: API and mobile contracts can change together. Do not add ba
 
 ## Testing Guidelines
 
-`pnpm test` uses Node's built-in runner with TypeScript stripping and runs `tests/*.test.mjs`. No coverage threshold is configured. Test observable behavior at external boundaries; prefer direct imports and explicit dependencies over module-loader mocks. Run tests, lint, typecheck, formatting checks, and relevant builds before submitting. CI (`.github/workflows/checks.yml`) runs `format:check`, `lint`, `typecheck` and `test` on the `.nvmrc` Node for every pull request and push to `main`. Smoke-test the affected user flow; for networking changes, verify `GET /api/health` returns `{"status":"ok"}` and check Connected, Unreachable, and recovery states in Expo. Auth ownership and native smoke checks are documented in `docs/architecture/authentication.md`.
+`pnpm test` uses Node's built-in runner with TypeScript stripping and runs `tests/*.test.mjs`. No coverage threshold is configured. Test observable behavior at external boundaries; prefer direct imports and explicit dependencies over module-loader mocks. Run tests, lint, typecheck, formatting checks, and relevant builds before submitting. CI (`.github/workflows/checks.yml`) runs `format:check`, `lint`, `knip`, `typecheck` and `test` on the `.nvmrc` Node for every pull request and push to `main`. Smoke-test the affected user flow; for networking changes, verify `GET /api/health` returns `{"status":"ok"}` and check Connected, Unreachable, and recovery states in Expo. Auth ownership and native smoke checks are documented in `docs/architecture/authentication.md`.
 
 To smoke-test Expo web as a signed-in user, `node scripts/qa-session.mjs > .qa/session.json` signs in a dedicated QA account without sending email; it needs `QA_EMAIL` and `QA_SUPABASE_REF` in `apps/api/.env.local`. Finish with `--revoke .qa/session.json`, which signs out only that session and deletes the file. Keep screenshots and session files in the gitignored `.qa/`.
 

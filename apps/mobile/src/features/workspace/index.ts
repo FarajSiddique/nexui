@@ -10,7 +10,6 @@ export { UndoToast } from './undo-toast';
 export { focusIntent, useFocusedIntentStore } from './use-focused-intent-store';
 export { useRevealOpenBand } from './use-reveal-open-band';
 export { revealOpenBand } from './use-reveal-store';
-export { fromInsightAction, resolveAction } from './workspace-actions';
 export type { CapabilityAction, WorkspaceAction } from './workspace-actions';
 export { layoutWorkspace } from './workspace-layout';
 export type { MapPin, RouteStop, SectionDataOf, SectionEntry } from './workspace-layout';

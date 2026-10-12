@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // An export only its own file uses is not dead code, just a wider surface than needed.
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      // Tests and scripts are run directly, so each file is an entry.
+      "entry": ["tests/*.test.mjs", "scripts/*.mjs"],
+      "project": ["tests/**/*.mjs", "scripts/**/*.mjs"],
+      // session-lifecycle.test.mjs requires the mobile app's own copy through createRequire.
+      "ignoreDependencies": ["@supabase/supabase-js"],
+    },
+    "apps/api": {},
+    "apps/mobile": {
+      // Config plugins are named by path in app.config.ts.
+      "entry": ["plugins/*.js"],
+      // Knip's Expo plugin expects expo-updates unless updates.enabled is false; the app doesn't
+      // use EAS Update.
+      "ignoreDependencies": ["expo-updates"],
+    },
+    "packages/*": {},
+  },
+}
