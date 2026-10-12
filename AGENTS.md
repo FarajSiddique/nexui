@@ -49,7 +49,7 @@ Always use braces and multiline bodies for `if`, `else`, `for`, `while`, and `do
 
 Shared layout rules live in `packages/config/eslint-style.js`. Leave a blank line before `return`, after a block (`if`, `try`, loops), and after a group of declarations. `pnpm lint:fix` adds these blank lines automatically.
 
-Size and complexity limits live in `packages/config/eslint-complexity.js`: complexity 12, nesting depth 3, 80 lines per function and four parameters. Code that already broke a limit when the limits were added is listed in each workspace's `eslint-suppressions.json`. Never add entries to make lint pass; split the function instead. When a change brings a listed function under its limit, lint fails until `pnpm lint:prune` removes the entry, so the list only shrinks.
+Size and complexity limits live in `packages/config/eslint-complexity.js`: complexity 12, nesting depth 3, 80 lines per function and four parameters. Code that already broke a limit when the limits were added is listed in each workspace's `eslint-suppressions.json`. Never add entries to make lint pass; split the function instead, or past four parameters take one options object. When a change brings a listed function under its limit, lint fails until `pnpm lint:prune` removes the entry, so the list only shrinks.
 
 Claude Code runs `.claude/hooks/format.sh` after every edit. The hook runs Prettier, then ESLint `--fix` in the file's owning workspace, and reports any errors ESLint can't fix back to Claude.
 
