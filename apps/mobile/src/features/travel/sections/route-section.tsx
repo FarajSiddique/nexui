@@ -4,18 +4,21 @@ import { Pressable, Text, View } from 'react-native';
 import type { GraphObject, LegData, PlaceData } from '@nexui/types';
 
 import type { PhotoState } from '#data';
-import { capitalize, formatDays, legFigures, placeName } from '#lib';
+import { aiMarkFor, capitalize, formatDays } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, PlacePhoto } from '#ui';
+import {
+  SectionFrame,
+  type RouteStop,
+  type SectionDataOf,
+  type SectionProps,
+} from '#features/workspace';
 
-import { aiMarkFor } from '../ai-mark';
 import { DayStepper, SmallButton } from '../day-stepper';
 import { stopButtonLabel, stopKind } from '../stop-details';
+import { legFigures, placeName } from '../travel-format';
+import { daysAction, moveAction } from '../trip-actions';
 import { rememberDays, useEditMemoryStore } from '../use-edit-memory-store';
-import { daysAction } from '../workspace-actions';
-import type { RouteStop, SectionDataOf } from '../workspace-layout';
-import { SectionFrame } from './section-frame';
-import type { SectionProps } from './types';
 
 /**
  * One stop. With a photo, or while one may still come, it's a card: the photo full width with
@@ -160,6 +163,7 @@ function UnallocatedRow({ data }: { data: SectionDataOf<'route'> }): ReactElemen
 export function RouteSection({
   section,
   data,
+  snapshot,
   onAction,
   photos,
 }: SectionProps<'route'>): ReactElement {
@@ -197,8 +201,14 @@ export function RouteSection({
             isFirst={index === 0}
             isLast={index === data.stops.length - 1}
             onDays={(days) => setDays(stop.place, days)}
-            onMove={(by) => onAction({ type: 'move', placeId: stop.place.id, by })}
-            onOpen={() => onAction({ type: 'openPlace', placeId: stop.place.id })}
+            onMove={(by) => {
+              const action = moveAction(snapshot, stop.place.id, by);
+
+              if (action) {
+                onAction(action);
+              }
+            }}
+            onOpen={() => onAction({ type: 'open', objectId: stop.place.id })}
           />
           {stop.legAfter ? <LegRow leg={stop.legAfter} /> : null}
         </View>

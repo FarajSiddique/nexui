@@ -57,6 +57,26 @@ const importBoundaries = {
           onlyImports('theme', []),
           onlyImports('data', []),
           onlyImports('lib', []),
+          // Each template's folder and the generic workspace stay apart; only features/registry
+          // joins them (readiness doc, section 3.5).
+          {
+            target: './src/features/workspace',
+            from: ['./src/features/travel', './src/features/jobs', './src/features/registry'],
+            message:
+              'features/workspace/ draws any template: it never imports a template\'s folder or features/registry (see "Where code lives" in docs/architecture/mobile.md).',
+          },
+          {
+            target: './src/features/travel',
+            from: ['./src/features/jobs', './src/features/registry'],
+            message:
+              "features/travel/ may import features/workspace/, never another template's folder or features/registry.",
+          },
+          {
+            target: './src/features/jobs',
+            from: ['./src/features/travel', './src/features/registry'],
+            message:
+              "features/jobs/ may import features/workspace/, never another template's folder or features/registry.",
+          },
         ],
       },
     ],

@@ -1,3 +1,5 @@
+import { MAX_UPLOAD_BYTES } from '@nexui/types';
+
 import { jsonError } from './responses.ts';
 
 /** A file a request uploaded, read into memory. Nexui never stores it. */
@@ -8,9 +10,6 @@ export interface Upload {
   /** Its declared media type; `%PDF-` is still checked before it is read. */
   type: string;
 }
-
-/** The largest file `start` and `resume` take: 4 MB, under Vercel's 4.5 MB request limit. */
-export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 // Room for the multipart boundary and headers around the file.
 const FORM_OVERHEAD = 64 * 1024;

@@ -16,10 +16,15 @@ export {
   usePlacePhotos,
   usePlanDeletes,
   useRecentChanges,
+  useReplaceResume,
   useRun,
+  useStartPlan,
   useUndo,
   useWorkspaceEdit,
 } from './queries';
+export { choosePdf } from './pick-pdf';
+export type { PdfChoice } from './pick-pdf';
+export type { PickedPdf } from './upload-form';
 export { mediaPlaceIds } from './place-media';
 export type { PhotoState } from './place-media';
 export { QueryProvider, queryClient } from './query-provider';

@@ -8,7 +8,8 @@ export interface PhotoBand {
 
 /**
  * The band for a card (spec section 5): the photos the API sent, and "+N" for the plan's stops
- * beyond them. A card with no photos has no band. The summary's strip holds at most 12 stops.
+ * beyond them. A card with no photos has no band. A stop is a strip entry with a media `key`.
+ * The summary's strip holds at most 12 entries.
  *
  * @example
  * photoBand({ photos: [berlin, prague, vienna], summary }) // { photos: [...], more: 1 } for 4 stops
@@ -18,7 +19,8 @@ export function photoBand(item: Pick<IntentListItem, 'photos' | 'summary'>): Pho
     return { photos: [], more: 0 };
   }
 
-  const stops = item.summary.strip?.length ?? 0;
+  // A stop carries its media key (`placeMediaKey`); a job search's company chips carry none.
+  const stops = (item.summary.strip ?? []).filter((entry) => entry.key !== undefined).length;
 
   return { photos: item.photos, more: Math.max(0, stops - item.photos.length) };
 }

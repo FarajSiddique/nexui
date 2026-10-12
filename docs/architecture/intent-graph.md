@@ -117,7 +117,9 @@ behind the registry's.
 Two more tables are keyed by kind, typed `Record<KindName, …>` so a kind missing from either
 fails typecheck:
 
-- `KIND_CARDS` (`packages/types/src/kinds/cards.ts`): the fields a card shows for each kind.
+- `KIND_CARDS` (`packages/types/src/kinds/cards.ts`): the fields a card shows for each kind, and
+  `compare`, the rows a decision adds for its options' candidates of that kind (a place's daily
+  cost).
 - `KIND_BEHAVIOUR` (`apps/api/src/lib/kinds/behaviour.ts`): how the generic `object.*`,
   `relationship.create` and `workspace.addSection` capabilities treat each kind. `creatable` lets
   `object.create` make one and `object.delete` remove one; `editable` lets `object.update`
@@ -132,9 +134,14 @@ fails typecheck:
   shows each as its length (`[8000 characters, not shown]`), and the template's prompt says how to
   read it. A document's `body` is one, and `document_read` returns it. `readOnlyFields` are data
   fields `object.update` refuses because code owns them, such as a search's `status`, `roleChecks`
-  and `passReasons`. Of job search's kinds only companies and people are creatable through
-  `object.create`; roles are added and moved by `jobs.*`, which link them to their company and
-  stamp their dates, and `object.update` refuses a role, the resume and the search's bookkeeping.
+  and `passReasons`. `nameField` is the data field the object's title follows when
+  `object.update` changes it while the two match: a place's `name` by default, a role's `title`.
+  Of job search's kinds only companies and people are creatable through `object.create`; roles
+  are added and moved by `jobs.*`, which link them to their company and stamp their dates.
+  `object.update` may rename a role or correct where it is, and refuses the
+  fields `jobs.*` owns (its URL, source, fit, stage, outcome and dates), the resume and the
+  search's bookkeeping. The app calls `object.update` too, for renames and criteria, with the same
+  checks.
   A template's capability scope lists its kinds and the capabilities
   read the rest here, so a new kind needs no capability code. `lib/kinds` imports no other domain.
 
@@ -143,10 +150,12 @@ fails typecheck:
 that anchor's figures from a snapshot with no model involved; the trip's are `totalDays`,
 `allocatedDays`, `unallocatedDays` and `estCost`, and the search's are `new` and `inPlay`. The workspace's metric, allocation and route
 sections read figures this way, not from `data.derived`, so an optimistic edit moves them at
-once; the Changes feed still reads `data.derived` from an event's ops. The template's
+once; the Changes feed reads an event's `payload.figures` instead (below). The template's
 derivation writes the same numbers to the anchor's `data.derived` on the server.
 `anchorFigures(snapshot)` gets the workspace anchor's figures, and `figureValue(figures, key)`
-reads one by derived key.
+reads one by derived key. `KIND_META` (`packages/types/src/kinds/meta.ts`) is keyed by anchor kind
+too: the line under a plan's title (`tripMeta`, `searchMeta`), which the app reads through
+`anchorMeta(snapshot)`.
 
 ## Templates
 
@@ -203,9 +212,9 @@ role (see [`job-search.md`](./job-search.md) for the flow):
   `context.ts` has the `jobs` context schema (time zone, `startedAt`, `seen`); `decisions.ts`
   has `JOB_DECISIONS`; `parts.ts` has small helpers shared by the others.
 - Capabilities: `capabilities.ts` has `JOBS_SCOPE` and `JOB_SEARCH_CAPABILITIES`; `roles.ts` has
-  `jobs.addRole`, `jobs.setStage`, `jobs.pass` and `jobs.logContact`; `resume.ts` has the resume
-  read, `jobs.setResume` and `RESUME_INTAKE`; `surface.ts` has `jobs.surfaceMatches`, which only
-  code calls.
+  `jobs.addRole`, `jobs.setStage`, `jobs.pass`, `jobs.forgetPass` and `jobs.logContact`;
+  `resume.ts` has the resume read, `jobs.setResume` and `RESUME_INTAKE`; `surface.ts` has
+  `jobs.surfaceMatches`, which only code calls.
 - Boards and search: `board-urls.ts` (which URLs count as a board's), `boards.ts` (the three
   boards' APIs), `search.ts` (Parallel's web search) and `text.ts` (posting text as plain text).
 - Scan: `scan.ts` (`scanForRoles` and `scanAfterBuild`), `score.ts` (Jev's scores),
@@ -226,9 +235,10 @@ it").
 **Adding a template** touches a folder or a registry line in each place, and nothing in
 `graph/`, `runs/`, `cognition/` or `orchestrator/` branches on it:
 
-- `packages/types`: `kinds/<template>/` (schemas and figures); a `KIND_REGISTRY` and a
-  `KIND_CARDS` entry for each new kind; `ANCHOR_KINDS` and `KIND_FIGURES` for its anchor kind;
-  `templateSchema`; the exports in `index.ts`.
+- `packages/types`: `kinds/<template>/` (schemas, figures and meta line); a `KIND_REGISTRY` and a
+  `KIND_CARDS` entry for each new kind; `ANCHOR_KINDS`, `KIND_FIGURES` and `KIND_META` for its
+  anchor kind; `templateSchema`, with its `TEMPLATE_EXAMPLES` and `TEMPLATE_INTAKES` entries
+  (`templates.ts`; null for none); the exports in `index.ts`.
 - `apps/api`: a domain `src/lib/<template>/` with its `TemplateDefinition` (seed, derivation,
   capabilities built from the generic builders for a `CapabilityScope` that lists its kinds,
   decision options, prompt, and as needed `gate`, `singleActive`, `lookups`, `intake` and
@@ -239,11 +249,12 @@ it").
   (`tests/support/<template>-model-surface.json`, which `tests/support/model-surface.mjs` writes;
   see "Checking it"), and a line for its domain in
   `tests/api-load-order.test.mjs`'s import checks (that test loads every domain without a change).
-- `apps/mobile`: the mobile app still reads trip kinds outside the section primitives (the
-  Changes feed, stop details, workspace actions), so a template's mobile side is not yet a
-  registry line. Section 5 of
-  [`docs/superpowers/specs/2026-10-04-architecture-readiness.md`](../superpowers/specs/2026-10-04-architecture-readiness.md)
-  lists the target once those registries exist.
+- `apps/mobile`: a folder `src/features/<template>/` with its section primitives and details
+  bodies, a line for each in `SECTION_REGISTRY` and `DETAIL_REGISTRY` (`src/features/registry/`),
+  and an import zone in `eslint.config.js` that keeps it apart from the other template folders
+  (see "Where code lives" in [`mobile.md`](./mobile.md)). Outside those folders the app compares
+  no kind or template name, except the place media lookup (`data/place-media.ts`); Changes shows
+  each event's `payload.label` and `figures`.
 
 ## A changeset's path
 
@@ -301,9 +312,10 @@ route.ts → fromUserOps → prepareChangeset → apply_changeset (RPC) → { ev
     `NXU22`, which rolls the changeset back. An empty payload changes nothing.
   - `payload` is not only API-written. `apply_changeset` is callable by signed-in clients, so a
     client can store any JSON object up to 4 000 characters on its own events. A reader, such as
-    the Changes feed once it shows labels and figures, parses it with `changesetPayloadSchema`
-    and treats it as untrusted. Seed (`create_intent`) and Undo/Redo (`revert_event`) events
-    carry no payload, and events from before the payload have `{}`.
+    the app's Changes feed, parses it with `changesetPayloadSchema` and treats it as untrusted:
+    one that doesn't parse counts as no label and no figures. Seed (`create_intent`) and
+    Undo/Redo (`revert_event`) events carry no payload, and events from before the payload have
+    `{}`.
 - **Size caps**: `POST /api/intents` and `POST /api/intents/:id/changesets` read the body with
   `readJsonBody` (`apps/api/src/lib/http/json-body.ts`) and refuse more than 65 536 characters
   with 413 "That change is too large.". In the contracts, link `metadata` and a capability
@@ -410,7 +422,8 @@ as a worker with the service-role client (see "Run queue" below).
 
 - **Starting a plan that waits** (`startPlan`, `replaceIntake`): a plan seeded with an `intake`
   waits for `start`. Both routes read a multipart `file` through
-  `readUpload` (`lib/http/upload.ts`): at most 4 MB (413 over it), or an empty body for none.
+  `readUpload` (`lib/http/upload.ts`): at most 4 MB (`MAX_UPLOAD_BYTES` in `@nexui/types`, which
+  the app checks before sending; 413 over it), or an empty body for none.
   - `POST /api/intents/[id]/start` (202, `maxDuration` 300): the template's `refuse` checks the
     file first (a 400 with its message), `read` reads it once with the fast tier, and the
     template's intake capability stores what it found with `start: true` as one changeset, which
@@ -536,10 +549,12 @@ as a worker with the service-role client (see "Run queue" below).
   adds its own, and lists them all in `capabilities` (`TRAVEL_CAPABILITIES` in
   `src/lib/travel/capabilities.ts`). The stager (`src/lib/staging`) validates each call's ops
   before keeping them. Models name objects by ref (the template's anchor ref, `trip`; `o1` …
-  oldest first; or the ref they gave a new object), never by id. `trip.setPlaceDays`,
-  `trip.reorderPlaces` and `decision.resolve` are also the app's buttons, through
-  `POST /api/intents/[id]/capabilities` (actor `user`, `invokeCapability` in `src/lib/staging`,
-  which offers only the plan's template's capabilities). `CapabilityContext.now` is the time of
+  oldest first; or the ref they gave a new object), never by id. A capability with
+  `callableByUser` is also an app button, through `POST /api/intents/[id]/capabilities` (actor
+  `user`, `invokeCapability` in `src/lib/staging`, which offers only the plan's template's
+  capabilities): `trip.setPlaceDays`, `trip.reorderPlaces`, `decision.resolve`, `object.update`
+  (renames and a search's criteria) and job search's `jobs.setStage`, `jobs.pass`,
+  `jobs.forgetPass` and `jobs.logContact`, among others. `CapabilityContext.now` is the time of
   the call as an ISO timestamp, for what a capability stamps, such as a role's date last seen
   live; capabilities stay pure, so none reads the clock itself. The data help the model reads (each
   kind's `modelHelp` in `KIND_BEHAVIOUR`) states the schema's limits, such as place `days`

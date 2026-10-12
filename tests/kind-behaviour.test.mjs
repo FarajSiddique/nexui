@@ -114,3 +114,21 @@ test("a resume isn't edited through object.update, and the search's bookkeeping 
     'forwarding',
   ]);
 });
+
+test("a role is renamable, its title follows data.title, and what jobs.* stamps is code's", () => {
+  assert.equal(KIND_BEHAVIOUR.opportunity.editable, true);
+  assert.equal(KIND_BEHAVIOUR.opportunity.nameField, 'title');
+  assert.deepEqual(KIND_BEHAVIOUR.opportunity.readOnlyFields, [
+    'url',
+    'source',
+    'fit',
+    'postedAt',
+    'lastSeenLiveAt',
+    'postingClosedAt',
+    'stage',
+    'outcome',
+    'appliedAt',
+    'lastContactAt',
+    'followUps',
+  ]);
+});

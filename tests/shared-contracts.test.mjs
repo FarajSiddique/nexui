@@ -68,8 +68,6 @@ test('a stored workspace doc passes through the upgrade step unchanged', () => {
 
 test('every template has an example entry, and each example is a goal the create route accepts', () => {
   assert.deepEqual(Object.keys(types.TEMPLATE_EXAMPLES), types.templateSchema.options);
-  // Job search's mobile side ships in PR 3; until then the + sheet doesn't offer it.
-  assert.equal(types.TEMPLATE_EXAMPLES.job_search, null);
 
   for (const [name, example] of Object.entries(types.TEMPLATE_EXAMPLES)) {
     if (example === null) {

@@ -1,4 +1,5 @@
 import {
+  legBetween,
   tripParts,
   type GraphObject,
   type GraphSnapshot,
@@ -6,9 +7,9 @@ import {
   type StayData,
 } from '@nexui/types';
 
-import { capitalize, countryName, formatDays, formatMoney, ordinalWord } from '#lib';
+import { capitalize, formatDays, formatMoney, ordinalWord } from '#lib';
 
-import { legBetween } from './workspace-layout.ts';
+import { countryName } from './travel-format.ts';
 
 /** What a stop's details sheet shows, read from the snapshot. */
 export interface StopDetails {

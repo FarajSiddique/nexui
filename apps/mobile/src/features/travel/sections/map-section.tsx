@@ -4,12 +4,11 @@ import { Platform, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import { fonts, createThemedStyles, useColors, useScheme } from '#theme';
+import { SectionFrame, type SectionProps } from '#features/workspace';
 
 import { MapFallback } from './map-fallback';
 import { fitRegion } from './map-region';
 import { darkMapStyle } from './map-style';
-import { SectionFrame } from './section-frame';
-import type { SectionProps } from './types';
 
 // Android draws Google Maps, which needs a key at build time (app.config.ts).
 const nativeMapAvailable =

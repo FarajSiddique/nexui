@@ -201,7 +201,9 @@ function objectUpdate(scope: CapabilityScope): Capability {
     }),
     policy: 'internal',
     exposeToModel: true,
-    callableByUser: false,
+    // The app's renames and criteria edits. A user can already write any object through
+    // POST /changesets; this adds the kind's checks.
+    callableByUser: true,
     execute(input, ctx) {
       const object = resolveRef(ctx.refs, ctx.graph, input.ref);
 
@@ -232,8 +234,13 @@ function objectUpdate(scope: CapabilityScope): Capability {
 
         patch.data = { ...object.data, ...changes };
 
-        if (typeof changes.name === 'string' && object.title === object.data.name) {
-          patch.title = changes.name;
+        // The title follows the kind's name field (a place's `name`, a role's `title`) while
+        // they match.
+        const nameField = behaviour.nameField ?? 'name';
+        const name = changes[nameField];
+
+        if (typeof name === 'string' && object.title === object.data[nameField]) {
+          patch.title = name;
         }
       }
 

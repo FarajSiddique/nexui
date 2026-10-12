@@ -27,6 +27,7 @@ import {
   type IntentMedia,
   type PlaceAbout,
   type RunRecord,
+  type StartResponse,
 } from '@nexui/types';
 
 import {
@@ -40,6 +41,8 @@ import {
   getRun,
   listChanges,
   listIntents,
+  replaceResume,
+  startPlan,
   undoEvent,
 } from './api';
 import { ApiError } from './api-request';
@@ -53,6 +56,7 @@ import {
   type PhotoState,
 } from './place-media';
 import { planDeletes, type DeleteAttempt, type PlanDeletes } from './plan-deletes';
+import type { PickedPdf } from './upload-form';
 
 export const queryKeys = {
   intents: ['intents'] as const,
@@ -366,6 +370,43 @@ export function useCreateIntent(): UseMutationResult<CreateIntentResponse, Error
         return;
       }
 
+      client.setQueryData(queryKeys.intent(result.snapshot.intent.id), result.snapshot);
+      refreshLists(client);
+    },
+  });
+}
+
+/**
+ * Starts a plan waiting for its resume, with one or without. The answer's snapshot replaces the
+ * cached plan, and Home learns it's Drafting.
+ */
+export function useStartPlan(): UseMutationResult<
+  StartResponse,
+  Error,
+  { intentId: string; pdf: PickedPdf | null }
+> {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ intentId, pdf }) => startPlan(intentId, pdf),
+    onSuccess: (result) => {
+      client.setQueryData(queryKeys.intent(result.snapshot.intent.id), result.snapshot);
+      refreshLists(client);
+    },
+  });
+}
+
+/** Replaces a started plan's resume. The answer is a change, so it can be undone. */
+export function useReplaceResume(): UseMutationResult<
+  CommitResponse,
+  Error,
+  { intentId: string; pdf: PickedPdf }
+> {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ intentId, pdf }) => replaceResume(intentId, pdf),
+    onSuccess: (result) => {
       client.setQueryData(queryKeys.intent(result.snapshot.intent.id), result.snapshot);
       refreshLists(client);
     },

@@ -2,6 +2,7 @@ import {
   anchorFigures,
   evaluateQuery,
   figureValue,
+  legBetween,
   readField,
   type AnchorFigures,
   type DecisionData,
@@ -15,9 +16,7 @@ import {
   type WorkspaceDoc,
 } from '@nexui/types';
 
-import { placeName } from '#lib';
-
-import { aiMarkFor } from './ai-mark.ts';
+import { aiMarkFor, cardText } from '#lib';
 
 export interface MapPin {
   id: string;
@@ -52,8 +51,8 @@ export interface AllocationPart {
 
 export interface DecisionOption {
   option: GraphObject;
-  /** The candidate place the option would add, if any. */
-  place: GraphObject | null;
+  /** The object the option would add (its `placeId`), if the graph has it. */
+  candidate: GraphObject | null;
 }
 
 export type SectionData =
@@ -95,25 +94,6 @@ function countOf(value: FigureValue | undefined): number | null {
   return typeof value === 'number' ? value : null;
 }
 
-/** The leg from one stop to another, if the graph has one. */
-export function legBetween(
-  snapshot: GraphSnapshot,
-  fromId: string,
-  toId: string,
-): GraphObject | null {
-  const end = (legId: string, type: 'leg_from' | 'leg_to'): string | undefined =>
-    snapshot.relationships.find((edge) => edge.sourceId === legId && edge.type === type)?.targetId;
-
-  return (
-    snapshot.objects.find(
-      (object) =>
-        object.kind === 'leg' &&
-        end(object.id, 'leg_from') === fromId &&
-        end(object.id, 'leg_to') === toId,
-    ) ?? null
-  );
-}
-
 function mapPins(places: GraphObject[]): MapPin[] {
   return places
     .filter((place) => {
@@ -126,7 +106,7 @@ function mapPins(places: GraphObject[]): MapPin[] {
 
       return {
         id: place.id,
-        label: placeName(place),
+        label: cardText(place).title,
         lat: data.lat,
         lng: data.lng,
         order: index + 1,
@@ -153,7 +133,7 @@ function decisionData(snapshot: GraphSnapshot, decisionId: string): SectionDataO
     const placeId = (option.data as Partial<OptionData>).placeId;
     const place = placeId ? snapshot.objects.find((object) => object.id === placeId) : undefined;
 
-    return { option, place: place ?? null };
+    return { option, candidate: place ?? null };
   });
 
   return { type: 'decision', decision, options };
@@ -209,7 +189,7 @@ function sectionData(
 
         return {
           id: object.id,
-          label: typeof label === 'string' && label.length > 0 ? label : placeName(object),
+          label: typeof label === 'string' && label.length > 0 ? label : cardText(object).title,
           value: typeof value === 'number' && value > 0 ? value : 0,
           ai: aiMarkFor(object).highlight,
         };
@@ -251,7 +231,7 @@ function isUnresolved(data: SectionData): boolean {
       return data.insights.length > 0;
     case 'pipeline':
     case 'timeline':
-      // Stand-ins that draw nothing until the mobile PR: never an empty Open band.
+      // Lists, not questions: they never wait on the user, so never open the band.
       return false;
     default:
       return true;

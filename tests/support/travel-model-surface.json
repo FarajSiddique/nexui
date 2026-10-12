@@ -53,7 +53,7 @@
       "description": "Change fields of the trip or of one of its places, legs, stays or things. Send only the data fields to change; the rest keep their values.",
       "policy": "internal",
       "exposeToModel": true,
-      "callableByUser": false,
+      "callableByUser": true,
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

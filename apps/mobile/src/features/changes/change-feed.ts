@@ -1,6 +1,6 @@
-import type { ChangeItem } from '@nexui/types';
+import { changesetPayloadSchema, type ChangeItem, type ChangesetPayload } from '@nexui/types';
 
-import { dayLabel } from '#lib';
+import { capitalize, dayLabel } from '#lib';
 
 export type ChangeFilter = 'all' | 'you' | 'nexui' | 'auto';
 
@@ -12,9 +12,9 @@ export interface ChangeRow {
   intentId: string | null;
   actor: RowActor;
   who: string;
-  /** The sentence after `who`, such as "set Tokyo to". */
+  /** What happened, as a sentence: the change's label, or the name of a figure it moved. */
   text: string;
-  diff: { before: string; after: string; unit: string } | null;
+  diff: { before: string; after: string } | null;
   intentGoal: string | null;
   createdAt: string;
   undone: boolean;
@@ -25,171 +25,28 @@ export interface ChangeRow {
   revert: { label: 'Undo' | 'Redo'; eventId: string } | null;
 }
 
-type Row = Record<string, unknown>;
-type StoredOp = NonNullable<ChangeItem['ops']>[number];
-type Sentence = Pick<ChangeRow, 'text' | 'diff'>;
-
 const WHO: Record<RowActor, string> = { user: 'You', ai: 'Nexui', derived: 'Auto-calculated' };
 
-const FIGURES = [
-  ['unallocatedDays', 'unallocated days'],
-  ['totalDays', 'total days'],
-] as const;
+// An event's label and figures. One the app can't read counts as neither.
+function payloadOf(item: ChangeItem): ChangesetPayload {
+  const parsed = changesetPayloadSchema.safeParse(item.payload);
 
-function asRow(value: unknown): Row {
-  return typeof value === 'object' && value !== null ? (value as Row) : {};
+  return parsed.success ? parsed.data : {};
 }
 
-const dataOf = (row: Row | null): Row => asRow(row?.data);
-
-function kindOf(op: StoredOp): string | null {
-  const kind = (op.after ?? op.before)?.kind;
-
-  return typeof kind === 'string' ? kind : null;
-}
-
-function nameOf(op: StoredOp): string {
-  const row = op.after ?? op.before;
-  const name = dataOf(row).name;
-
-  if (typeof name === 'string' && name.length > 0) {
-    return name;
-  }
-
-  return typeof row?.title === 'string' && row.title.length > 0 ? row.title : 'an item';
-}
-
-const quote = (text: unknown): string => `“${String(text)}”`;
-
-const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
-
-const shown = (value: unknown): string =>
-  value === null || value === undefined ? '—' : String(value);
-
-function onlyMoved(op: StoredOp): boolean {
-  return (
-    op.before?.position !== op.after?.position &&
-    JSON.stringify(dataOf(op.before)) === JSON.stringify(dataOf(op.after))
-  );
-}
-
-function describeObjects(ops: StoredOp[]): Sentence | null {
-  const inserts = ops.filter((op) => op.op === 'insert_object');
-  const updates = ops.filter((op) => op.op === 'update_object');
-  const deletes = ops.filter((op) => op.op === 'delete_object');
-  const decision = inserts.find((op) => kindOf(op) === 'decision');
-
-  if (decision) {
-    const options = inserts.filter((op) => kindOf(op) === 'option').length;
-
-    return {
-      text: `proposed ${count(options, 'option', 'options')} for ${quote(dataOf(decision.after).question)}`,
-      diff: null,
-    };
-  }
-
-  const settled = updates.find(
-    (op) =>
-      kindOf(op) === 'decision' &&
-      dataOf(op.before).status === 'open' &&
-      dataOf(op.after).status !== 'open',
-  );
-
-  if (settled) {
-    const verb = dataOf(settled.after).status === 'resolved' ? 'settled' : 'dismissed';
-
-    return { text: `${verb} ${quote(dataOf(settled.after).question)}`, diff: null };
-  }
-
-  const dayEdits = updates.filter(
-    (op) => kindOf(op) === 'place' && dataOf(op.before).days !== dataOf(op.after).days,
-  );
-
-  if (dayEdits.length === 1 && updates.length === 1 && inserts.length + deletes.length === 0) {
-    const [edit] = dayEdits as [StoredOp];
-    const after = dataOf(edit.after).days;
-
-    return {
-      text: `set ${nameOf(edit)} to`,
-      diff: {
-        before: shown(dataOf(edit.before).days),
-        after: shown(after),
-        unit: after === 1 ? 'day' : 'days',
-      },
-    };
-  }
-
-  if (updates.length > 0 && inserts.length + deletes.length === 0 && updates.every(onlyMoved)) {
-    return { text: 'reordered the route', diff: null };
-  }
-
-  const places = inserts.filter((op) => kindOf(op) === 'place');
-  const [first] = places.length > 0 ? places : inserts;
-
-  if (first) {
-    const total = places.length > 0 ? places.length : inserts.length;
-    const many = places.length > 0 ? 'places' : 'items';
-
-    return { text: total === 1 ? `added ${nameOf(first)}` : `added ${total} ${many}`, diff: null };
-  }
-
-  if (deletes.length > 0) {
-    const [removed] = deletes as [StoredOp];
-
-    return {
-      text: deletes.length === 1 ? `removed ${nameOf(removed)}` : `removed ${deletes.length} items`,
-      diff: null,
-    };
-  }
-
-  if (updates.length === 1) {
-    const [update] = updates as [StoredOp];
-
-    return {
-      text: kindOf(update) === 'trip' ? 'updated the trip' : `changed ${nameOf(update)}`,
-      diff: null,
-    };
-  }
-
-  return null;
-}
-
-// The main row's sentence, from the event's direct ops.
-function describeDirect(item: ChangeItem): Sentence {
+// The main row's sentence: the plan's start, the stored label, or how much changed.
+function sentence(item: ChangeItem, payload: ChangesetPayload): string {
   if (item.actor === 'system') {
-    return { text: `started ${quote(item.intentGoal ?? 'a plan')}`, diff: null };
+    return `Started “${item.intentGoal ?? 'a plan'}”`;
   }
 
-  const ops = (item.ops ?? []).filter((op) => op.origin === 'direct');
-  const objects = describeObjects(ops.filter((op) => op.table === 'objects'));
-
-  if (objects) {
-    return objects;
+  if (payload.label) {
+    return payload.label;
   }
 
-  if (ops.some((op) => op.table === 'workspaces')) {
-    return { text: 'rearranged the plan', diff: null };
-  }
+  const direct = (item.ops ?? []).filter((op) => op.origin === 'direct').length;
 
-  return { text: ops.length === 0 ? 'made a change' : `made ${ops.length} changes`, diff: null };
-}
-
-// The trip figures the event recalculated. The trip's op may be `direct` when the same step
-// also edited the trip (ops are merged per row), so any op on the trip counts.
-function describeDerived(item: ChangeItem): Sentence[] {
-  const tripOp = (item.ops ?? []).find((op) => op.table === 'objects' && kindOf(op) === 'trip');
-  const before = asRow(dataOf(tripOp?.before ?? null).derived);
-  const after = asRow(dataOf(tripOp?.after ?? null).derived);
-
-  if (!tripOp?.before || Object.keys(before).length === 0) {
-    return [];
-  }
-
-  return FIGURES.flatMap(([key, label]) =>
-    before[key] === after[key]
-      ? []
-      : [{ text: label, diff: { before: shown(before[key]), after: shown(after[key]), unit: '' } }],
-  );
+  return direct > 1 ? `Made ${direct} changes` : 'Made a change';
 }
 
 // Follows Undo → Redo → Undo … An odd number of reverts means the change is undone now, and
@@ -220,8 +77,9 @@ function actorOf(item: ChangeItem): RowActor {
 }
 
 /**
- * The Changes feed's rows, newest first: one per changeset plus one per recalculated trip
- * figure. Undo and Redo events show only as the state of the row they reverted.
+ * The Changes feed's rows, newest first: one per changeset, reading its stored label, plus one
+ * per figure its derivation moved. Undo and Redo events show only as the state of the row they
+ * reverted. No row reads an object's kind (readiness doc, section 3.4).
  */
 export function buildChangeRows(items: readonly ChangeItem[]): ChangeRow[] {
   const byId = new Map(items.map((item) => [item.id, item]));
@@ -231,29 +89,32 @@ export function buildChangeRows(items: readonly ChangeItem[]): ChangeRow[] {
     .flatMap((item) => {
       const { undone, target } = revertState(item, byId);
       const actor = actorOf(item);
+      const payload = payloadOf(item);
       const main: ChangeRow = {
         key: item.id,
         eventId: item.id,
         intentId: item.intentId,
         actor,
         who: WHO[actor],
-        ...describeDirect(item),
+        text: sentence(item, payload),
+        diff: null,
         intentGoal: item.intentGoal,
         createdAt: item.createdAt,
         undone,
         revert:
           item.actor === 'system' ? null : { label: undone ? 'Redo' : 'Undo', eventId: target },
       };
-      const derived = item.actor === 'system' ? [] : describeDerived(item);
+      const figures = item.actor === 'system' ? [] : (payload.figures ?? []);
 
       return [
         main,
-        ...derived.map((sentence, index): ChangeRow => ({
+        ...figures.map((figure, index): ChangeRow => ({
           ...main,
-          ...sentence,
           key: `${item.id}:${index}`,
           actor: 'derived',
           who: WHO.derived,
+          text: capitalize(figure.label),
+          diff: { before: figure.before ?? '—', after: figure.after ?? '—' },
           revert: null,
         })),
       ];

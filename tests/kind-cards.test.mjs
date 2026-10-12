@@ -15,5 +15,16 @@ test('every registered kind has a card, and cards read only query fields', () =>
     for (const line of card.subtitle) {
       assert.match(line.field, FIELD, kind);
     }
+
+    for (const line of card.compare ?? []) {
+      assert.match(line.field, FIELD, kind);
+    }
   }
+});
+
+test("an interview's card shows its time, and a place compares its daily cost", () => {
+  assert.deepEqual(KIND_CARDS.interview.subtitle, [{ field: 'data.at', format: 'dateTime' }]);
+  assert.deepEqual(KIND_CARDS.place.compare, [
+    { field: 'data.estDailyCost', label: 'Per day', format: 'estimate' },
+  ]);
 });

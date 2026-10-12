@@ -3,21 +3,25 @@ import type { ComponentType, ReactElement } from 'react';
 import type { GraphSnapshot, Section } from '@nexui/types';
 
 import type { PhotoState } from '#data';
+import { PipelineSection, TimelineSection } from '#features/jobs';
+import { AllocationSection, MapSection, RouteSection } from '#features/travel';
+import {
+  ComparisonSection,
+  DecisionSection,
+  InsightSection,
+  MetricSection,
+  ObjectListSection,
+  type SectionDataOf,
+  type SectionEntry,
+  type SectionProps,
+  type WorkspaceAction,
+} from '#features/workspace';
 
-import type { WorkspaceAction } from '../workspace-actions';
-import type { SectionDataOf, SectionEntry } from '../workspace-layout';
-import { AllocationSection } from './allocation-section';
-import { ComparisonSection } from './comparison-section';
-import { DecisionSection } from './decision-section';
-import { InsightSection } from './insight-section';
-import { MapSection } from './map-section';
-import { MetricSection } from './metric-section';
-import { ObjectListSection } from './object-list-section';
-import { PendingSection } from './pending-section';
-import { RouteSection } from './route-section';
-import type { SectionProps } from './types';
-
-/** Every section type's primitive. A type without one fails typecheck (spec section D). */
+/**
+ * Every section type's primitive: the generic ones from `features/workspace`, each template's
+ * from its folder. A type without one fails typecheck (spec section D). A new template adds its
+ * primitives here, one line each.
+ */
 export const SECTION_REGISTRY: { [T in Section['type']]: ComponentType<SectionProps<T>> } = {
   map: MapSection,
   route: RouteSection,
@@ -27,8 +31,8 @@ export const SECTION_REGISTRY: { [T in Section['type']]: ComponentType<SectionPr
   comparison: ComparisonSection,
   decision: DecisionSection,
   insight: InsightSection,
-  pipeline: PendingSection,
-  timeline: PendingSection,
+  pipeline: PipelineSection,
+  timeline: TimelineSection,
 };
 
 /** One section, drawn by its registered primitive. */

@@ -1,18 +1,15 @@
 import {
-  formatDateRange,
+  formatMoney,
   isKindName,
   KIND_CARDS,
   readField,
   type FieldFormat,
   type GraphObject,
-  type LegData,
   type Money,
-  type PhotoCredit,
-  type PlaceData,
-  type TripData,
 } from '@nexui/types';
 
-import { COUNTRY_NAMES } from './country-names.ts';
+// Shared with the meta line in `@nexui/types`; cards and metrics read it from here.
+export { formatMoney };
 
 /** @example formatDays(1) // '1 day' */
 export function formatDays(days: number): string {
@@ -30,48 +27,6 @@ export function formatHours(hours: number): string {
   }
 
   return rest === 0 ? `${whole}h` : `${whole}h ${rest}m`;
-}
-
-const currencyFormats = new Map<string, Intl.NumberFormat>();
-
-function currencyFormat(currency: string, digits: number): Intl.NumberFormat {
-  const key = `${currency}:${digits}`;
-  const cached = currencyFormats.get(key);
-
-  if (cached) {
-    return cached;
-  }
-
-  const created = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits,
-  });
-
-  currencyFormats.set(key, created);
-
-  return created;
-}
-
-/**
- * A short amount for a metric or a cell. Callers add "≈" where the figure is an estimate.
- *
- * @example
- * formatMoney({ amount: 3140, currency: 'USD' }) // '$3.1k'
- */
-export function formatMoney(money: Money): string {
-  const { amount, currency } = money;
-
-  if (amount >= 1_000_000) {
-    return `${currencyFormat(currency, 1).format(amount / 1_000_000)}m`;
-  }
-
-  if (amount >= 1_000) {
-    return `${currencyFormat(currency, 1).format(amount / 1_000)}k`;
-  }
-
-  return currencyFormat(currency, 0).format(amount);
 }
 
 const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
@@ -119,33 +74,6 @@ export function dayLabel(iso: string, now: Date): string {
   return longDate.format(date);
 }
 
-/**
- * The line under a workspace's title.
- *
- * @example
- * tripMeta({ startDate: '2026-12-12', endDate: '2026-12-24', travelers: 2, pace: 'balanced' })
- * // 'Dec 12 – 24, 2 travelers, balanced pace'
- */
-export function tripMeta(trip: Partial<TripData>): string {
-  const parts: string[] = [];
-
-  if (trip.startDate && trip.endDate) {
-    parts.push(formatDateRange(trip.startDate, trip.endDate));
-  } else if (trip.totalDays) {
-    parts.push(formatDays(trip.totalDays));
-  }
-
-  if (trip.travelers) {
-    parts.push(`${trip.travelers} ${trip.travelers === 1 ? 'traveler' : 'travelers'}`);
-  }
-
-  if (trip.pace) {
-    parts.push(`${trip.pace} pace`);
-  }
-
-  return parts.join(', ');
-}
-
 /** @example humanizeKey('hoursFromKyoto') // 'Hours from kyoto' */
 export function humanizeKey(key: string): string {
   const words = key
@@ -167,6 +95,76 @@ function isMoney(value: unknown): value is Money {
   );
 }
 
+// Intl puts a narrow no-break space before AM and PM; cards use a plain one.
+const NARROW_SPACE = /\u202f/g;
+
+/** True for a date with no time, such as an interview "next Tuesday": `2026-10-21`. */
+export function isDateOnly(at: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(at);
+}
+
+// A date-or-time as an instant and the zone to read it in: a date alone is noon UTC that day
+// (as `interviewTime` counts it), read in UTC so it never moves a day. Null for either that
+// doesn't parse, such as `2026-13-45`.
+function instant(at: string, timeZone?: string): { date: Date; timeZone?: string } | null {
+  const dateOnly = isDateOnly(at);
+  const time = Date.parse(dateOnly ? `${at}T12:00:00Z` : at);
+
+  if (Number.isNaN(time)) {
+    return null;
+  }
+
+  return { date: new Date(time), timeZone: dateOnly ? 'UTC' : timeZone };
+}
+
+function formatted(
+  at: string,
+  timeZone: string | undefined,
+  options: Intl.DateTimeFormatOptions,
+): string | null {
+  const read = instant(at, timeZone);
+
+  if (!read) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', { ...options, timeZone: read.timeZone })
+    .format(read.date)
+    .replace(NARROW_SPACE, ' ');
+}
+
+/**
+ * A date and time for a card or a sheet, in the device's time zone unless one is given. A date
+ * with no time shows the date alone. Anything unparsable shows as it is.
+ *
+ * @example
+ * formatDateTime('2026-10-09T13:00:00Z', 'Europe/London') // 'Fri, Oct 9, 2:00 PM'
+ * formatDateTime('2026-10-21') // 'Wed, Oct 21'
+ */
+export function formatDateTime(at: string, timeZone?: string): string {
+  const day = { weekday: 'short', month: 'short', day: 'numeric' } as const;
+
+  if (isDateOnly(at)) {
+    return formatted(at, timeZone, day) ?? at;
+  }
+
+  return formatted(at, timeZone, { ...day, hour: 'numeric', minute: '2-digit' }) ?? at;
+}
+
+/** @example formatTime('2026-10-09T13:00:00Z', 'Europe/London') // '2:00 PM'; '' for a date */
+export function formatTime(at: string, timeZone?: string): string {
+  if (isDateOnly(at)) {
+    return '';
+  }
+
+  return formatted(at, timeZone, { hour: 'numeric', minute: '2-digit' }) ?? '';
+}
+
+/** @example formatDate('2026-09-26T09:00:00Z') // 'Sep 26' */
+export function formatDate(at: string, timeZone?: string): string {
+  return formatted(at, timeZone, { month: 'short', day: 'numeric' }) ?? at;
+}
+
 /** One field's value as text, for cards and comparisons. Missing values read "—". */
 export function formatField(value: unknown, format: FieldFormat = 'text'): string {
   if (value === null || value === undefined || value === '') {
@@ -174,7 +172,7 @@ export function formatField(value: unknown, format: FieldFormat = 'text'): strin
   }
 
   if (isMoney(value)) {
-    return formatMoney(value);
+    return format === 'estimate' ? `≈ ${formatMoney(value)}` : formatMoney(value);
   }
 
   if (typeof value === 'number') {
@@ -194,7 +192,7 @@ export function formatField(value: unknown, format: FieldFormat = 'text'): strin
   }
 
   if (typeof value === 'string') {
-    return value;
+    return format === 'dateTime' ? formatDateTime(value) : value;
   }
 
   if (typeof value === 'boolean') {
@@ -202,13 +200,6 @@ export function formatField(value: unknown, format: FieldFormat = 'text'): strin
   }
 
   return '—';
-}
-
-/** A place's display name: its `data.name`, else its title. */
-export function placeName(object: GraphObject): string {
-  const name = (object.data as Partial<PlaceData>).name;
-
-  return name ?? object.title ?? 'Stop';
 }
 
 /** An object's card text from `KIND_CARDS`; unknown kinds read like `thing`. */
@@ -270,62 +261,4 @@ export function ordinalWord(n: number): string {
   const suffixes: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
 
   return `${n}${suffixes[n % 10] ?? 'th'}`;
-}
-
-/**
- * A country's English name from its ISO code, or the code itself for one the list doesn't
- * know. The list is bundled because Hermes has no Intl.DisplayNames.
- *
- * @example countryName('DE') // 'Germany'
- */
-export function countryName(code: string): string {
-  return COUNTRY_NAMES[code] ?? code;
-}
-
-const TRAVEL_MODES: Record<LegData['mode'], string> = {
-  flight: 'Flight',
-  train: 'Train',
-  bus: 'Bus',
-  car: 'Drive',
-  ferry: 'Ferry',
-  other: 'Travel',
-};
-
-/** @example travelTo('train', 'Prague') // 'Train to Prague' */
-export function travelTo(mode: LegData['mode'], name: string): string {
-  return `${TRAVEL_MODES[mode]} to ${name}`;
-}
-
-/**
- * A leg's time and cost, either of which may be missing.
- *
- * @example
- * legFigures({ mode: 'train', estHours: 4.25, estCost: { amount: 40, currency: 'USD' } })
- * // '4h 15m, ≈ $40'
- */
-export function legFigures(leg: LegData): string {
-  const parts: string[] = [];
-
-  if (leg.estHours !== undefined) {
-    parts.push(formatHours(leg.estHours));
-  }
-
-  if (leg.estCost) {
-    parts.push(`≈ ${formatMoney(leg.estCost)}`);
-  }
-
-  return parts.join(', ');
-}
-
-/**
- * A photo's credit line, as the stop sheet shows it under the photo.
- *
- * @example
- * photoCredit({ author: 'Kasa Fue', license: 'CC BY-SA 4.0' })
- * // 'Photo: Kasa Fue, CC BY-SA 4.0, via Wikimedia Commons'
- */
-export function photoCredit(credit: Pick<PhotoCredit, 'author' | 'license'>): string {
-  const who = [credit.author, credit.license].filter(Boolean).join(', ');
-
-  return `Photo: ${who}, via Wikimedia Commons`;
 }

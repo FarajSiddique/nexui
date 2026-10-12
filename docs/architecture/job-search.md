@@ -1,6 +1,6 @@
 # Job search
 
-A job search is the second template. A user says what they want, uploads a resume once, and Nexui reads the public job boards for roles that fit. The product design is in [`docs/superpowers/specs/`](../superpowers/specs/); the evidence behind the board and search choices is in `2026-10-10-job-search-spikes.md` there. This doc covers the flow across `apps/api/src/lib/jobs/` as it runs today. The template's place in the registry is in [`intent-graph.md`](./intent-graph.md).
+A job search is the second template. A user says what they want, uploads a resume once, and Nexui reads the public job boards for roles that fit. The product design is in [`docs/superpowers/specs/`](../superpowers/specs/); the evidence behind the board and search choices is in `2026-10-10-job-search-spikes.md` there. This doc covers the flow across `apps/api/src/lib/jobs/` as it runs today, and what the app draws of it. The template's place in the registry is in [`intent-graph.md`](./intent-graph.md).
 
 The flow:
 
@@ -86,6 +86,15 @@ A role added from a button carries what a scan found, so it keeps its fit and is
 
 A blank, illegible or non-resume file, a damaged or password-protected PDF, a timeout and an outage all end the same way: "Couldn't read that PDF. Try another file." The plan still starts. The file is never stored, only the bytes in memory during the request.
 
+## In the app
+
+The app draws a job search through the generic workspace and its own folder, `apps/mobile/src/features/jobs/`, joined by the registries in `features/registry/` (see [`mobile.md`](./mobile.md)).
+
+- **The + sheet.** A goal routed here answers `awaiting_resume`, and the sheet asks for the resume: **Add resume (PDF)** picks a file (4 MB at most, `MAX_UPLOAD_BYTES` in `@nexui/types`, checked before it's sent) and calls `start` with it; **Continue without** calls `start` with none. Either streams the build run. A second job search's goal answers `existing_search`: "You already have a job search. Add this to it?", and **Open my search** puts the goal back in the composer to ask that plan. On a job search, the composer's PDF button adds the resume through `start` before the first run and replaces it through `resume` after; it doesn't show under the second-search reply, which is about the other plan.
+- **The plan.** The meta line under the title (`searchMeta`: roles, places and pay floor) opens the search's sheet. Coming up (`timeline`) lists interviews soonest first, and a row opens its role. The Roles pipeline shows New first, under the AI disclosure "Picked by Nexui's AI from employers' own job boards.", each role with why it fits, its gaps, **Interested** and **Pass**. Pass asks why in one tap (or skips): the reason joins the search's pass reasons, the last 10 of which the scan's scoring reads. Later stages show only with roles in them, and Closed folds to a count. Home's card shows the search's companies as chips.
+- **The sheets.** A role's sheet renames it, moves its stage or closes it with an outcome, shows why it fits, opens its posting after naming the host it opens (a model may have written the URL; one that isn't https or carries a user name or password shows no button), and lists its drafts, people and interviews; **Ask about this role** opens + with the role named. A draft's sheet copies its text, and for a follow-up or withdrawal opens a `mailto:` link in the user's own mail app (Nexui never sends); **I sent it** logs the contact. The search's sheet edits its roles, places, work modes, salary floor, industries and never-show list (the resume's current employer stays), forgets a pass reason, and adds or replaces the resume.
+- **What the app calls.** Renames and criteria go through `object.update`, with the same kind checks as a model's call: a role's title follows its `data.title` (`nameField`), and the fields `jobs.*` owns stay refused. `jobs.forgetPass` removes one pass reason by when it was given; only the app calls it. Stage moves are `jobs.setStage` and `jobs.pass`, and I sent it is `jobs.logContact`. Each of these edits has Undo, and all but I sent it show before the server answers. The resume buttons call `start` or `resume` and wait for the server: starting a plan has no Undo, and replacing the resume offers Undo on the plan and in the object sheet, while the + sheet's PDF button only says "Replaced your resume." (the Changes tab can undo it).
+
 ## Privacy
 
 - Two kinds of web search query. The scan's search (`searchQuery`) is built from the criteria only. The model's `web_search` lookup sends a query the model writes (up to 120 characters, three a run), and its only guard is the prompt rule that the query holds job titles, places and industries, never resume text. That is a residual risk the prompt rule covers, not code. Jev and the explain call read the profile and criteria, not the resume's text.
@@ -96,7 +105,7 @@ A blank, illegible or non-resume file, a damaged or password-protected PDF, a ti
 
 Set in `apps/api/.env.local` (see `apps/api/.env.example`):
 
-- `JOB_SEARCH`: `on` lets Jev route new goals to job search. The gate governs only routing (`routableTemplates`): the `start` and `resume` routes aren't gated. Unset, the template doesn't route (`gate`). The app side ships with job search's mobile PR, so production leaves it unset until then.
+- `JOB_SEARCH`: `on` lets Jev route new goals to job search. The gate governs only routing (`routableTemplates`): the `start` and `resume` routes aren't gated. Unset, the template doesn't route (`gate`). The app draws job search (see "In the app"), but production leaves it unset until the iOS preview build with the app's two new native modules, `expo-document-picker` and `expo-clipboard`, is installed, then turns it on. The `gate` field stays for the next template whose app side follows its API.
 - `NEXUI_CONTACT`: an email address or URL (at most 200 characters) the boards can reach us at. Unset or invalid, board lookups and the scan are off; an invalid value logs that, without the value.
 - `PARALLEL_API_KEY`: unset, web search is off and scans read only the boards of companies a user named. Production waits for Parallel's written answer on its acceptable-use policy.
 
@@ -105,4 +114,5 @@ Set in `apps/api/.env.local` (see `apps/api/.env.example`):
 - `tests/jobs-board-urls.test.mjs`, `jobs-boards.test.mjs`, `jobs-search.test.mjs`, `jobs-lookups.test.mjs`, `jobs-resume.test.mjs`, `jobs-scan.test.mjs`, `jobs-capabilities.test.mjs`, `jobs-derive.test.mjs`, `jobs-kinds.test.mjs`, `jobs-template.test.mjs` and `jobs-build.test.mjs`: the URL rules, the boards' parsing and limits, the search, the lookups, the resume read, the scan and the build run, with network and models stubbed.
 - `tests/start-route.test.mjs` and `tests/resume-route.test.mjs`: the two routes.
 - `tests/model-surface.test.mjs`: pins what models see for a job search.
+- `tests/mobile-jobs-pipeline.test.mjs`, `mobile-jobs-timeline.test.mjs`, `mobile-jobs-role.test.mjs`, `mobile-jobs-draft.test.mjs`, `mobile-jobs-search.test.mjs`, `mobile-compose-reply.test.mjs` and `mobile-upload-form.test.mjs`: the app's pipeline, timeline, sheets, + sheet replies and upload, under plain Node. `tests/kind-meta.test.mjs` and `template-intakes.test.mjs`: the meta line and the intake step's shared contracts.
 - Manual live gates: `pnpm eval:jobs` and `node --experimental-strip-types scripts/check-job-search.mjs` (see "Checking it" in `intent-graph.md`).

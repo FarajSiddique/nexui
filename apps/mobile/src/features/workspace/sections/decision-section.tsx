@@ -2,20 +2,23 @@ import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
 import {
+  isKindName,
+  KIND_CARDS,
   readField,
+  type CompareField,
   type DecisionData,
+  type GraphObject,
   type OptionData,
-  type PlaceData,
   type Section,
 } from '@nexui/types';
 
 import type { PhotoState } from '#data';
-import { cardText, formatField, formatMoney, humanizeKey } from '#lib';
+import { aiMarkFor, cardText, formatField, humanizeKey } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, NexuiTag, Button } from '#ui';
 
 import type { DecisionOption } from '../workspace-layout';
-import { aiMarkFor } from '../ai-mark';
+import { resolveAction } from '../workspace-actions';
 import { ComparisonTable, type ComparisonRow } from './comparison-table';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
@@ -32,8 +35,13 @@ function candidatePhoto(state: PhotoState | undefined): string | null | undefine
   return state ? state.thumbUrl : undefined;
 }
 
-// The section's fields, then every metric any option reports, then the candidate place's daily
-// cost. Rows where no option has a value are left out.
+// What a candidate's kind compares (`KIND_CARDS`), such as a place's daily cost.
+function compareFields(candidate: GraphObject | null): CompareField[] {
+  return candidate && isKindName(candidate.kind) ? (KIND_CARDS[candidate.kind].compare ?? []) : [];
+}
+
+// The section's fields, then every metric any option reports, then what the options'
+// candidates compare. Rows where no option has a value are left out.
 function decisionRows(fields: FieldSpec[], options: DecisionOption[]): ComparisonRow[] {
   const byField = fields.map((field) => ({
     label: field.label,
@@ -48,16 +56,19 @@ function decisionRows(fields: FieldSpec[], options: DecisionOption[]): Compariso
     label: humanizeKey(key),
     cells: options.map((entry) => formatField((entry.option.data as OptionData).metrics[key])),
   }));
-  const perDay = {
-    label: 'Per day',
-    cells: options.map((entry) => {
-      const cost = (entry.place?.data as Partial<PlaceData> | undefined)?.estDailyCost;
+  const compared = new Map(
+    options.flatMap((entry) => compareFields(entry.candidate)).map((field) => [field.field, field]),
+  );
+  const candidates = [...compared.values()].map((field) => ({
+    label: field.label,
+    cells: options.map((entry) =>
+      entry.candidate ? formatField(readField(entry.candidate, field.field), field.format) : '—',
+    ),
+  }));
 
-      return cost ? `≈ ${formatMoney(cost)}` : '—';
-    }),
-  };
-
-  return [...byField, ...metrics, perDay].filter((row) => row.cells.some((cell) => cell !== '—'));
+  return [...byField, ...metrics, ...candidates].filter((row) =>
+    row.cells.some((cell) => cell !== '—'),
+  );
 }
 
 /**
@@ -88,7 +99,7 @@ export function DecisionSection({
     title: cardText(entry.option).title,
     highlight: aiMarkFor(entry.option).highlight,
     tentative: true,
-    photo: candidatePhoto(entry.place ? photos[entry.place.id] : undefined),
+    photo: candidatePhoto(entry.candidate ? photos[entry.candidate.id] : undefined),
   }));
   const mark = aiMarkFor(decision);
 
@@ -135,13 +146,7 @@ export function DecisionSection({
                   label="Choose"
                   accessibilityLabel={`Choose ${column.title}`}
                   disabled={busy}
-                  onPress={() =>
-                    onAction({
-                      type: 'resolveDecision',
-                      decisionId: decision.id,
-                      optionId: column.id,
-                    })
-                  }
+                  onPress={() => onAction(resolveAction(decision.id, column.id))}
                 />
               )}
             />
@@ -150,9 +155,7 @@ export function DecisionSection({
             label="Keep the day free"
             variant="text"
             disabled={busy}
-            onPress={() =>
-              onAction({ type: 'resolveDecision', decisionId: decision.id, optionId: null })
-            }
+            onPress={() => onAction(resolveAction(decision.id, null))}
           />
         </View>
       )}

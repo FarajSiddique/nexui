@@ -128,3 +128,16 @@ test('a malformed request is a 400', async (t) => {
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, 'That action is not valid.');
 });
+
+test('the app may change an object through object.update, with its kind’s checks', async (t) => {
+  const applied = graph(t);
+  const response = await press({
+    name: 'object.update',
+    input: { ref: TOKYO_ID, data: { why: 'Ramen' } },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(applied.length, 1);
+  assert.deepEqual(applied[0].p_ops[0].patch, { data: { ...tokyoData, why: 'Ramen' } });
+  assert.equal(applied[0].p_payload.label, 'Updated Tokyo');
+});

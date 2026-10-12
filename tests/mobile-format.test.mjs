@@ -1,23 +1,28 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { aiMarkFor } from '../apps/mobile/src/features/workspace/ai-mark.ts';
+import {
+  countryName,
+  legFigures,
+  photoCredit,
+  travelTo,
+} from '../apps/mobile/src/features/travel/travel-format.ts';
+import { aiMarkFor } from '../apps/mobile/src/lib/ai-mark.ts';
 import {
   capitalize,
   cardText,
-  countryName,
   dayLabel,
+  formatDate,
+  formatDateTime,
   formatDays,
   formatField,
   formatHours,
   formatMoney,
   formatRelative,
+  formatTime,
   humanizeKey,
-  legFigures,
+  isDateOnly,
   ordinalWord,
-  photoCredit,
-  travelTo,
-  tripMeta,
 } from '../apps/mobile/src/lib/format.ts';
 
 const object = (kind, data, extra = {}) => ({
@@ -70,15 +75,6 @@ test('relative times and day groups use the local calendar', () => {
       older,
     ),
   );
-});
-
-test('the trip meta line names dates, travelers and pace', () => {
-  assert.equal(
-    tripMeta({ startDate: '2026-12-12', endDate: '2026-12-24', travelers: 2, pace: 'balanced' }),
-    'Dec 12 – 24, 2 travelers, balanced pace',
-  );
-  assert.equal(tripMeta({ totalDays: 3, travelers: 1 }), '3 days, 1 traveler');
-  assert.equal(tripMeta({}), '');
 });
 
 test('fields format by their spec, and missing values show a dash', () => {
@@ -168,4 +164,27 @@ test('a photo credit names the author and licence, via Wikimedia Commons', () =>
     photoCredit({ author: '', license: 'Public domain' }),
     'Photo: Public domain, via Wikimedia Commons',
   );
+});
+
+test('dates read with their time in the given zone; a date alone never moves a day', () => {
+  assert.equal(formatDateTime('2026-10-09T13:00:00Z', 'Europe/London'), 'Fri, Oct 9, 2:00 PM');
+  assert.equal(
+    formatDateTime('2026-10-09T23:30:00-07:00', 'Europe/London'),
+    'Sat, Oct 10, 7:30 AM',
+  );
+  assert.equal(formatDateTime('2026-10-21'), 'Wed, Oct 21');
+  assert.equal(formatDateTime('not a date'), 'not a date');
+  assert.equal(formatDateTime('2026-13-45'), '2026-13-45');
+  assert.equal(formatDate('2026-13-45'), '2026-13-45');
+  assert.equal(formatTime('2026-10-09T13:00:00Z', 'Europe/London'), '2:00 PM');
+  assert.equal(formatTime('2026-10-21'), '');
+  assert.equal(formatDate('2026-09-26T23:30:00Z', 'Europe/London'), 'Sep 27');
+  assert.equal(formatDate('2026-09-26'), 'Sep 26');
+  assert.deepEqual([isDateOnly('2026-10-21'), isDateOnly('2026-10-21T09:00:00Z')], [true, false]);
+  assert.equal(formatField('2026-10-21', 'dateTime'), 'Wed, Oct 21');
+  assert.equal(formatField({ amount: 120, currency: 'USD' }, 'estimate'), '≈ $120');
+  assert.deepEqual(cardText(object('interview', { at: '2026-10-21', label: 'Phone screen' })), {
+    title: 'Phone screen',
+    subtitle: 'Wed, Oct 21',
+  });
 });

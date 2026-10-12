@@ -4,16 +4,13 @@ import { Pressable, Text, View } from 'react-native';
 import type { LegData, PhotoCredit, PlaceAbout, StayData } from '@nexui/types';
 
 import type { PhotoState } from '#data';
-import { formatDays, formatMoney, legFigures, photoCredit, placeName, travelTo } from '#lib';
+import { aiMarkFor, formatDays, formatMoney } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, Button, PlacePhoto } from '#ui';
-import {
-  aiMarkFor,
-  DayStepper,
-  stayLine,
-  stopSubtitle,
-  type StopDetails,
-} from '#features/workspace';
+
+import { DayStepper } from './day-stepper';
+import { stayLine, stopSubtitle, type StopDetails } from './stop-details';
+import { legFigures, photoCredit, placeName, travelTo } from './travel-format';
 
 /** The About section: the introduction, a placeholder while it's looked up, or nothing. */
 export type AboutState = PlaceAbout | 'pending' | null;

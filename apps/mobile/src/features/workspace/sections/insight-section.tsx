@@ -1,27 +1,14 @@
 import type { ReactElement } from 'react';
 import { Text, View } from 'react-native';
 
-import type { GraphObject, InsightAction, InsightData } from '@nexui/types';
+import type { GraphObject, InsightData } from '@nexui/types';
 
 import { fonts, createThemedStyles } from '#theme';
 import { ActorAvatar, Button } from '#ui';
 
-import type { WorkspaceAction } from '../workspace-actions';
+import { fromInsightAction, type WorkspaceAction } from '../workspace-actions';
 import { SectionFrame } from './section-frame';
 import type { SectionProps } from './types';
-
-// `upload`, `copy` and `start` get their buttons in job search's mobile PR; until then they
-// are left out.
-function toAction(action: InsightAction): WorkspaceAction | null {
-  switch (action.type) {
-    case 'ask':
-      return { type: 'ask', prompt: action.prompt };
-    case 'capability':
-      return { type: 'capability', name: action.name, input: action.input };
-    default:
-      return null;
-  }
-}
 
 function InsightCard({
   insight,
@@ -35,11 +22,10 @@ function InsightCard({
   const styles = useStyles();
   const data = insight.data as InsightData;
   const derived = data.derivedKey !== undefined || insight.source?.type === 'derived';
-  const buttons = data.actions.flatMap((action) => {
-    const next = toAction(action);
-
-    return next ? [{ label: action.label, next }] : [];
-  });
+  const buttons = data.actions.map((action) => ({
+    label: action.label,
+    next: fromInsightAction(action),
+  }));
 
   return (
     <SectionFrame accent={data.severity === 'attention'}>
@@ -57,7 +43,7 @@ function InsightCard({
               key={`${index}-${label}`}
               label={label}
               variant={index === 0 ? 'primary' : 'secondary'}
-              disabled={busy && next.type === 'capability'}
+              disabled={busy && next.type !== 'ask' && next.type !== 'copy'}
               onPress={() => onAction(next)}
             />
           ))}

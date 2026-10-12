@@ -1,12 +1,14 @@
 import { Fragment, type ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import type { IntentListItem } from '@nexui/types';
+import type { IntentListItem, IntentSummary } from '@nexui/types';
 
 import { fonts, createThemedStyles } from '#theme';
 import { AiText, PlacePhoto, Pill } from '#ui';
 
 import { photoBand, type PhotoBand } from './photo-band';
+
+type Strip = NonNullable<IntentSummary['strip']>;
 
 /** Up to three photos across the top of a card, with "+N" on the last for the stops beyond. */
 function Band({ band }: { band: PhotoBand }): ReactElement {
@@ -29,10 +31,41 @@ function Band({ band }: { band: PhotoBand }): ReactElement {
   );
 }
 
+/** A trip's stops as a mini route. */
+function RouteStrip({ strip }: { strip: Strip }): ReactElement {
+  const styles = useStyles();
+
+  return (
+    <View style={styles.strip}>
+      {strip.map((stop, index) => (
+        <Fragment key={`${stop.label}-${index}`}>
+          {index > 0 ? <View style={styles.connector} /> : null}
+          <AiText text={stop.label} highlight={stop.ai} tag={false} style={styles.stop} />
+        </Fragment>
+      ))}
+    </View>
+  );
+}
+
+/** A job search's companies, one chip each, on the highlighter while a role there waits in New. */
+function Chips({ strip }: { strip: Strip }): ReactElement {
+  const styles = useStyles();
+
+  return (
+    <View style={styles.chips}>
+      {strip.map((chip, index) => (
+        <View key={`${chip.label}-${index}`} style={[styles.chip, chip.ai && styles.chipNew]}>
+          <Text style={styles.chipText}>{chip.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /**
  * A plan on Home: a band of its stops' photos when it has any, then its goal, badge, summary
- * line and a mini route of its stops. With `onDelete`, screen readers also offer a Delete
- * action, the counterpart of swiping the card away.
+ * line and strip: a trip's stops as a mini route, a job search's companies as chips. With
+ * `onDelete`, screen readers also offer a Delete action, the counterpart of swiping the card away.
  */
 export function IntentCard({
   item,
@@ -46,6 +79,7 @@ export function IntentCard({
   const styles = useStyles();
   const { summary } = item;
   const strip = summary.strip ?? [];
+  const chips = summary.stripStyle === 'chips';
   const band = photoBand(item);
 
   return (
@@ -70,16 +104,8 @@ export function IntentCard({
           {summary.badge ? <Pill text={summary.badge.text} tone={summary.badge.tone} /> : null}
         </View>
         {summary.line ? <Text style={styles.line}>{summary.line}</Text> : null}
-        {strip.length > 0 ? (
-          <View style={styles.strip}>
-            {strip.map((stop, index) => (
-              <Fragment key={`${stop.label}-${index}`}>
-                {index > 0 ? <View style={styles.connector} /> : null}
-                <AiText text={stop.label} highlight={stop.ai} tag={false} style={styles.stop} />
-              </Fragment>
-            ))}
-          </View>
-        ) : null}
+        {strip.length > 0 && chips ? <Chips strip={strip} /> : null}
+        {strip.length > 0 && !chips ? <RouteStrip strip={strip} /> : null}
       </View>
     </Pressable>
   );
@@ -112,4 +138,15 @@ const useStyles = createThemedStyles((colors) => ({
   strip: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   connector: { width: 10, height: 2, borderRadius: 1, backgroundColor: colors.line },
   stop: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: colors.soft,
+  },
+  chipNew: { backgroundColor: colors.aiMark, borderColor: colors.aiMark },
+  chipText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink },
 }));

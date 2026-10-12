@@ -106,7 +106,7 @@ test('pinned sections with something unresolved lift into one band under the met
 
   assert.equal(decision.decision.id, DECISION_ID);
   assert.deepEqual(
-    decision.options.map((entry) => [entry.option.title, entry.place]),
+    decision.options.map((entry) => [entry.option.title, entry.candidate]),
     [['Nara', null]],
   );
 });
@@ -239,7 +239,7 @@ test('a pipeline and a timeline get the objects their queries find, for PR 3 to 
   );
 });
 
-test('a pinned pipeline or timeline never makes an Open band: they draw nothing yet', () => {
+test('a pinned pipeline or timeline never makes an Open band: they list, they never wait on the user', () => {
   const places = doc.sections.find((section) => section.id === 'route').query;
   const pinnedDoc = {
     ...doc,

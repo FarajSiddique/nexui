@@ -43,6 +43,25 @@ export function tripParts(
   };
 }
 
+/** The leg from one stop to another, if the graph has one. */
+export function legBetween(
+  snapshot: GraphSnapshot,
+  fromId: string,
+  toId: string,
+): GraphObject | null {
+  const end = (legId: string, type: 'leg_from' | 'leg_to'): string | undefined =>
+    snapshot.relationships.find((edge) => edge.sourceId === legId && edge.type === type)?.targetId;
+
+  return (
+    snapshot.objects.find(
+      (object) =>
+        object.kind === 'leg' &&
+        end(object.id, 'leg_from') === fromId &&
+        end(object.id, 'leg_to') === toId,
+    ) ?? null
+  );
+}
+
 /**
  * The trip's days and approximate cost, computed only from the graph (no model involved).
  * Dates win over `totalDays`; costs in unknown currencies are skipped and flagged.

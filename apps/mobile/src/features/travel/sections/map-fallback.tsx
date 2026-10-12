@@ -3,9 +3,7 @@ import { Text, View } from 'react-native';
 
 import { fonts, createThemedStyles } from '#theme';
 import { AiText } from '#ui';
-
-import type { MapPin } from '../workspace-layout';
-import { SectionFrame } from './section-frame';
+import { SectionFrame, type MapPin } from '#features/workspace';
 
 /** The route as an ordered list, where no native map is available (web, Android without a key). */
 export function MapFallback({ title, pins }: { title?: string; pins: MapPin[] }): ReactElement {

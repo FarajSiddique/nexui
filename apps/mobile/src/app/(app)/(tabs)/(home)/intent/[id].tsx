@@ -1,13 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import type { GraphSnapshot, TripData } from '@nexui/types';
+import { anchorMeta, intakeRoute, TEMPLATE_INTAKES } from '@nexui/types';
 
 import {
   ApiError,
+  choosePdf,
   mediaPlaceIds,
   queryKeys,
   useIntent,
@@ -16,27 +18,21 @@ import {
   useUndo,
   useWorkspaceEdit,
   useIntentLive,
+  useReplaceResume,
+  useStartPlan,
+  type PickedPdf,
 } from '#data';
-import { tripMeta } from '#lib';
+import { openableUrl } from '#lib';
 import { fonts, createThemedStyles } from '#theme';
 import { ListEmpty, ListError, RefetchNotice, SkeletonRows, Pill } from '#ui';
 import {
-  SectionView,
   UndoToast,
   focusIntent,
   useRevealOpenBand,
-  capabilityFor,
-  optimisticOps,
   type WorkspaceAction,
   layoutWorkspace,
 } from '#features/workspace';
-
-function anchorMeta(snapshot: GraphSnapshot): string {
-  const anchorId = snapshot.workspace?.doc.anchorId;
-  const anchor = snapshot.objects.find((object) => object.id === anchorId);
-
-  return anchor?.kind === 'trip' ? tripMeta(anchor.data as Partial<TripData>) : '';
-}
+import { SectionView, hasDetail } from '#features/registry';
 
 function goBack(): void {
   if (router.canGoBack()) {
@@ -62,6 +58,9 @@ export default function WorkspaceScreen(): ReactElement {
   const intent = useIntent(id, { poll: drafting });
   const edit = useWorkspaceEdit(id);
   const undo = useUndo();
+  const start = useStartPlan();
+  const replace = useReplaceResume();
+  const [notice, setNotice] = useState<string | null>(null);
   const [undoable, setUndoable] = useState<string | null>(null);
   const hideUndo = useCallback(() => setUndoable(null), []);
   const wasDrafting = useRef(drafting);
@@ -103,36 +102,113 @@ export default function WorkspaceScreen(): ReactElement {
     settled: intent.isSuccess && !intent.isFetching,
   });
 
-  const handleAction = (action: WorkspaceAction): void => {
-    if (action.type === 'openPlace') {
-      router.push({ pathname: '/place', params: { intentId: id, placeId: action.placeId } });
+  const busy = edit.isPending || start.isPending || replace.isPending;
 
-      return;
-    }
-
-    if (action.type === 'ask') {
-      router.push({
-        pathname: '/compose',
-        params: action.prompt ? { intentId: id, prompt: action.prompt } : { intentId: id },
-      });
-
-      return;
-    }
-
+  // A picked PDF goes where the plan's intake takes it: `start` before its first run, `resume`
+  // after (job search spec, section 4).
+  const sendPdf = (pdf: PickedPdf): void => {
     if (!snapshot) {
       return;
     }
 
-    const request = capabilityFor(action, snapshot);
+    if (intakeRoute(snapshot.intent) === 'resume') {
+      replace.mutate(
+        { intentId: id, pdf },
+        { onSuccess: (result) => setUndoable(result.event.id) },
+      );
 
-    if (!request) {
       return;
     }
 
-    edit.mutate(
-      { request, optimistic: optimisticOps(action, snapshot) },
-      { onSuccess: (result) => setUndoable(result.event.id) },
-    );
+    start.mutate({ intentId: id, pdf });
+  };
+
+  const addFile = async (): Promise<void> => {
+    setNotice(null);
+
+    try {
+      const choice = await choosePdf();
+
+      if (!choice) {
+        return;
+      }
+
+      if ('problem' in choice) {
+        setNotice(choice.problem);
+
+        return;
+      }
+
+      sendPdf(choice.pdf);
+    } catch {
+      setNotice("Couldn't open your files. Try again.");
+    }
+  };
+
+  const copy = async (text: string): Promise<void> => {
+    try {
+      await Clipboard.setStringAsync(text);
+      setNotice('Copied.');
+    } catch {
+      setNotice("Couldn't copy that.");
+    }
+  };
+
+  // Only an https page or a mailto: message opens (`openableUrl`); anything else, or a link the
+  // system can't open, says so.
+  const openLink = async (url: string): Promise<void> => {
+    const openable = openableUrl(url);
+
+    setNotice(null);
+
+    if (!openable) {
+      setNotice("Couldn't open that link.");
+
+      return;
+    }
+
+    try {
+      await Linking.openURL(openable);
+    } catch {
+      setNotice("Couldn't open that link.");
+    }
+  };
+
+  const handleAction = (action: WorkspaceAction): void => {
+    switch (action.type) {
+      case 'open':
+        router.push({ pathname: '/object', params: { intentId: id, objectId: action.objectId } });
+
+        return;
+      case 'ask':
+        router.push({
+          pathname: '/compose',
+          params: action.prompt ? { intentId: id, prompt: action.prompt } : { intentId: id },
+        });
+
+        return;
+      case 'capability':
+        edit.mutate(
+          { request: action.request, optimistic: action.optimistic },
+          { onSuccess: (result) => setUndoable(result.event.id) },
+        );
+
+        return;
+      case 'upload':
+        void addFile();
+
+        return;
+      case 'start':
+        start.mutate({ intentId: id, pdf: null });
+
+        return;
+      case 'copy':
+        void copy(action.text);
+
+        return;
+      case 'link':
+        void openLink(action.url);
+    }
   };
 
   const renderBody = (): ReactElement => {
@@ -150,6 +226,9 @@ export default function WorkspaceScreen(): ReactElement {
 
     const data = intent.data;
     const meta = anchorMeta(data);
+    const intake = data.intent.template ? TEMPLATE_INTAKES[data.intent.template] : null;
+    const reading =
+      intake !== null && (replace.isPending || (start.isPending && Boolean(start.variables?.pdf)));
 
     return (
       <View style={styles.page} onLayout={band.onPageLayout}>
@@ -157,11 +236,41 @@ export default function WorkspaceScreen(): ReactElement {
           <Text accessibilityRole="header" style={styles.title}>
             {data.intent.goal}
           </Text>
-          {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+          {meta && hasDetail(meta.kind) ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${meta.text}. Show details`}
+              onPress={() => handleAction({ type: 'open', objectId: meta.objectId })}
+              style={({ pressed }) => [styles.metaButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.meta}>{meta.text} ›</Text>
+            </Pressable>
+          ) : null}
+          {meta && !hasDetail(meta.kind) ? <Text style={styles.meta}>{meta.text}</Text> : null}
           {drafting ? <Pill text="Drafting" tone="running" /> : null}
         </View>
         {intent.isRefetchError ? (
           <RefetchNotice subject="this plan" onRetry={() => void intent.refetch()} />
+        ) : null}
+        {reading ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            {intake?.reading}
+          </Text>
+        ) : null}
+        {notice ? (
+          <Text accessibilityLiveRegion="polite" style={styles.notice}>
+            {notice}
+          </Text>
+        ) : null}
+        {start.isError ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            Couldn&apos;t start this plan. {start.error.message}
+          </Text>
+        ) : null}
+        {replace.isError ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            Couldn&apos;t add that resume. {replace.error.message}
+          </Text>
         ) : null}
         {edit.isError ? (
           <Text accessibilityLiveRegion="polite" style={styles.error}>
@@ -185,7 +294,7 @@ export default function WorkspaceScreen(): ReactElement {
                   entry={entry}
                   snapshot={data}
                   onAction={handleAction}
-                  busy={edit.isPending}
+                  busy={busy}
                   photos={photos}
                 />
               ))}
@@ -196,7 +305,7 @@ export default function WorkspaceScreen(): ReactElement {
               entry={block.entry}
               snapshot={data}
               onAction={handleAction}
-              busy={edit.isPending}
+              busy={busy}
               photos={photos}
             />
           ),
@@ -249,6 +358,9 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.ink,
   },
   meta: { fontFamily: fonts.body, fontSize: 15, color: colors.muted },
+  metaButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+  pressed: { opacity: 0.7 },
+  notice: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },
   open: { gap: 12 },
 }));

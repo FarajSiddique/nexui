@@ -55,3 +55,46 @@ export function convertMoney(money: Money, to: string): number | null {
 
   return (money.amount * from) / target;
 }
+
+const currencyFormats = new Map<string, Intl.NumberFormat>();
+
+function currencyFormat(currency: string, digits: number): Intl.NumberFormat {
+  const key = `${currency}:${digits}`;
+  const cached = currencyFormats.get(key);
+
+  if (cached) {
+    return cached;
+  }
+
+  const created = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+
+  currencyFormats.set(key, created);
+
+  return created;
+}
+
+/**
+ * A short amount for a metric, a card or a plan's meta line. Callers add "≈" where the figure is
+ * an estimate.
+ *
+ * @example
+ * formatMoney({ amount: 3140, currency: 'USD' }) // '$3.1k'
+ */
+export function formatMoney(money: Money): string {
+  const { amount, currency } = money;
+
+  if (amount >= 1_000_000) {
+    return `${currencyFormat(currency, 1).format(amount / 1_000_000)}m`;
+  }
+
+  if (amount >= 1_000) {
+    return `${currencyFormat(currency, 1).format(amount / 1_000)}k`;
+  }
+
+  return currencyFormat(currency, 0).format(amount);
+}
