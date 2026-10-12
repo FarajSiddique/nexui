@@ -60,6 +60,8 @@ export default function ObjectScreen(): ReactElement {
   const intake = snapshot?.intent.template ? TEMPLATE_INTAKES[snapshot.intent.template] : null;
   const reading =
     intake !== null && (replace.isPending || (start.isPending && Boolean(start.variables?.pdf)));
+  const hasStatus =
+    edit.isError || undo.isError || reading || Boolean(notice) || start.isError || replace.isError;
 
   // A picked PDF goes where the plan's intake takes it: `start` before its first run, `resume`
   // after (job search spec, section 4).
@@ -134,6 +136,8 @@ export default function ObjectScreen(): ReactElement {
   const handleAction = (action: WorkspaceAction): void => {
     switch (action.type) {
       case 'open':
+        // A notice ("Copied.") was about the body being swapped out.
+        setNotice(null);
         router.setParams({ objectId: action.objectId });
 
         return;
@@ -206,39 +210,46 @@ export default function ObjectScreen(): ReactElement {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
-        {edit.isError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            Couldn&apos;t save that. {edit.error.message}
-          </Text>
-        ) : null}
-        {undo.isError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            Couldn&apos;t undo that. {undo.error.message}
-          </Text>
-        ) : null}
-        {reading ? (
-          <Text accessibilityLiveRegion="polite" style={styles.notice}>
-            {intake?.reading}
-          </Text>
-        ) : null}
-        {notice ? (
-          <Text accessibilityLiveRegion="polite" style={styles.notice}>
-            {notice}
-          </Text>
-        ) : null}
-        {start.isError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            Couldn&apos;t start this plan. {start.error.message}
-          </Text>
-        ) : null}
-        {replace.isError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            Couldn&apos;t add that resume. {replace.error.message}
-          </Text>
-        ) : null}
         {renderBody()}
       </ScrollView>
+      {/* Fixed under the body, like the + sheet's composer, so a line about the button just
+          tapped (Replace, Copy, a failed edit) is in view on a long sheet. */}
+      {hasStatus ? (
+        <View style={[styles.status, undoable !== null && styles.statusOverToast]}>
+          {edit.isError ? (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              Couldn&apos;t save that. {edit.error.message}
+            </Text>
+          ) : null}
+          {undo.isError ? (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              Couldn&apos;t undo that. {undo.error.message}
+            </Text>
+          ) : null}
+          {reading ? (
+            <Text accessibilityLiveRegion="polite" style={styles.notice}>
+              {intake?.reading}
+            </Text>
+          ) : null}
+          {notice ? (
+            <Text accessibilityLiveRegion="polite" style={styles.notice}>
+              {notice}
+            </Text>
+          ) : null}
+          {start.isError ? (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              Couldn&apos;t start this plan. {start.error.message}
+            </Text>
+          ) : null}
+          {replace.isError ? (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              Couldn&apos;t add that resume. {replace.error.message}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {undoable ? (
         <UndoToast
           key={undoable}
@@ -259,6 +270,19 @@ const useStyles = createThemedStyles((colors) => ({
   // The place body's photo bleeds through this padding.
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 96 },
   gone: { gap: 12 },
+  status: {
+    width: '100%',
+    maxWidth: 488,
+    alignSelf: 'center',
+    gap: 4,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  // Clears the Undo toast (44 pt, 12 pt off the bottom) when both show.
+  statusOverToast: { paddingBottom: 68 },
   notice: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },
 }));
