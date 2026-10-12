@@ -423,7 +423,8 @@ as a worker with the service-role client (see "Run queue" below).
 - **Starting a plan that waits** (`startPlan`, `replaceIntake`): a plan seeded with an `intake`
   waits for `start`. Both routes read a multipart `file` through
   `readUpload` (`lib/http/upload.ts`): at most 4 MB (`MAX_UPLOAD_BYTES` in `@nexui/types`, which
-  the app checks before sending; 413 over it), or an empty body for none.
+  the app checks before sending; 413 over it), or an empty body for none. The file's name is
+  percent-decoded, since the phone's `expo/fetch` sends it encoded (`Jordan%20Lee%20CV.pdf`).
   - `POST /api/intents/[id]/start` (202, `maxDuration` 300): the template's `refuse` checks the
     file first (a 400 with its message), `read` reads it once with the fast tier, and the
     template's intake capability stores what it found with `start: true` as one changeset, which

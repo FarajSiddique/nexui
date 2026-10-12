@@ -89,6 +89,33 @@ test('a readable resume is read once, stored, and the build run queued with its 
   assert.equal(tasks.length, 1);
 });
 
+test('a file name sent percent-encoded, as Expo’s fetch sends one, is stored decoded', async (t) => {
+  const { fake } = setup(t, waiting());
+
+  await withFile(PDF, 'Jordan%20Lee%20CV.pdf');
+  assert.equal(objectsOf(fake, 'document')[0].data.fileName, 'Jordan Lee CV.pdf');
+});
+
+test('a long decoded file name is cut without splitting a character in two', async (t) => {
+  const { fake } = setup(t, waiting());
+  // 199 letters, then an emoji whose two UTF-16 halves straddle the 200-character cut.
+  const name = `${'a'.repeat(199)}${encodeURIComponent('😀')}.pdf`;
+
+  await withFile(PDF, name);
+
+  const { fileName } = objectsOf(fake, 'document')[0].data;
+
+  assert.ok(fileName.isWellFormed());
+  assert.ok(fileName.length <= 200);
+});
+
+test('a file name that isn’t valid percent-encoding is stored as it came', async (t) => {
+  const { fake } = setup(t, waiting());
+
+  await withFile(PDF, 'cv-100%.pdf');
+  assert.equal(objectsOf(fake, 'document')[0].data.fileName, 'cv-100%.pdf');
+});
+
 test('starting without a file asks for the resume later, and queues the run', async (t) => {
   const { fake, tasks } = setup(t, waiting());
   const response = await withoutFile();

@@ -360,8 +360,9 @@ export const RESUME_INTAKE: TemplateIntake = {
       return { outcome: 'none', input: { status: 'none' }, usage: null };
     }
 
-    // The client's name goes to the model and into the document, so it is cleaned once, here.
-    const named = { ...file, name: file.name.replace(/[\u0000-\u001f\u007f]/g, '') };
+    // The client's name goes to the model and into the document, so it is cleaned once, here:
+    // control characters, and invisible ones such as a right-to-left override or a zero-width space.
+    const named = { ...file, name: file.name.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '') };
     const read = await readResume(named, ai);
 
     if (read.outcome === 'unreadable') {
