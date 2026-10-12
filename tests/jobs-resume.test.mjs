@@ -162,6 +162,16 @@ test("control characters are stripped from the file's name before the model and 
   assert.equal(user.content.find((part) => part.type === 'file').filename, 'cv.pdf');
 });
 
+// A phone's name arrives percent-encoded and is decoded, so these reach the read as characters.
+test("invisible format characters are stripped from the file's name too", async () => {
+  const read = await RESUME_INTAKE.read(
+    { ...PDF, name: '﻿c​v‮fdp\u0085.pdf ' },
+    ai(scriptedModel([textStep(JSON.stringify(answer))], [])),
+  );
+
+  assert.equal(read.input.fileName, 'cvfdp.pdf');
+});
+
 test('a profile is held to its limits', () => {
   assert.deepEqual(
     normalizeProfile({

@@ -5,7 +5,7 @@ import { jsonError } from './responses.ts';
 /** A file a request uploaded, read into memory. Nexui never stores it. */
 export interface Upload {
   bytes: Uint8Array;
-  /** The name the device gave it, cut to 200 characters. */
+  /** The name the device gave it, percent-decoded and cut to 200 characters. */
   name: string;
   /** Its declared media type; `%PDF-` is still checked before it is read. */
   type: string;
@@ -16,6 +16,24 @@ const FORM_OVERHEAD = 64 * 1024;
 
 const TOO_LARGE = 'That file is over 4 MB.';
 const UNREADABLE_FORM = 'That upload could not be read.';
+
+// Expo's fetch on a phone percent-encodes the file name (`Jordan%20Lee%20CV.pdf`). A browser
+// sends the name as it is, so a web file literally named `50%25.pdf` is stored as `50%.pdf`; the
+// name is only a label. A name that isn't valid percent-encoding is kept as it came.
+function decodeName(name: string): string {
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
+// The first 200 characters, without leaving half of one that takes two, such as an emoji.
+function cutName(name: string): string {
+  const cut = name.slice(0, 200);
+
+  return /[\ud800-\udbff]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
 
 /**
  * Reads an optional file from a multipart request's `file` field. Returns `{ file }`, null
@@ -70,7 +88,7 @@ export async function readUpload(
   return {
     file: {
       bytes: new Uint8Array(await entry.arrayBuffer()),
-      name: entry.name.slice(0, 200),
+      name: cutName(decodeName(entry.name)),
       type: entry.type,
     },
   };

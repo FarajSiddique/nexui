@@ -37,10 +37,10 @@ function setup(t, row) {
   return { fake, tasks };
 }
 
-function upload(body = PDF) {
+function upload(body = PDF, name = 'cv.pdf') {
   const form = new FormData();
 
-  form.set('file', new File([body], 'cv.pdf', { type: 'application/pdf' }));
+  form.set('file', new File([body], name, { type: 'application/pdf' }));
 
   return route.POST(authed(url, { method: 'POST', body: form }), context);
 }
@@ -63,6 +63,16 @@ test('a later resume is stored as one changeset, and no run starts', async (t) =
   assert.equal(fake.state.applied.length, 1);
   assert.equal(fake.state.applied[0].p_payload.label, 'Added your resume');
   assert.equal(tasks.length, 0);
+});
+
+test('a later resume’s file name, percent-encoded by Expo’s fetch, is stored decoded', async (t) => {
+  const { fake } = setup(t, plan());
+
+  await upload(PDF, 'Jordan%20Lee%20CV.pdf');
+
+  const [doc] = fake.state.snapshot.objects.filter((object) => object.kind === 'document');
+
+  assert.equal(doc.data.fileName, 'Jordan Lee CV.pdf');
 });
 
 test('a resume that can’t be read changes nothing: 400 with the reason', async (t) => {
