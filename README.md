@@ -120,8 +120,9 @@ revoke Apple access.
 details and photo lookup sends it in its User-Agent, and leaving it empty turns lookups off.
 Whether Jev routes new goals to job search is the `job-search` Vercel flag, switched in the
 Vercel dashboard without a deploy; locally the API reads it with a `VERCEL_OIDC_TOKEN` (see
-`apps/api/.env.example`). Job search's API-only settings: `NEXUI_CONTACT` is the address the job boards can reach us at (their User-Agent; empty turns board
-lookups off) and `PARALLEL_API_KEY` turns on web search (see `docs/architecture/job-search.md`).
+`apps/api/.env.example`). Job search's API-only settings: `NEXUI_CONTACT` is the address the
+job boards can reach us at (their User-Agent; empty turns board lookups off) and
+`PARALLEL_API_KEY` turns on web search (see `docs/architecture/job-search.md`).
 
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.
 Never use either prefix for secrets. Future server credentials belong only in the

@@ -30,7 +30,7 @@ importers:
         specifier: ^2.86.0
         version: 2.117.0
       '@vercel/flags-core':
-        specifier: ~1.8.3
+        specifier: 1.8.3
         version: 1.8.3(next@16.3.6(@babel/core@7.29.7)(@types/node@24.13.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(ws@8.21.3)
       ai:
         specifier: ^7.0.122

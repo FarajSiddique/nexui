@@ -25,7 +25,7 @@ These rules add to the root `AGENTS.md` for the Next.js API. Rules marked _(lint
 - Read environment variables through an `env` parameter that defaults to `process.env` (see `verifyRequest`), so tests can pass explicit values.
 - Server secrets stay in `apps/api`. Never import server modules from `packages/types` or the mobile app.
 - AI settings come from `readAiConfig` (`src/lib/ai/config.ts`); routes open AI sessions with `sessionOpener()`. Route tests pin `AI_PROVIDER=mock` with `useMockAi(t)` and collect runs instead of calling `after()` with `captureRuns(t)` (`tests/support/ai.mjs`).
-- Feature flags are Vercel Flags, read with `readFlag(key)` (`src/lib/flags`) inside a request; a flag that can't be read is off. A template's `gate` names its flag. Tests never reach Vercel: they answer flags with `useFlags(t, 'job-search')` (`tests/support/flags.mjs`) or `chooseTemplate`'s `flags` option.
+- Feature flags are Vercel Flags, read with `readFlag(key)` (`src/lib/flags`) inside a request. A flag that can't be read is off, except that a deployment may still serve the value it was built with when the flags service can't be reached. A template's `gate` names its flag. Tests never reach Vercel: they answer flags with `useFlags(t, 'job-search')` (`tests/support/flags.mjs`) or `chooseTemplate`'s `flags` option; `setFlagReader` is a test hook, imported from `flags.ts` directly.
 
 ## Types and imports
 
