@@ -32,6 +32,7 @@ Use Node.js 24 (`nvm use`) and pnpm 10.34.5. Run commands from the root:
 - `node --experimental-strip-types scripts/check-job-search.mjs`: run ten live Parallel web searches and read each hit from its board, a manual live gate; needs `PARALLEL_API_KEY` and `NEXUI_CONTACT`.
 - `node scripts/check-place-media.mjs`: run the place media lookup (text and photos) against live Wikipedia and Commons for eight places and print pass or fail per case, a manual live gate; needs `WIKIMEDIA_CONTACT`.
 - `pnpm lint:fix`: apply ESLint fixes across the workspaces.
+- `pnpm lint:prune`: remove `eslint-suppressions.json` entries for violations that are gone.
 - `pnpm fix`: apply ESLint fixes, then Prettier formatting.
 - `pnpm format` / `pnpm format:check`: apply or verify formatting.
 - `pnpm db:new <name>` / `pnpm db:push`: create a migration / apply migrations to the linked Supabase project (`supabase link` once first).
@@ -46,6 +47,8 @@ Use strict TypeScript, two-space indentation, single quotes, semicolons, and tra
 Always use braces and multiline bodies for `if`, `else`, `for`, `while`, and `do` statements, including one-statement guards. ESLint's `curly: ['error', 'all']` requires braces; Prettier formats the blocks. Do not disable the rule to keep a single-line statement.
 
 Shared layout rules live in `packages/config/eslint-style.js`. Leave a blank line before `return`, after a block (`if`, `try`, loops), and after a group of declarations. `pnpm lint:fix` adds these blank lines automatically.
+
+Size and complexity limits live in `packages/config/eslint-complexity.js`: complexity 12, nesting depth 3, 80 lines per function and four parameters. Code that already broke a limit when the limits were added is listed in each workspace's `eslint-suppressions.json`. Never add entries to make lint pass; split the function instead. When a change brings a listed function under its limit, lint fails until `pnpm lint:prune` removes the entry, so the list only shrinks.
 
 Claude Code runs `.claude/hooks/format.sh` after every edit. The hook runs Prettier, then ESLint `--fix` in the file's owning workspace, and reports any errors ESLint can't fix back to Claude.
 

@@ -14,6 +14,7 @@
     "build:preview": "pnpm --filter @nexui/mobile build:preview",
     "lint": "turbo run lint",
     "lint:fix": "pnpm -r --if-present run lint:fix",
+    "lint:prune": "pnpm -r --if-present run lint:prune",
     "fix": "pnpm lint:fix && pnpm format",
     "typecheck": "turbo run typecheck",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",

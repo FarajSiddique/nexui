@@ -9,6 +9,7 @@
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
+    "lint:prune": "eslint . --prune-suppressions",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
