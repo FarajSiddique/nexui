@@ -358,7 +358,7 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.ink,
   },
   meta: { fontFamily: fonts.body, fontSize: 15, color: colors.muted },
-  metaButton: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
+  metaButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
   pressed: { opacity: 0.7 },
   notice: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.muted },
   error: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.danger },

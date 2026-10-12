@@ -201,7 +201,8 @@ function objectUpdate(scope: CapabilityScope): Capability {
     }),
     policy: 'internal',
     exposeToModel: true,
-    // The app's renames and criteria edits. A user can already write any object through POST /changesets; this adds the kind's checks.
+    // The app's renames and criteria edits. A user can already write any object through
+    // POST /changesets; this adds the kind's checks.
     callableByUser: true,
     execute(input, ctx) {
       const object = resolveRef(ctx.refs, ctx.graph, input.ref);

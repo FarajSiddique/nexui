@@ -142,7 +142,7 @@ const placeUpdate = (ops, id) => ops.find((op) => op.op === 'update_object' && o
 const newLeg = (ops) => ops.find((op) => op.op === 'insert_object' && op.kind === 'leg');
 const deletedIds = (ops) => ops.filter((op) => op.op === 'delete_object').map((op) => op.id);
 
-test('the registry holds the slice-1 capabilities, and only three are for buttons', () => {
+test('the registry holds the slice-1 capabilities, and only four are for buttons', () => {
   const names = CAPABILITIES.map((capability) => capability.name);
 
   assert.deepEqual([...names].sort(), [

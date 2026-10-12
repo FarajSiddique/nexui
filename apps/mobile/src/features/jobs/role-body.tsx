@@ -34,7 +34,12 @@ export function RoleBody({ object, snapshot, onAction, onDone, busy }: DetailPro
   const { data, role, posting } = details;
   const subtitle = [details.company, details.line].filter(Boolean).join(' · ');
 
+  // The return key calls this too, so it waits out an edit in flight as Save does.
   const saveName = (): void => {
+    if (busy) {
+      return;
+    }
+
     const action = renameAction(role, name);
 
     setRenaming(false);

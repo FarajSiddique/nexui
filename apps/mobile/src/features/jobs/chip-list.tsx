@@ -46,7 +46,12 @@ export function ChipList({
     setAdding(false);
   };
 
+  // The return key calls this too, so it waits out an edit in flight as Add does.
   const submit = (): void => {
+    if (busy) {
+      return;
+    }
+
     onAdd?.(value);
     close();
   };

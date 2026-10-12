@@ -48,8 +48,11 @@ function profileLine(profile: ResumeProfile | undefined): string {
     profile.currentTitle && profile.currentEmployer
       ? `${profile.currentTitle} at ${profile.currentEmployer}`
       : (profile.currentTitle ?? profile.currentEmployer ?? profile.headline ?? '');
-  const years =
-    profile.years === undefined ? '' : `${profile.years} ${profile.years === 1 ? 'year' : 'years'}`;
+  let years = '';
+
+  if (profile.years !== undefined) {
+    years = profile.years === 1 ? '1 year' : `${profile.years} years`;
+  }
 
   return [now, years, profile.skills.slice(0, 3).join(', ')]
     .filter((part) => part.length > 0)

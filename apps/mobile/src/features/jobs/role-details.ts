@@ -59,10 +59,22 @@ export interface RoleDetails {
   interviews: { label: string; when: string }[];
 }
 
-function words(body: string): number {
+// "1 word", "250 words".
+function wordCount(body: string): string {
   const trimmed = body.trim();
+  const count = trimmed ? trimmed.split(/\s+/).length : 0;
 
-  return trimmed ? trimmed.split(/\s+/).length : 0;
+  return count === 1 ? '1 word' : `${count} words`;
+}
+
+// The calendar date an instant falls on in the zone, year included: "2026-10-08".
+function calendarDate(at: Date, timeZone?: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(at);
 }
 
 // When the posting went up and when a board last listed it: "Posted Oct 2 · still live today on
@@ -75,8 +87,9 @@ function postingNote(data: OpportunityData, now: Date, timeZone?: string): strin
   }
 
   if (data.lastSeenLiveAt) {
+    const seen = new Date(data.lastSeenLiveAt);
     const today =
-      formatDate(data.lastSeenLiveAt, timeZone) === formatDate(now.toISOString(), timeZone);
+      !Number.isNaN(seen.getTime()) && calendarDate(seen, timeZone) === calendarDate(now, timeZone);
 
     parts.push(
       today
@@ -141,7 +154,7 @@ export function roleDetails(
 
         return {
           id: draft.id,
-          label: `${DOC_LABELS[doc.docType]} · ${words(doc.body)} words`,
+          label: `${DOC_LABELS[doc.docType]} · ${wordCount(doc.body)}`,
           ai: aiMarkFor(draft).highlight,
         };
       }),

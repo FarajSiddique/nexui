@@ -53,7 +53,12 @@ function SalaryFloor({
     );
   }
 
+  // The return key calls this too, so it waits out an edit in flight as Save does.
   const save = (): void => {
+    if (busy) {
+      return;
+    }
+
     const action = salaryFloorAction(search, typed);
 
     setTyped(null);

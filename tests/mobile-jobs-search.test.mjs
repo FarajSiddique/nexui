@@ -66,6 +66,14 @@ test('the search sheet shows its criteria, never-show list, passes and resume', 
     profile: 'Senior PM at Brightbank · 8 years · payments, risk, lending',
   });
   assert.equal(searchDetails(snapshot, RESUME_ID), null);
+
+  const oneYear = { ...resume.data, profile: { ...resume.data.profile, years: 1 } };
+  const junior = jobSnapshot({ search: data, objects: [{ ...resume, data: oneYear }] });
+
+  assert.equal(
+    searchDetails(junior, SEARCH_ID).resume.profile,
+    'Senior PM at Brightbank · 1 year · payments, risk, lending',
+  );
 });
 
 test('lists take a new entry once, within their limits, and keep one role', () => {

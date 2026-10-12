@@ -104,15 +104,17 @@ export function isDateOnly(at: string): boolean {
 }
 
 // A date-or-time as an instant and the zone to read it in: a date alone is noon UTC that day
-// (as `interviewTime` counts it), read in UTC so it never moves a day.
+// (as `interviewTime` counts it), read in UTC so it never moves a day. Null for either that
+// doesn't parse, such as `2026-13-45`.
 function instant(at: string, timeZone?: string): { date: Date; timeZone?: string } | null {
-  if (isDateOnly(at)) {
-    return { date: new Date(`${at}T12:00:00Z`), timeZone: 'UTC' };
+  const dateOnly = isDateOnly(at);
+  const time = Date.parse(dateOnly ? `${at}T12:00:00Z` : at);
+
+  if (Number.isNaN(time)) {
+    return null;
   }
 
-  const time = Date.parse(at);
-
-  return Number.isNaN(time) ? null : { date: new Date(time), timeZone };
+  return { date: new Date(time), timeZone: dateOnly ? 'UTC' : timeZone };
 }
 
 function formatted(

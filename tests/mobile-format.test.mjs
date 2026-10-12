@@ -174,6 +174,8 @@ test('dates read with their time in the given zone; a date alone never moves a d
   );
   assert.equal(formatDateTime('2026-10-21'), 'Wed, Oct 21');
   assert.equal(formatDateTime('not a date'), 'not a date');
+  assert.equal(formatDateTime('2026-13-45'), '2026-13-45');
+  assert.equal(formatDate('2026-13-45'), '2026-13-45');
   assert.equal(formatTime('2026-10-09T13:00:00Z', 'Europe/London'), '2:00 PM');
   assert.equal(formatTime('2026-10-21'), '');
   assert.equal(formatDate('2026-09-26T23:30:00Z', 'Europe/London'), 'Sep 27');

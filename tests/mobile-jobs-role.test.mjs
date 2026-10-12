@@ -139,6 +139,34 @@ test('View posting opens the host it names, and a link with a user name shows no
   });
 });
 
+test('the posting note says still live only for today, year and all', () => {
+  const note = (changes) => roleDetails(planWith(role(roleData(changes))), ROLE_ID, NOW, ZONE);
+
+  // NOW is Oct 8, 2026, 1 PM in London.
+  assert.deepEqual(
+    [
+      note({ lastSeenLiveAt: '2025-10-08T07:04:00.000Z' }).posting.note,
+      note({ postedAt: '2026-10-02T09:00:00.000Z', lastSeenLiveAt: '2026-10-05T07:00:00.000Z' })
+        .posting.note,
+      note({ lastSeenLiveAt: '2026-10-08T07:04:00.000Z' }).posting.note,
+      note({}).posting.note,
+    ],
+    [
+      'Last seen live Oct 8',
+      'Posted Oct 2 · last seen live Oct 5',
+      'Still live today on its job board',
+      '',
+    ],
+  );
+});
+
+test('a one-word draft reads as one word', () => {
+  const draft = jobObject(DRAFT_ID, 'document', { docType: 'follow_up', body: ' Thanks ' });
+  const details = roleDetails(planWith(role(roleData()), [draft]), ROLE_ID, NOW, ZONE);
+
+  assert.equal(details.drafts[0].label, 'Follow-up · 1 word');
+});
+
 test('a closed role says how, and offers its outcomes to close by', () => {
   const closed = roleDetails(
     planWith(role(roleData({ stage: 'closed', outcome: 'no_reply' }))),
