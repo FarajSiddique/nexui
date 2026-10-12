@@ -14,6 +14,7 @@
     "build:preview": "pnpm --filter @nexui/mobile build:preview",
     "lint": "turbo run lint",
     "lint:fix": "pnpm -r --if-present run lint:fix",
+    "lint:prune": "pnpm -r --if-present run lint:prune",
     "fix": "pnpm lint:fix && pnpm format",
     "typecheck": "turbo run typecheck",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
@@ -24,10 +25,12 @@
     "db:push:dev": "node scripts/db-push.mjs dev",
     "db:push:prod": "node scripts/db-push.mjs prod",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "knip": "knip"
   },
   "devDependencies": {
     "@nexui/config": "workspace:*",
+    "knip": "^6.41.0",
     "prettier": "^3.6.2",
     "supabase": "^2.117.0",
     "turbo": "^2.5.8"

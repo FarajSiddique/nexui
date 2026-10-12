@@ -9,3 +9,5 @@ pnpm-lock.yaml
 next-env.d.ts
 expo-env.d.ts
 docs/design/
+# Written by ESLint (--suppress-rule / --prune-suppressions).
+eslint-suppressions.json

@@ -5,6 +5,7 @@ const { defineConfig } = require('eslint/config');
 const expo = require('eslint-config-expo/flat');
 const prettier = require('eslint-config-prettier');
 
+const complexity = require('@nexui/config/eslint-complexity').default;
 const style = require('@nexui/config/eslint-style').default;
 
 const tsconfig = require.resolve('./tsconfig.json');
@@ -185,6 +186,7 @@ module.exports = defineConfig([
   expo,
   prettier,
   style,
+  complexity,
   importBoundaries,
   ...barrels,
   { ignores: ['dist/**', '.expo/**', 'expo-env.d.ts'] },

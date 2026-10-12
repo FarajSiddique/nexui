@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
+import complexity from './eslint-complexity.js';
 import style from './eslint-style.js';
 
 export default [
@@ -10,4 +11,5 @@ export default [
   ...tseslint.configs.recommended,
   prettier,
   style,
+  complexity,
 ];

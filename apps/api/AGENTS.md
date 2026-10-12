@@ -1,6 +1,6 @@
 # API Guidelines
 
-These rules add to the root `AGENTS.md` for the Next.js API. Rules marked _(lint)_ are enforced by `apps/api/eslint.config.mjs`.
+These rules add to the root `AGENTS.md` for the Next.js API. Rules marked _(lint)_ are enforced by `apps/api/eslint.config.mjs`, and _(knip)_ by `pnpm knip` (`knip.jsonc`).
 
 ## Route handlers
 
@@ -24,16 +24,17 @@ These rules add to the root `AGENTS.md` for the Next.js API. Rules marked _(lint
 
 - Read environment variables through an `env` parameter that defaults to `process.env` (see `verifyRequest`), so tests can pass explicit values.
 - Server secrets stay in `apps/api`. Never import server modules from `packages/types` or the mobile app.
-- AI settings come from `readAiConfig` (`src/lib/ai/config.ts`); routes open AI sessions with `sessionOpener()`. Route tests pin `AI_PROVIDER=mock` with `useMockAi(t)` and collect runs instead of calling `after()` with `captureRuns(t)` (`tests/support/ai.mjs`).
+- AI settings are read in `src/lib/ai/config.ts`; routes open AI sessions with `sessionOpener()`, which reads them. Route tests pin `AI_PROVIDER=mock` with `useMockAi(t)` and collect runs instead of calling `after()` with `captureRuns(t)` (`tests/support/ai.mjs`).
 - Feature flags are Vercel Flags, read with `readFlag(key)` (`src/lib/flags`) inside a request. A flag that can't be read is off, except that a deployment may still serve the value it was built with when the flags service can't be reached. A template's `gate` names its flag. Tests never reach Vercel: they answer flags with `useFlags(t, 'job-search')` (`tests/support/flags.mjs`) or `chooseTemplate`'s `flags` option; `setFlagReader` is a test hook, imported from `flags.ts` directly.
 
 ## Types and imports
 
 - Exported functions have explicit parameter and return types. _(lint: `explicit-module-boundary-types`)_
+- Functions stay within the shared size and complexity limits in `packages/config/eslint-complexity.js`; past four parameters, take one options object. Existing exceptions are listed in `eslint-suppressions.json` (see the root `AGENTS.md`). _(lint)_
 - Use `import type` for type-only imports. _(lint)_
-- Each `src/lib/<domain>/` has an `index.ts` barrel that re-exports, by name, what other code may use. Import another domain, or `src/lib` from a route, through its barrel: `import { loadSnapshot } from '#lib/graph'`. `#lib/*` is a Node subpath import in `package.json`, so Next.js, `tsc` and the Node test runner all resolve it. _(lint: `no-restricted-imports` bans `../` paths and `#lib/<domain>/<file>`)_
+- Each `src/lib/<domain>/` has an `index.ts` barrel that re-exports, by name, what routes and other domains import from it. Import another domain, or `src/lib` from a route, through its barrel: `import { loadSnapshot } from '#lib/graph'`. `#lib/*` is a Node subpath import in `package.json`, so Next.js, `tsc` and the Node test runner all resolve it. _(lint: `no-restricted-imports` bans `../` paths and `#lib/<domain>/<file>`)_
 - Inside a domain, import siblings directly with `./file.ts`, never the domain's own barrel, which would load it in a cycle. _(lint)_
-- A barrel holds only `export { … } from './file.ts'` and `export type { … } from './file.ts'` lines; code lives in the domain's other files. _(lint: `no-restricted-syntax`)_ Re-export types with `export type`, because Node strips types file by file. When another domain needs a new name, add it to the barrel; a new domain needs its `index.ts` before `#lib/<domain>` resolves.
+- A barrel holds only `export { … } from './file.ts'` and `export type { … } from './file.ts'` lines; code lives in the domain's other files. _(lint: `no-restricted-syntax`)_ Re-export types with `export type`, because Node strips types file by file. When another domain needs a new name, add it to the barrel then, not before: a name nothing imports through the barrel fails CI, even a type that appears in an exported signature (callers infer it). _(knip)_ A new domain needs its `index.ts` before `#lib/<domain>` resolves.
 - Some barrels import each other in a cycle (for example `graph` and `runs`). That is safe only while cross-domain imports are used inside functions, so never use one at module top level (a `const`, `class … extends`, or array built from another domain's export). The exception is the registries' load chain: a domain on it may use the exports of the domains below it at top level (at runtime, since `import type` doesn't count: `lib/kinds` imports no other domain, `lib/capabilities` only `lib/kinds`, `lib/travel` and `lib/jobs` only `lib/capabilities`, and `lib/templates` only domains below it: `lib/kinds`, `lib/capabilities`, `lib/travel` and `lib/jobs`), which is how `TRAVEL_CAPABILITIES`, `JOB_SEARCH_CAPABILITIES` and `TEMPLATES` are built at load time. `tests/api-load-order.test.mjs` enforces the chain and loads every domain first in a fresh process. Everywhere else the rule stands.
 - Import groups go in this order: Node builtins, packages, `@nexui/*`, `#lib/*`, then relative paths, with a blank line between groups. _(lint: `import/order`)_
 - Relative imports include the `.ts` extension, because the Node test runner loads source files directly.

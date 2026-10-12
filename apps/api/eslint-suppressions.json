@@ -1,0 +1,101 @@
+{
+  "src/lib/account/delete-account.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/capabilities/decisions.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/lib/capabilities/graph.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/graph/prepare.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "src/lib/jobs/board-urls.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/jobs/config.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/jobs/derive.ts": {
+    "max-params": {
+      "count": 3
+    }
+  },
+  "src/lib/jobs/roles.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/jobs/scan.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/media/rules.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/media/wikipedia.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/runs/execute.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/runs/store.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "src/lib/staging/invoke.ts": {
+    "max-params": {
+      "count": 3
+    }
+  },
+  "src/lib/staging/stage.ts": {
+    "max-depth": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/lib/supabase/verify-request.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/templates/derive.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "src/lib/travel/derive.ts": {
+    "max-params": {
+      "count": 1
+    }
+  }
+}

@@ -6,12 +6,14 @@
   "exports": {
     "./typescript/base.json": "./typescript/base.json",
     "./eslint": "./eslint.js",
+    "./eslint-complexity": "./eslint-complexity.js",
     "./eslint-style": "./eslint-style.js",
     "./prettier": "./prettier.js"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "lint:fix": "eslint . --fix --max-warnings 0"
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "lint:prune": "eslint . --prune-suppressions"
   },
   "devDependencies": {
     "eslint": "^9.39.1"

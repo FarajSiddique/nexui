@@ -1,0 +1,134 @@
+{
+  "src/app/(app)/(tabs)/(home)/index.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/app/(app)/(tabs)/(home)/intent/[id].tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/app/(app)/(tabs)/changes.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/app/(app)/account.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/app/(app)/compose.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/app/(app)/object.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/app/(auth)/sign-in.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/app/(auth)/verify.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/data/api-request.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "src/features/account/appearance-card.tsx": {
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/features/auth/auth-actions.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/compose/run-card.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/home/swipe-to-delete.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/jobs/chip-list.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/jobs/draft-details.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/features/jobs/pipeline.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "src/features/jobs/role-body.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/jobs/search-body.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/jobs/timeline.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "src/features/travel/place-sheet.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/travel/sections/route-section.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/sections/decision-section.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/features/workspace/workspace-layout.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/lib/format.ts": {
+    "complexity": {
+      "count": 1
+    }
+  }
+}
