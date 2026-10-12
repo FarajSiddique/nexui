@@ -125,7 +125,9 @@ turns whatever a primitive reports (a `WorkspaceAction`) into one of:
   `intakeRoute` (`@nexui/types`) says: `start` before the plan's first run, `resume` after;
 - `start`: `start` with no file;
 - `copy`: the text on the clipboard (`expo-clipboard`), then "Copied.";
-- `link`: `Linking.openURL`.
+- `link`: `Linking.openURL`, only for an https page or a `mailto:` message, as the URL it parses
+  to (`openableUrl`, `lib/links.ts`); a link it refuses, or one the system can't open, shows
+  "Couldn't open that link.".
 
 ### Deleting a plan
 
@@ -153,7 +155,7 @@ into a close.
 These files under `apps/mobile/src/` have no `react-native` or `expo-*` import, so
 `tests/mobile-*.test.mjs` can run them under plain Node with no RN runtime:
 
-- `lib/format.ts` and `lib/ai-mark.ts`;
+- `lib/format.ts`, `lib/ai-mark.ts` and `lib/links.ts`;
 - `workspace-layout.ts` and `workspace-actions.ts` in `features/workspace/`;
 - `stop-details.ts`, `trip-actions.ts`, `travel-format.ts` and `sections/map-region.ts` in
   `features/travel/`;
@@ -174,6 +176,7 @@ it: the action builders take `CapabilityAction` from `#features/workspace` that 
   reads a field in its `FieldFormat`; `cardText` reads an object's title/subtitle from
   `KIND_CARDS`; `capitalize` and `ordinalWord`.
 - **`ai-mark.ts`**: `aiMarkFor`, the one place that decides what's marked as Nexui's work.
+- **`links.ts`**: `openableUrl`, the URL a `link` action may open (https and `mailto:` only).
 - **`workspace-layout.ts`**: `layoutWorkspace` and `sectionData`, which turn a `WorkspaceDoc` and a
   `GraphSnapshot` into `WorkspaceBlock[]` — each section's data, evaluated with `evaluateQuery`
   from `@nexui/types`, and the Open band placement. `metric` and `allocation` read the anchor's
@@ -191,7 +194,8 @@ it: the action builders take `CapabilityAction` from `#features/workspace` that 
 - **`job-parts.ts`**: a role's links and interviews (`linkedTo`, `linkedFrom`, `companyName`,
   `interviewsFor`, `nextInterview`, `isUpcoming`).
 - **`job-format.ts`**: a role's wording (`roleLine`, `placeLine`, `salaryText`, `outcomeLabel`,
-  `workModeLabel`) and `linkHost`, the host a posting's link opens.
+  `workModeLabel`) and `postingLink`, the parsed link a posting opens and its host (null for one
+  that isn't https or carries a user name or password).
 - **`role-actions.ts`**: `stageAction`, `passAction`, `cardAction` (a pipeline card's button) and
   `renameAction`, each with the ops that show it at once.
 - **`pipeline.ts`**: `pipelineGroups`, the pipeline's stages and cards.
@@ -393,9 +397,11 @@ maps from the create's outcome; `targetOf` gives the plan the sheet acts on next
   the composer, where sending it asks the plan already going.
 
 On a plan whose template takes a document (`TEMPLATE_INTAKES`), a **PDF** button sits beside the
-input, except during the resume step and while anything is in flight. It picks a file and sends it
+input once the plan has loaded, except during the resume step, under the second-search reply
+(whose plan is the other search), and while anything is in flight. It picks a file and sends it
 where `intakeRoute` says: `start` before the plan's first run, or `resume` after, which replaces
-the resume as one undoable change ("Replaced your resume.").
+the resume as one change and says "Replaced your resume." (no Undo toast here; the Changes tab
+can undo it).
 
 A goal Nexui can't plan is saved, and the sheet shows `SavedGoalReply`
 (`apps/mobile/src/features/compose/saved-goal-reply.tsx`) instead of a run: what Nexui plans today
@@ -463,17 +469,22 @@ The sheet handles a body's actions as the workspace screen does: edits go throug
 capability path, optimistic ops and Undo (see "Optimistic edits"), and `upload`, `copy` and `link`
 work the same. Two differ:
 
-- `open` swaps the body in place (`router.setParams`; Next stop, a role's draft) and scrolls to
-  the top.
+- `open` swaps the body in place (`router.setParams`; Next stop, a role's draft), scrolls to the
+  top and clears the notice.
 - `ask` dismisses the sheet and opens `+` with the prompt (Find a stay, Ask about this role, the
   salary floor's Set in +).
 
 An object removed while its sheet is open shows "This is no longer in your plan." (each body has
 its own line for an object it can't read). Done closes the sheet, or opens the plan when there's
 no history to go back to, as after a reload on web. The ScrollView keeps taps while the keyboard
-is up (`keyboardShouldPersistTaps="handled"`), so Save lands on the first tap. Like the + sheet,
-its root `View` is `collapsable={false}` with an empty `<View collapsable={false} />` first child;
-without them react-native-screens resizes the ScrollView and the iOS form sheet shows blank.
+is up (`keyboardShouldPersistTaps="handled"`), so Save lands on the first tap, and on iOS it
+insets its content by the keyboard (`automaticallyAdjustKeyboardInsets`; it uses UIKit's own
+geometry, so the form sheet's measuring problem in "The + sheet" doesn't apply), keeping a lower
+field in view. The sheet's notice ("Copied.", a 4 MB refusal), "Reading your resume…" and its
+error lines sit in a fixed strip under the ScrollView, as the + sheet's composer does, so the line
+about the button just tapped shows on a long sheet. Like the + sheet, its root `View` is
+`collapsable={false}` with an empty `<View collapsable={false} />` first child; without them
+react-native-screens resizes the ScrollView and the iOS form sheet shows blank.
 
 `usePlaceMedia(intentId, placeIds)` fetches `GET /api/intents/:id/media`, refetching every 2 s
 while any place is pending, up to ten times, and the workspace screen calls it, through
