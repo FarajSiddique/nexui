@@ -10,7 +10,7 @@ iOS). Setup steps are in `docs/specs/auth.md`. For the current auth flow and own
 
 ## Requirements
 
-- Node.js 24 LTS recommended (`nvm use`); minimum 22.13.
+- Node.js 24 (`nvm use`); the test suite needs it.
 - pnpm 10.34.5: `npm install --global pnpm@10.34.5`.
 - An EAS development build on the iOS Simulator or an Android device. Native Google
   and Apple sign-in don't run in Expo Go (see "EAS builds" in `docs/specs/auth.md`). The web preview
