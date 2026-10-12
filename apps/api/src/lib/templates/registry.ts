@@ -5,7 +5,8 @@ import { TRAVEL_TEMPLATE } from '#lib/travel';
 
 import type { TemplateDefinition } from './types.ts';
 
-type Env = Record<string, string | undefined>;
+/** Answers whether a template's gate, a Vercel flag, is on (`readFlag` in `lib/flags`). */
+export type GateCheck = (flag: string) => Promise<boolean>;
 
 /** Every template, by name. A name `templateSchema` lists without an entry fails typecheck. */
 export const TEMPLATES: Record<Template, TemplateDefinition> = {
@@ -20,15 +21,18 @@ export function templateFor(name: Template | null): TemplateDefinition | null {
 
 /**
  * The templates Jev may route a new goal to: every one without a `gate`, and each whose gate
- * variable is `on`.
+ * flag is on.
  *
  * @example
- * routableTemplates({}).map((template) => template.name) // ['travel']
+ * (await routableTemplates(async () => false)).map((template) => template.name) // ['travel']
  */
-export function routableTemplates(env: Env = process.env): TemplateDefinition[] {
-  return Object.values(TEMPLATES).filter(
-    (template) => template.gate === undefined || env[template.gate]?.trim() === 'on',
+export async function routableTemplates(isOn: GateCheck): Promise<TemplateDefinition[]> {
+  const templates = Object.values(TEMPLATES);
+  const open = await Promise.all(
+    templates.map((template) => (template.gate === undefined ? true : isOn(template.gate))),
   );
+
+  return templates.filter((_, index) => open[index]);
 }
 
 /**

@@ -118,8 +118,9 @@ revoke Apple access.
 `CRON_SECRET`, also API-only, authorizes Vercel's cron call to `GET /api/cron/runs`.
 `WIKIMEDIA_CONTACT` there is an email address or URL Wikimedia can reach us at; the stop
 details and photo lookup sends it in its User-Agent, and leaving it empty turns lookups off.
-Job search's API-only settings: `JOB_SEARCH=on` lets Jev route new goals to it,
-`NEXUI_CONTACT` is the address the job boards can reach us at (their User-Agent; empty turns board
+Whether Jev routes new goals to job search is the `job-search` Vercel flag, switched in the
+Vercel dashboard without a deploy; locally the API reads it with a `VERCEL_OIDC_TOKEN` (see
+`apps/api/.env.example`). Job search's API-only settings: `NEXUI_CONTACT` is the address the job boards can reach us at (their User-Agent; empty turns board
 lookups off) and `PARALLEL_API_KEY` turns on web search (see `docs/architecture/job-search.md`).
 
 `EXPO_PUBLIC_*` is bundled into the app, and `NEXT_PUBLIC_*` is public configuration.

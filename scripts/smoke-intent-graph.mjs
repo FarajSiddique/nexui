@@ -5,8 +5,8 @@
  * (replaying `japan-ask-free-days`), pick an option and undo the pick. Needs the API running
  * and a QA session from `node scripts/qa-session.mjs > .qa/session.json`. Run the API with
  * AI_PROVIDER=mock: the goal matches no fixture, so its run changes nothing and the counts
- * below hold. Run it with JOB_SEARCH=on and NEXUI_CONTACT empty: the job search goal replays
- * `job-search-staff-pm`, and its scan reads no board.
+ * below hold. Run it with NEXUI_CONTACT empty and the `job-search` Vercel flag on in Development
+ * (it is): the job search goal replays `job-search-staff-pm`, and its scan reads no board.
  *
  * node scripts/smoke-intent-graph.mjs [.qa/session.json] [http://localhost:3000]
  */

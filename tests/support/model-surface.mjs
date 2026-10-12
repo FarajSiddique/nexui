@@ -5,14 +5,15 @@ import { instructionsFor } from '../../apps/api/src/lib/cognition/prompts.ts';
 import { chooseTemplate } from '../../apps/api/src/lib/perception/perceive.ts';
 import { TEMPLATES } from '../../apps/api/src/lib/templates/registry.ts';
 import { Experimental_EvaluationMockModelV4 } from './ai.mjs';
+import { flagsOn } from './flags.mjs';
 
 /**
  * Everything a model sees for one template's plans: each tool's name, description, flags and
  * input schema in order (capabilities, then lookups), the run instructions for every kind and
- * route, and Jev's template question with the gates `env` sets. JSON round trip, so it compares
- * with the stored file exactly.
+ * route, and Jev's template question with the gate flags `flags` turns on. JSON round trip, so
+ * it compares with the stored file exactly.
  */
-export async function modelSurface(name, env) {
+export async function modelSurface(name, flags) {
   const template = TEMPLATES[name];
   const seen = [];
   const model = new Experimental_EvaluationMockModelV4({
@@ -23,7 +24,7 @@ export async function modelSurface(name, env) {
     },
   });
 
-  await chooseTemplate(model, 'Plan Japan', { env });
+  await chooseTemplate(model, 'Plan Japan', { flags });
 
   const surface = {
     tools: [
@@ -54,11 +55,11 @@ export async function modelSurface(name, env) {
   return JSON.parse(JSON.stringify(surface));
 }
 
-/** What a model sees for a trip, with job search gated off as in production. */
-export const travelModelSurface = () => modelSurface('travel', {});
+/** What a model sees for a trip, with job search's flag off. */
+export const travelModelSurface = () => modelSurface('travel', flagsOn());
 
-/** What a model sees for a job search, with its gate on. */
-export const jobSearchModelSurface = () => modelSurface('job_search', { JOB_SEARCH: 'on' });
+/** What a model sees for a job search, with its flag on. */
+export const jobSearchModelSurface = () => modelSurface('job_search', flagsOn('job-search'));
 
 // `node --experimental-strip-types tests/support/model-surface.mjs` rewrites both expected files,
 // for a change to what models see that is meant. Review their diffs like code.

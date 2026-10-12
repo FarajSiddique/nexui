@@ -12,8 +12,9 @@
  * pnpm eval:jobs --case <name>      one Part B case
  * pnpm eval:jobs --clean            delete every plan a jobs eval left in the QA account
  *
- * Part A needs AI_GATEWAY_API_KEY in apps/api/.env.local. Part B needs the API running with
- * AI_PROVIDER=live, JOB_SEARCH=on and NEXUI_CONTACT (and PARALLEL_API_KEY for web search), a QA
+ * Part A needs AI_GATEWAY_API_KEY in apps/api/.env.local, and routes with every gated template
+ * open. Part B needs the API running with AI_PROVIDER=live and NEXUI_CONTACT (and
+ * PARALLEL_API_KEY for web search), the `job-search` Vercel flag on in Development (it is), a QA
  * session in .qa/session.json, and SUPABASE_SECRET_KEY with QA_SUPABASE_REF in
  * apps/api/.env.local to tag and clean up plans.
  */
@@ -41,8 +42,9 @@ const tokens = (run) =>
   `${run.modelUsage.inputTokens ?? 0} in / ${run.modelUsage.outputTokens ?? 0} out`;
 
 async function routing() {
-  const env = { ...process.env, AI_PROVIDER: 'live', JOB_SEARCH: 'on' };
-  const open = sessionOpener(env);
+  const open = sessionOpener({ ...process.env, AI_PROVIDER: 'live' });
+  // Every gated template is offered, whatever the flags serve: the eval is about routing.
+  const flags = async () => true;
   let right = 0;
 
   console.log('━━ Part A: routing');
@@ -54,7 +56,7 @@ async function routing() {
     try {
       answer = await chooseTemplate(session.evaluationModel, testCase.goal, {
         providerOptions: session.providerOptions('perception'),
-        env,
+        flags,
       });
     } catch {
       answer = 'failed';

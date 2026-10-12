@@ -18,7 +18,7 @@ export const JOB_SEARCH_TEMPLATE: TemplateDefinition = {
   perception:
     'Getting a job: a job search, a career move, roles at named companies, or one application ' +
     'or interview, such as prep for a Google interview.',
-  gate: 'JOB_SEARCH',
+  gate: 'job-search',
   singleActive: true,
   context: { jobs: jobsContextSchema },
   timeZone: (snapshot) => jobsContext(snapshot.intent)?.timezone,
