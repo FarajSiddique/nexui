@@ -129,8 +129,9 @@ export interface TemplateDefinition {
   /** The sentence Jev reads when it picks a template for a new goal. */
   perception: string;
   /**
-   * An env var that must be `on` for Jev to route new goals here, so a template can ship before
-   * its app side (job search's `JOB_SEARCH`). Without one, the template always routes.
+   * The key of a boolean Vercel flag (project `nexui-api`) that must be on for Jev to route new
+   * goals here, so a template can ship before its app side or be switched off without a deploy
+   * (job search's `job-search`). Without one, the template always routes.
    */
   gate?: string;
   /**

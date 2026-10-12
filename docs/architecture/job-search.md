@@ -103,9 +103,15 @@ The app draws a job search through the generic workspace and its own folder, `ap
 
 ## Configuration and rollout
 
+Whether Jev routes new goals to job search is the boolean Vercel flag `job-search` in the `nexui-api` project (the template's `gate`). It is on in Development, Preview and Production. Flip it in the Vercel dashboard (or `vercel flags enable|disable job-search`), per environment, with no deploy.
+
+- The flag governs only routing (`routableTemplates`): the `start` and `resume` routes aren't gated, so a plan that exists keeps working when the flag goes off.
+- `readFlag` (`lib/flags`) evaluates it with `@vercel/flags-core` inside the request. Deployments authenticate with their own OIDC token and carry the definitions they were built with, as a fallback when the service can't be reached. A flag that can't be read is off, and `[flags]` logs its key.
+- Locally the API reads the Development environment's value with a `VERCEL_OIDC_TOKEN` in `apps/api/.env.local` (see `apps/api/.env.example`); without one, job search doesn't route. Tests and scripts answer flags themselves (`useFlags(t, 'job-search')` in `tests/support/flags.mjs`; `chooseTemplate`'s `flags` option).
+- The `gate` field stays for the next template whose app side follows its API.
+
 Set in `apps/api/.env.local` (see `apps/api/.env.example`):
 
-- `JOB_SEARCH`: `on` lets Jev route new goals to job search. The gate governs only routing (`routableTemplates`): the `start` and `resume` routes aren't gated. Unset, the template doesn't route (`gate`). The app draws job search (see "In the app"), but production leaves it unset until the iOS preview build with the app's two new native modules, `expo-document-picker` and `expo-clipboard`, is installed, then turns it on. The `gate` field stays for the next template whose app side follows its API.
 - `NEXUI_CONTACT`: an email address or URL (at most 200 characters) the boards can reach us at. Unset or invalid, board lookups and the scan are off; an invalid value logs that, without the value.
 - `PARALLEL_API_KEY`: unset, web search is off and scans read only the boards of companies a user named. Production waits for Parallel's written answer on its acceptable-use policy.
 

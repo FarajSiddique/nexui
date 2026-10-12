@@ -8,7 +8,7 @@ import { PerceptionFailedError } from '../apps/api/src/lib/perception/perceive.t
 import { getAdminClient, getUserClient } from '../apps/api/src/lib/supabase/clients.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, failingEvaluationModel } from './support/ai.mjs';
-import { useEnv } from './support/env.mjs';
+import { useFlags } from './support/flags.mjs';
 import { graphDb } from './support/graph-db.mjs';
 import {
   INTENT_ID,
@@ -84,6 +84,8 @@ function setup(t, row = null, options = {}) {
   const fake = graphDb(row, options);
 
   mockSupabaseAuth(t, fake.fetch);
+  // Every flag is off unless a test turns one on after setup.
+  useFlags(t);
 
   return {
     fake,
@@ -215,9 +217,10 @@ test('an ask on an intent without a workspace is refused', async (t) => {
 });
 
 test('a job search is seeded with the device’s zone and waits for its resume: no run', async (t) => {
-  useEnv(t, { JOB_SEARCH: 'on' });
-
   const { fake, tasks, deps } = setup(t);
+
+  useFlags(t, 'job-search');
+
   const started = await startIntent(deps, 'Find a Staff PM role in London', 'Europe/London');
 
   assert.equal(started.outcome, 'awaiting_resume');
@@ -234,9 +237,9 @@ test('a job search is seeded with the device’s zone and waits for its resume: 
 });
 
 test('a second job search goal while one is going answers with that plan, and creates nothing', async (t) => {
-  useEnv(t, { JOB_SEARCH: 'on' });
-
   const { fake, deps } = setup(t, null, { activeIntents: [INTENT_ID] });
+
+  useFlags(t, 'job-search');
 
   assert.deepEqual(await startIntent(deps, 'Find a Staff PM role in Berlin'), {
     outcome: 'existing_search',
@@ -245,9 +248,8 @@ test('a second job search goal while one is going answers with that plan, and cr
   assert.equal(fake.state.created, null);
 });
 
-test("with its gate off, Jev isn't offered job search, and an answer naming it is refused", async (t) => {
-  useEnv(t, { JOB_SEARCH: undefined });
-
+test("with its flag off, Jev isn't offered job search, and an answer naming it is refused", async (t) => {
+  // `setup` leaves every flag off.
   const { deps } = setup(t);
 
   // The fixture answers `job_search`, which Jev wasn't offered, so the SDK refuses it.

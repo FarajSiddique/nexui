@@ -9,6 +9,7 @@ import { createStager } from '../apps/api/src/lib/staging/stage.ts';
 import { chooseTemplate, routeAsk } from '../apps/api/src/lib/perception/perceive.ts';
 import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
 import { applyOps } from '../packages/types/src/index.ts';
+import { flagsOn } from './support/flags.mjs';
 import { idSequence, INTENT_ID, RUN_ID, STAMP } from './support/graph.mjs';
 
 const fixture = {
@@ -33,7 +34,10 @@ test('a mock session answers Jev from its fixture and replays its steps, then st
     'Find a new job',
   );
 
-  assert.equal(await chooseTemplate(session.evaluationModel, 'Find a new job'), 'unsupported');
+  assert.equal(
+    await chooseTemplate(session.evaluationModel, 'Find a new job', { flags: flagsOn() }),
+    'unsupported',
+  );
   assert.deepEqual(
     await routeAsk(session.evaluationModel, { text: 'Find a new job', goal: '', summary: '' }),
     { value: 'edit', source: 'model' },
@@ -58,7 +62,7 @@ test('a mock session answers Jev from its fixture and replays its steps, then st
 test('without a fixture, mock perception says travel and reasoning, and the model changes nothing', async () => {
   const session = sessionOpener({}, [fixture])('ask', 'Something else entirely');
 
-  assert.equal(await chooseTemplate(session.evaluationModel, 'x'), 'travel');
+  assert.equal(await chooseTemplate(session.evaluationModel, 'x', { flags: flagsOn() }), 'travel');
   assert.equal(
     (await routeAsk(session.evaluationModel, { text: 'x', goal: '', summary: '' })).value,
     'reasoning',

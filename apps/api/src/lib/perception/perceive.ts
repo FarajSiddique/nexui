@@ -3,9 +3,8 @@ import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
 import type { RunRoute, Template } from '@nexui/types';
 
 import type { GatewayOptions } from '#lib/ai';
-import { routableTemplates } from '#lib/templates';
-
-type Env = Record<string, string | undefined>;
+import { readFlag } from '#lib/flags';
+import { routableTemplates, type GateCheck } from '#lib/templates';
 
 /** A template, or `unsupported` for a goal no template fits: saved, but not planned. */
 export type TemplateChoice = Template | 'unsupported';
@@ -19,8 +18,8 @@ export interface Perceived<T> {
 export interface PerceptionOptions {
   providerOptions?: GatewayOptions;
   timeoutMs?: number;
-  /** The settings templates' gates read: `process.env` unless a caller passes its own. */
-  env?: Env;
+  /** How templates' gate flags are read: Vercel Flags (`readFlag`), unless a caller passes one. */
+  flags?: GateCheck;
 }
 
 /** Perception runs before the response is sent, so it gets a short budget. */
@@ -33,10 +32,10 @@ export class PerceptionFailedError extends Error {}
 const UNSUPPORTED = 'Anything else, such as a move, a wedding, buying a car or hiring for a team.';
 
 // Each template's own sentence, then `unsupported`: a new template teaches routing by existing.
-function templateCriteria(env: Env): Record<TemplateChoice, string> {
+async function templateCriteria(flags: GateCheck): Promise<Record<TemplateChoice, string>> {
   const criteria = {} as Record<TemplateChoice, string>;
 
-  for (const template of routableTemplates(env)) {
+  for (const template of await routableTemplates(flags)) {
     criteria[template.name] = template.perception;
   }
 
@@ -68,7 +67,7 @@ export async function chooseTemplate(
         template: {
           type: 'choice',
           instructions: 'Someone typed this goal to start a plan. Which template fits it?',
-          criteria: templateCriteria(options.env ?? process.env),
+          criteria: await templateCriteria(options.flags ?? readFlag),
         },
       },
       abortSignal: AbortSignal.timeout(options.timeoutMs ?? PERCEPTION_TIMEOUT_MS),

@@ -5,6 +5,7 @@ import { GET, OPTIONS, POST } from '../apps/api/src/app/api/intents/route.ts';
 import { travelWorkspace } from '../apps/api/src/lib/travel/seed.ts';
 import { captureRuns, useMockAi } from './support/ai.mjs';
 import { useEnv } from './support/env.mjs';
+import { useFlags } from './support/flags.mjs';
 import { authed, pgError, postgrest } from './support/graph-api.mjs';
 import { INTENT_ID, intentRow, RUN_ID, runRow, snapshotRow, TRIP_ID } from './support/graph.mjs';
 import { toSnapshotRow } from './support/graph-db.mjs';
@@ -189,6 +190,7 @@ test('creating a plan requires a token', async (t) => {
 
 test('creating an intent seeds the trip, starts its run and answers at once', async (t) => {
   useMockAi(t);
+  useFlags(t);
 
   const tasks = captureRuns(t);
   let created;
@@ -233,6 +235,7 @@ test('creating an intent seeds the trip, starts its run and answers at once', as
 
 test('a goal no template fits is saved: a 201 with no plan and no run', async (t) => {
   useMockAi(t);
+  useFlags(t);
 
   const tasks = captureRuns(t);
   let created;
@@ -286,6 +289,7 @@ test('a goal Jev can’t read is a 503, and nothing is written', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
 
   useEnv(t, { AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: 'vck_test' });
+  useFlags(t);
 
   // The Gateway refuses at once (a 401 isn't retried); the database must never be reached.
   const upstream = mockSupabaseAuth(t, async () =>
@@ -317,6 +321,7 @@ test('a goal Jev can’t read is a 503, and nothing is written', async (t) => {
 
 test('a database failure returns a safe 500 and logs only its code', async (t) => {
   useMockAi(t);
+  useFlags(t);
 
   const logged = t.mock.method(console, 'error', () => {});
 
@@ -337,6 +342,7 @@ test('a database failure returns a safe 500 and logs only its code', async (t) =
 test('a misconfigured AI provider is a safe 500 that names the variable in the log', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
   useEnv(t, { AI_PROVIDER: 'live', AI_GATEWAY_API_KEY: undefined });
+  useFlags(t);
   mockSupabaseAuth(t);
 
   const response = await POST(
@@ -396,7 +402,7 @@ function jobDb(t, intents = []) {
 
 test('a job search goal answers 201 awaiting_resume with its plan, and starts no run', async (t) => {
   useMockAi(t);
-  useEnv(t, { JOB_SEARCH: 'on' });
+  useFlags(t, 'job-search');
 
   const tasks = captureRuns(t);
   const created = jobDb(t);
@@ -415,7 +421,7 @@ test('a job search goal answers 201 awaiting_resume with its plan, and starts no
 
 test('a second job search answers 200 with the plan already going', async (t) => {
   useMockAi(t);
-  useEnv(t, { JOB_SEARCH: 'on' });
+  useFlags(t, 'job-search');
   jobDb(t, [INTENT_ID]);
 
   const response = await POST(jobGoal('Find a Staff PM role in Berlin', 'Europe/Berlin'));
@@ -426,7 +432,7 @@ test('a second job search answers 200 with the plan already going', async (t) =>
 
 test('a time zone the server doesn’t know is dropped, and the plan reads dates in UTC', async (t) => {
   useMockAi(t);
-  useEnv(t, { JOB_SEARCH: 'on' });
+  useFlags(t, 'job-search');
 
   const created = jobDb(t);
   const response = await POST(jobGoal('Find a Staff PM role in London', 'Mars/Olympus'));

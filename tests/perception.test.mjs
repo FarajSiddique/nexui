@@ -8,6 +8,7 @@ import {
 } from '../apps/api/src/lib/perception/perceive.ts';
 import { TEMPLATES } from '../apps/api/src/lib/templates/registry.ts';
 import { Experimental_EvaluationMockModelV4, failingEvaluationModel } from './support/ai.mjs';
+import { flagsOn } from './support/flags.mjs';
 
 function answering(answers, seen = []) {
   return new Experimental_EvaluationMockModelV4({
@@ -29,7 +30,10 @@ test('Jev picks the template from the goal alone', async () => {
   const providerOptions = { gateway: { models: ['anthropic/claude-haiku-4.5'] } };
 
   assert.equal(
-    await chooseTemplate(model, 'Plan my wedding next June', { providerOptions, env: {} }),
+    await chooseTemplate(model, 'Plan my wedding next June', {
+      providerOptions,
+      flags: flagsOn(),
+    }),
     'unsupported',
   );
   assert.deepEqual(seen[0].state, { goal: 'Plan my wedding next June' });
@@ -58,7 +62,10 @@ test('Jev routes an ask with the plan as context', async () => {
 test('when Jev fails, a goal is not guessed and an ask gets the reasoning tier', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
 
-  await assert.rejects(chooseTemplate(failingEvaluationModel(), 'Plan Japan'), unread);
+  await assert.rejects(
+    chooseTemplate(failingEvaluationModel(), 'Plan Japan', { flags: flagsOn() }),
+    unread,
+  );
   assert.deepEqual(
     await routeAsk(failingEvaluationModel(), { text: 'Hi there', goal: 'Plan Japan', summary: '' }),
     { value: 'reasoning', source: 'fallback' },
@@ -87,7 +94,10 @@ test('a slow Jev is abandoned after the timeout', async (t) => {
   });
   const started = Date.now();
 
-  await assert.rejects(chooseTemplate(slow, 'Plan Japan', { timeoutMs: 20 }), unread);
+  await assert.rejects(
+    chooseTemplate(slow, 'Plan Japan', { timeoutMs: 20, flags: flagsOn() }),
+    unread,
+  );
   assert.ok(Date.now() - started < 1_000);
 });
 
@@ -127,7 +137,7 @@ test("Jev reads each template's own sentence, then one for goals none fits", asy
   await chooseTemplate(
     answering({ template: { type: 'choice', choice: 'travel' } }, seen),
     'Plan Japan',
-    { env: { JOB_SEARCH: 'on' } },
+    { flags: flagsOn('job-search') },
   );
 
   const { criteria } = seen[0].questions.template;
@@ -149,11 +159,11 @@ test("Jev reads each template's own sentence, then one for goals none fits", asy
 test('an answer Jev was not offered is refused like a failure', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
 
-  // A stale fixture's `none`, `job_search` while its gate is off, a prototype key.
+  // A stale fixture's `none`, `job_search` while its flag is off, a prototype key.
   for (const choice of ['none', 'job_search', 'toString']) {
     await assert.rejects(
       chooseTemplate(answering({ template: { type: 'choice', choice } }), 'Find a new job', {
-        env: {},
+        flags: flagsOn(),
       }),
       unread,
       choice,
@@ -163,12 +173,21 @@ test('an answer Jev was not offered is refused like a failure', async (t) => {
   assert.equal(logged.mock.callCount(), 3);
 });
 
-test('a gated template is offered only where its gate is on', async () => {
+test('a gated template is offered only while its Vercel flag is on', async () => {
   const seen = [];
+  const asked = [];
   const model = answering({ template: { type: 'choice', choice: 'travel' } }, seen);
+  const recording = (check) => async (key) => {
+    asked.push(key);
 
-  await chooseTemplate(model, 'Plan Japan', { env: {} });
-  await chooseTemplate(model, 'Plan Japan', { env: { JOB_SEARCH: 'on' } });
+    return check(key);
+  };
+
+  await chooseTemplate(model, 'Plan Japan', { flags: recording(flagsOn()) });
+  await chooseTemplate(model, 'Plan Japan', { flags: recording(flagsOn('job-search')) });
+
+  // Only gated templates read a flag: travel has none, job search reads `job-search`.
+  assert.deepEqual(asked, ['job-search', 'job-search']);
 
   assert.deepEqual(Object.keys(seen[0].questions.template.criteria), ['travel', 'unsupported']);
   assert.deepEqual(Object.keys(seen[1].questions.template.criteria), [
