@@ -88,7 +88,14 @@ export default function ComposeSheet(): ReactElement {
     start.isPending ||
     replace.isPending;
   const canSend = text.trim().length >= (target ? 2 : 3) && !working;
-  const canAttach = intake !== null && sent?.reply.type !== 'resume' && !working;
+  // The PDF button acts on a loaded plan the user is looking at: not under the resume step (it
+  // has its own button) nor the second-search reply, whose target is the other plan.
+  const canAttach =
+    intake !== null &&
+    plan !== undefined &&
+    sent?.reply.type !== 'resume' &&
+    sent?.reply.type !== 'existing' &&
+    !working;
   const error = create.error ?? ask.error ?? cancel.error ?? start.error ?? replace.error;
   const goal = plan?.goal;
   const next = params.intentId ? afterAsk(run.data) : null;
