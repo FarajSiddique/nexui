@@ -32,7 +32,8 @@ edits, and Realtime.
   choice.
 - **`data/`**: the API and Supabase clients, the TanStack Query hooks and keys (`queries.ts`, with
   `usePlaceMedia`, `usePlacePhotos` and the `PhotoState` type), Realtime (`use-intent-live.ts`),
-  and the PDF picker and upload (`pick-pdf.ts` on `expo-document-picker`, and `upload-form.ts`).
+  and the PDF picker and upload (`pick-pdf.ts` on `expo-document-picker` and `expo-file-system`,
+  and `upload-form.ts`).
 - **`lib/`**: pure helpers that several features share (`format.ts`, and `ai-mark.ts`'s
   `aiMarkFor`).
 
@@ -214,8 +215,12 @@ it: the action builders take `CapabilityAction` from `#features/workspace` that 
 - **`compose-reply.ts`**: `replyFor` and `targetOf`, the + sheet's reply to a new goal and the
   plan it acts on next.
 - **`upload-form.ts`**: `checkPdf`, which refuses a PDF over `MAX_UPLOAD_BYTES` (4 MB) before
-  it's sent, and `appendPdf`, the multipart `file` part (the `File` on web, a `{ uri, name, type }`
-  part on a phone).
+  it's sent, and `appendPdf`, the multipart `file` part. On web it is the `File`. On a phone it is
+  `{ name, type, bytes() }` over the picker's cache copy (`expo-file-system`'s `File`), under the
+  name the user picked: SDK 57's global `fetch` is `expo/fetch`, which builds the multipart body
+  itself and throws on React Native's `{ uri, name, type }` part. The copy is read before the
+  request, so a file that can't be read says "Couldn't read that file. Pick it again." rather
+  than `requestJson`'s "can't reach its server".
 - **`plan-deletes.ts`**: `planDeletes`, which reduces the plan deletes in the mutation cache to
   the ids to hide (pending) and the failed ones to retry, counting each plan's latest attempt.
 - **`api-request.ts`**: `requestJson`, the one function that sends a request, applies a timeout,
@@ -530,9 +535,9 @@ native dev client, not just a JS reload: `pnpm --filter @nexui/mobile exec expo 
 
 `expo-image`, which `PlacePhoto` uses, is a native module with a config plugin in `app.config.ts`,
 so photos need a new dev client and a new EAS preview build. `expo-document-picker` (the PDF
-picker, `data/pick-pdf.ts`) and `expo-clipboard` (Copy) are native modules too, with no config
-plugin: picking a resume and copying a draft need a dev client and a preview build that include
-them.
+picker, `data/pick-pdf.ts`), `expo-file-system` (which reads the picked PDF as it's sent) and
+`expo-clipboard` (Copy) are native modules too, with no config plugin: picking a resume and
+copying a draft need a dev client and a preview build that include them.
 
 ## iOS scene life cycle
 

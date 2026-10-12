@@ -154,14 +154,14 @@ const INTAKE_TIMEOUT_MS = 90_000;
 
 // A POST with the PDF as multipart, or with no body to start without one. Fetch sets the
 // multipart boundary itself, so no Content-Type is given.
-function postPdf(pdf: PickedPdf | null): RequestInit {
+async function postPdf(pdf: PickedPdf | null): Promise<RequestInit> {
   if (!pdf) {
     return { method: 'POST' };
   }
 
   const form = new FormData();
 
-  appendPdf(form, pdf);
+  await appendPdf(form, pdf);
 
   return { method: 'POST', body: form };
 }
@@ -170,21 +170,21 @@ function postPdf(pdf: PickedPdf | null): RequestInit {
  * Starts a plan that waits for its intake (job search spec, section 4), with the resume or
  * without. Answers once the file is read and the build run queued.
  */
-export function startPlan(intentId: string, pdf: PickedPdf | null): Promise<StartResponse> {
+export async function startPlan(intentId: string, pdf: PickedPdf | null): Promise<StartResponse> {
   return callApi(
     `/api/intents/${intentId}/start`,
     startResponseSchema,
-    postPdf(pdf),
+    await postPdf(pdf),
     INTAKE_TIMEOUT_MS,
   );
 }
 
 /** Replaces a started plan's resume, as one change with Undo. */
-export function replaceResume(intentId: string, pdf: PickedPdf): Promise<CommitResponse> {
+export async function replaceResume(intentId: string, pdf: PickedPdf): Promise<CommitResponse> {
   return callApi(
     `/api/intents/${intentId}/resume`,
     commitResponseSchema,
-    postPdf(pdf),
+    await postPdf(pdf),
     INTAKE_TIMEOUT_MS,
   );
 }

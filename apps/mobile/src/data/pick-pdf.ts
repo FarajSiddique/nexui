@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import { File as DeviceFile } from 'expo-file-system';
 
 import { checkPdf, type PickedPdf } from './upload-form';
 
@@ -21,12 +22,11 @@ export async function choosePdf(): Promise<PdfChoice> {
     return null;
   }
 
-  const pdf: PickedPdf = {
-    uri: asset.uri,
-    name: asset.name,
-    size: asset.size ?? null,
-    file: asset.file ?? null,
-  };
+  const details = { name: asset.name, size: asset.size ?? null };
+  // Only web hands over the File; a phone gives the uri of the picker's copy in the cache.
+  const pdf: PickedPdf = asset.file
+    ? { ...details, file: asset.file }
+    : { ...details, copy: new DeviceFile(asset.uri) };
   const problem = checkPdf(pdf);
 
   return problem ? { problem } : { pdf };
