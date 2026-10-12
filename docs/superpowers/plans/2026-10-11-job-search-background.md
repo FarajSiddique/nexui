@@ -80,7 +80,7 @@ Order matters: the database first, then the flag, then each code PR.
   - The cron queues at most 10 checks a minute (`CHECKS_PER_MINUTE`), before its sweep of up to 10 runs (`RUN_SWEEP_LIMIT`).
   - The check-in: at most 30 roles re-checked (`MAX_RECHECKS`), within 30 seconds (`CHECKIN_BUDGET_MS`); a role still in New 7 days after it was added is cleared; 7 days with no change by the user pause new-role checks.
   - The daily scan: roles posted in the last 7 days (`DAILY_WINDOW_DAYS`), within the scan's 45 seconds (`SCAN_BUDGET_MS`), with the PR 2 caps (25 candidates, 1 web search, 1 Jev call, 1 fast call, 3 into New, 1 partial fit).
-  - Kits: at most 3 roles a run (`MAX_KIT_ROLES`) and 6 a day per plan (`KITS_PER_DAY`), each a cover letter of about 250 words and a brief, with at most one web search per role.
+  - Kits: at most 3 roles a run (`MAX_KIT_ROLES`) and 6 a day per plan (`KITS_PER_DAY`), each a cover letter of about 250 words and a brief, with at most one web search per role. At most 6 kit runs a day per plan, however each ended (the kit task's `perDay`, Task 16).
   - Asks keep the PR 2 caps: 3 web searches and 10 board lookups a run.
 - **`maxDuration`:** 300 on every route that can queue a run (`intents`, `ask`, `start`, `capabilities` from Task 16, and the cron), pinned by `tests/route-durations.test.mjs` (Task 8). `resume` keeps 90 and `media` 30: neither queues a run.
 - **Replace seams with registries, never branch.**
@@ -140,7 +140,7 @@ The two items from PR #48's "Left for later" that touch this plan's code, and wh
    - It records `context.jobs.lastCheckAt`, so every check-in is a changeset and `derive.jobSearch` runs with that morning's time, keeping follow-up and interview cards current on a quiet plan.
    - A cleared New role's key joins `seen`, so a later scan can't bring it back.
 6. **The paused-checks card belongs to `derive.jobSearch`** (derived key `search.checks`), shown while `roleChecks` is `paused` on an active search, so **Resume** removes it in its own changeset.
-7. **Kits are counted per plan:** 6 a day, which with one search per user is the spec's per-user cap. A kit counts when Nexui writes the role's cover letter.
+7. **Kits are counted per plan:** 6 a day, which with one search per user is the spec's per-user cap. A kit counts when Nexui writes the role's cover letter. Kit runs have a cap of their own, 6 a day however each ends (Decision 9), so a kit that keeps failing can't keep costing.
 8. **A kit run is an `ask` with `task: 'kit'`** and `perception: 'code'` (no Jev). The run that finishes queues the next kit when roles still wait; the sweep claims it within a minute.
 9. **Asks from the app's buttons name a task** (Decision 8): Draft a follow-up (`follow_up`, fast), Add interview (`interview`, fast) and Prep me (`prep`, reasoning) skip Jev and take the route spec 6 gives each. Other asks are routed by Jev as before.
 10. **Background runs don't show Drafting** (spec 5.2): Home's badge counts model runs only. `delete_intent` still answers 409 while one works (spec 8).
@@ -172,7 +172,10 @@ The plan's own:
 6. **The cron queues checks, then sweeps** (spec 5.2's order). `TemplateDefinition.checks` names a template's flag and its enqueue function; `queueChecks` reads each template's flag, queues up to 10 checks, and works each queued run at once in `after()`, like any route that queues a run, so a check never waits a minute for the sweep. The answer becomes `{ reaped, claimed, checks }`.
 7. **Usage counts are taken at the network boundary** (`TemplateDefinition.meter`). The executor wraps the run's `fetch` once; every board request and web search the run makes, whether from a model's lookup, a scan, a check-in or a kit, adds to `webSearches` or `boardLookups`, which ride in the next recorded step's usage.
 8. **Named asks are template tasks** (`TemplateDefinition.tasks`). A task has a route, instructions added to the run's task line, whether the app may ask for it, and optional preparation in code. Job search declares `kit` (code only, reasoning, preparation reads the postings), `follow_up` (fast), `interview` (fast) and `prep` (reasoning). An ask with a task skips Jev and records `perception: 'code'`.
-9. **The next kit is the plan's to ask for** (`TemplateDefinition.nextRun`). After a user's capability call (the capabilities route) and after every run that succeeds (the executor), the template may name one run to queue. Job search names a kit while an Interested role has no cover letter, the plan has made fewer than 6 today, and, after a kit run, only if that run wrote a cover letter, so a kit that fails or writes nothing never queues another. A queue refused because a run is working (`NXU12`) or the user is at the cap (`NXU14`) is dropped quietly: the next run's finish asks again.
+9. **The next kit is the plan's to ask for** (`TemplateDefinition.nextRun`). After a user's capability call (the capabilities route) and after every run that succeeds (the executor, the morning's check included), the template may name one run to queue.
+   - Job search names a kit while an Interested role has no cover letter and the plan has fewer than 6 cover letters from Nexui today. After a kit run, it names one only if that run wrote a cover letter, so a kit run that fails or writes nothing doesn't queue the next itself. The role waits for the plan's next button press, the next run that succeeds on it, or the next morning's check, and each of those asks again.
+   - What bounds a kit that keeps failing is a cap on runs, not on letters. A task's `perDay` (`TemplateTask`) holds a plan to that many runs with that task in 24 hours, counted from `runs` however each ended, and `queueNextRun` refuses at the cap. The kit's is 6, so at most six reasoning runs a day go to kits, however often the user taps.
+   - A queue refused because a run is working on the plan (`NXU12`) is dropped quietly, and that run's finish asks again. One refused because the user has 3 runs working across their plans (`NXU14`) is dropped too; nothing on this plan finishes then, so the next press or the next morning's check asks again.
 10. **Changes credits background runs through the event payload.** `changesetPayloadSchema` gains `by`, which the executor sets from `RUN_KIND_BY` (`This morning's check` for `checkin` and `scan`) on every commit a background run makes; the feed shows it in place of `Nexui`.
 11. **`See the draft` comes from the cards registry.** `CardSpec.made` names the button for an object of that kind a run just made (`document`: `See the draft`). After an ask, the + sheet opens the newest object the run made whose kind has one, so the + sheet names no kind.
 12. **The + sheet's chip text comes with the action.** An ask action carries `objectId` and `about` (`Staff PM at Ledgerly`), built by the code that knows the object (`features/jobs/`, `derive.jobSearch`), so the + sheet shows `Asking about <about>` without reading kinds.
@@ -205,7 +208,8 @@ The plan's own:
    Pinned by Tasks 3, 6 and 9.
 
 4. **A kit that can't finish, or many Interested taps.** Expected:
-   - a kit run that fails queues no other kit;
+   - a kit run that fails or writes nothing queues no other kit itself; the next press, run or morning check asks again;
+   - kit runs that keep failing stop at six a day for the plan, however often the user taps;
    - four roles marked Interested in a row get one run for three, then one for the fourth;
    - the seventh kit in a day waits for tomorrow;
    - a role moved back to New before its kit runs isn't kitted;
@@ -221,26 +225,26 @@ The plan's own:
 
 ## File Structure
 
-| Path                                                                                                                            | Change                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `supabase/migrations/<timestamp>_job_checks.sql`, `supabase/tests/runs-smoke.sql`                                               | Run kinds, `create_run`, usage counts, `enqueue_job_checks` (1)                                                    |
-| `packages/types/src/{runs,graph,api,primitives,index}.ts`                                                                       | Run kinds and records (2); `by` (4); meters (5); tasks and focus (12); ask actions (13)                            |
-| `packages/types/src/kinds/{cards,jobs/schemas}.ts`                                                                              | `made`, a draft's `sentAt` (14)                                                                                    |
-| `apps/api/src/lib/templates/{types,registry,index}.ts`                                                                          | `background`, `graph`, `lastUserChangeAt` (4); `meter` (5); `checks` (8); `tasks`, `taskFor` (12); `nextRun` (16)  |
-| `apps/api/src/lib/runs/{execute,worker,store,meter,checks,next,index}.ts`                                                       | Narrowing (2); background runs (4); meters (5); `queueChecks` (8); tasks (12, 15); `queueNextRun` (16)             |
-| `apps/api/src/lib/graph/{commit,payload,lists,index}.ts`                                                                        | `by`, `lastUserChangeAt` (4)                                                                                       |
-| `apps/api/src/lib/flags/{flags,index}.ts`                                                                                       | `readFlagVariant` (8)                                                                                              |
-| `apps/api/src/lib/cognition/{prompts,index}.ts`                                                                                 | A model run's kind (2); task instructions, `<focus>`, a task's brief (12)                                          |
-| `apps/api/src/lib/orchestrator/{orchestrate,index}.ts`                                                                          | Asks with an object or a task, unstarted plans (12); `invokeAndQueue` (16)                                         |
-| `apps/api/src/lib/jobs/{schedule,meter,checkin,checks,tasks,kit}.ts` (new)                                                      | Schedule (3); meter (5); check-in (6); checks (8); tasks (12); kit (15, 16)                                        |
-| `apps/api/src/lib/jobs/{context,seed,derive,capabilities,resume,scan,roles,template}.ts`, `apps/api/src/lib/kinds/behaviour.ts` | Context and schedule (3); paused card (6); scan run (7); asks on cards (13); I sent it (14)                        |
-| `apps/api/src/app/api/cron/runs/route.ts`, `intents/[id]/ask/route.ts`, `intents/[id]/capabilities/route.ts`                    | Checks (8); object and task (12); queueing kits, `maxDuration` (16)                                                |
-| `apps/mobile/src/features/jobs/{search-details,search-body,role-details,role-body,draft-details,draft-body,pipeline}.ts(x)`     | Check line (9); Add interview, ask actions (13); `Sent` (14); kit ready (16)                                       |
-| `apps/mobile/src/features/{changes/change-feed,workspace/workspace-actions,workspace/index,compose/run-outcome}.ts`             | Credit (9); ask actions (13); See the draft (14)                                                                   |
-| `apps/mobile/src/app/(app)/{compose,object}.tsx`, `(tabs)/(home)/intent/[id].tsx`, `apps/mobile/src/data/{api,queries}.ts`      | Ask params (13); the chip, the hint, objects and tasks on asks (14)                                                |
-| `scripts/lib/eval-runner.mjs` (new), `scripts/{eval-travel,eval-jobs,record-fixture}.mjs`, `scripts/lib/eval-jobs-checks.mjs`   | A background run's input (2); one runner, the scan half (10); the kit half (17)                                    |
-| `tests/support/{graph-db,flags,jobs,model-surface}.mjs`, `tests/support/*-model-surface.json`                                   | Events in the fake database (4); flag values (8); tasks pinned (12); kit helpers (15); regenerated (6, 12, 14, 15) |
-| `docs/architecture/{intent-graph,job-search,mobile}.md`, `apps/api/AGENTS.md`, root `AGENTS.md`                                 | Task 1's runs line; Tasks 11 and 18; 8's flag rule; 10 and 17's eval lines                                         |
+| Path                                                                                                                            | Change                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `supabase/migrations/<timestamp>_job_checks.sql`, `supabase/tests/runs-smoke.sql`                                               | Run kinds, `create_run`, usage counts, `enqueue_job_checks` (1)                                                                      |
+| `packages/types/src/{runs,graph,api,primitives,index}.ts`                                                                       | Run kinds and records (2); `by` (4); meters (5); tasks and focus (12); ask actions (13)                                              |
+| `packages/types/src/kinds/{cards,jobs/schemas}.ts`                                                                              | `made`, a draft's `sentAt` (14)                                                                                                      |
+| `apps/api/src/lib/templates/{types,registry,index}.ts`                                                                          | `background`, `graph`, `lastUserChangeAt` (4); `meter` (5); `checks` (8); `tasks`, `taskFor` (12); `nextRun`, a task's `perDay` (16) |
+| `apps/api/src/lib/runs/{execute,worker,store,meter,checks,next,index}.ts`                                                       | Narrowing (2); background runs (4); meters (5); `queueChecks` (8); tasks (12, 15); `queueNextRun`, `countTaskRuns` (16)              |
+| `apps/api/src/lib/graph/{commit,payload,lists,index}.ts`                                                                        | `by`, `lastUserChangeAt` (4)                                                                                                         |
+| `apps/api/src/lib/flags/{flags,index}.ts`                                                                                       | `readFlagVariant` (8)                                                                                                                |
+| `apps/api/src/lib/cognition/{prompts,index}.ts`                                                                                 | A model run's kind (2); task instructions, `<focus>`, a task's brief (12)                                                            |
+| `apps/api/src/lib/orchestrator/{orchestrate,index}.ts`                                                                          | Asks with an object or a task, unstarted plans (12); `invokeAndQueue` (16)                                                           |
+| `apps/api/src/lib/jobs/{schedule,meter,checkin,checks,tasks,kit}.ts` (new)                                                      | Schedule (3); meter (5); check-in (6); checks (8); tasks (12, 16); kit (15, 16)                                                      |
+| `apps/api/src/lib/jobs/{context,seed,derive,capabilities,resume,scan,roles,template}.ts`, `apps/api/src/lib/kinds/behaviour.ts` | Context and schedule (3); paused card (6); scan run (7); asks on cards (13); I sent it (14)                                          |
+| `apps/api/src/app/api/cron/runs/route.ts`, `intents/[id]/ask/route.ts`, `intents/[id]/capabilities/route.ts`                    | Checks (8); object and task (12); queueing kits, `maxDuration` (16)                                                                  |
+| `apps/mobile/src/features/jobs/{search-details,search-body,role-details,role-body,draft-details,draft-body,pipeline}.ts(x)`     | Check line (9); Add interview, ask actions (13); `Sent` (14); kit ready (16)                                                         |
+| `apps/mobile/src/features/{changes/change-feed,workspace/workspace-actions,workspace/index,compose/run-outcome}.ts`             | Credit (9); ask actions (13); See the draft (14)                                                                                     |
+| `apps/mobile/src/app/(app)/{compose,object}.tsx`, `(tabs)/(home)/intent/[id].tsx`, `apps/mobile/src/data/{api,queries}.ts`      | Ask params (13); the chip, the hint, objects and tasks on asks, a finished run's plan refetched first (14)                           |
+| `scripts/lib/eval-runner.mjs` (new), `scripts/{eval-travel,eval-jobs,record-fixture}.mjs`, `scripts/lib/eval-jobs-checks.mjs`   | A background run's input (2); one runner, the scan half (10); the kit half (17)                                                      |
+| `tests/support/{graph-db,flags,jobs,model-surface}.mjs`, `tests/support/*-model-surface.json`                                   | Events (4) and runs (16) in the fake database; flag values (8); tasks pinned (12); kit helpers (15); regenerated (6, 12, 14, 15)     |
+| `docs/architecture/{intent-graph,job-search,mobile}.md`, `apps/api/AGENTS.md`, root `AGENTS.md`                                 | Task 1's runs line; Tasks 11 and 18; 8's flag rule; 10 and 17's eval lines                                                           |
 
 New tests: `job-checks-migration`, `jobs-schedule`, `run-background`, `run-meters`, `jobs-checkin`, `jobs-scan-run`, `run-checks`, `route-durations`, `eval-runner`, `jobs-tasks`, `jobs-kit`.
 
@@ -265,7 +269,7 @@ Every name a task produces for a later one, in one place. Each task's own **Inte
 - Task 5: `TemplateDefinition.meter?: (url: string) => RunMeter | null`.
 - Task 8: `type CheckMode = 'on' | 'checkins_only' | 'off'`; `interface TemplateChecks { flag: string; enqueue(db: SupabaseClient, mode: Exclude<CheckMode, 'off'>, limit: number): Promise<string[]> }`; `TemplateDefinition.checks?: TemplateChecks`.
 - Task 12: `interface TaskJob { snapshot: GraphSnapshot; refs: RefTable; env: Record<string, string | undefined>; fetch: typeof fetch; now: Date }`; `interface TemplateTask { route: RunRoute; instructions: string; fromApp: boolean; prepare?: (job: TaskJob) => Promise<string | null> }`; `TemplateDefinition.tasks?: Record<string, TemplateTask>`; `taskFor(template: Pick<TemplateDefinition, 'tasks'>, name: string | undefined): TemplateTask | undefined` (`registry.ts`; only a template's own keys, so `constructor` names no task).
-- Task 16: `interface NextRunInput { snapshot: GraphSnapshot; now: Date; finished: { task?: string; before: GraphSnapshot } | null }`; `interface NextRun { task: string; text: string }`; `TemplateDefinition.nextRun?: (input: NextRunInput) => NextRun | null`.
+- Task 16: `interface NextRunInput { snapshot: GraphSnapshot; now: Date; finished: { task?: string; before: GraphSnapshot } | null }`; `interface NextRun { task: string; text: string }`; `TemplateDefinition.nextRun?: (input: NextRunInput) => NextRun | null`; `TemplateTask.perDay?: number` (the most runs with the task code may queue on a plan in 24 hours, however each ended).
 
 **`apps/api/src/lib/runs`**
 
@@ -273,7 +277,7 @@ Every name a task produces for a later one, in one place. Each task's own **Inte
 - Task 4: `RunDeps.background?: TemplateDefinition['background']` (tests); in `execute.ts`, `workJob` (shared by `afterBuild` and background runs) and `runBackground`.
 - Task 5 (`meter.ts`): `type RunMeters = Partial<Record<RunMeter, number>>`; `interface Meter { fetch: typeof fetch; take(): RunMeters }`; `createMeter(classify?: (url: string) => RunMeter | null): Meter`; `recordRunStep(db, runId, leaseId, entries, usage, meters: RunMeters = {})`; in `execute.ts`, `StepContext.meter` and `finish(step, status, error): Promise<RunRecord>`, which records what is left on the meter, then finishes the run.
 - Task 8 (`checks.ts`): `CHECKS_PER_MINUTE = 10`; `CHECK_MODES = ['on', 'checkins_only', 'off'] as const`; `type ModeReader = (flag: string) => Promise<CheckMode | null>`; `queueChecks(worker: RunWorker, readMode?: ModeReader): Promise<number>`.
-- Task 16 (`next.ts`): `ClaimedRun.userId: string` and `RunJob.userId: string`; `interface NextRunRequest { userId: string; intentId: string; template: TemplateDefinition; snapshot: GraphSnapshot; now: Date; finished: NextRunInput['finished'] }`; `queueNextRun(db: SupabaseClient, input: NextRunRequest): Promise<RunRecord | null>`.
+- Task 16 (`next.ts`): `ClaimedRun.userId: string` and `RunJob.userId: string`; `interface NextRunRequest { userId: string; intentId: string; template: TemplateDefinition; snapshot: GraphSnapshot; now: Date; finished: NextRunInput['finished'] }`; `queueNextRun(db: SupabaseClient, input: NextRunRequest): Promise<RunRecord | null>`, which holds a task to its `perDay` with `countTaskRuns(db, intentId, task, since, limit): Promise<number>` (`store.ts`, not in the barrel).
 
 **`apps/api/src/lib/graph`**
 
@@ -303,13 +307,13 @@ Every name a task produces for a later one, in one place. Each task's own **Inte
 - Task 12 (`tasks.ts`): `JOB_SEARCH_TASKS: Record<string, TemplateTask>` with `follow_up`, `interview` and `prep`; Task 15 adds `kit` first.
 - Task 14 (`roles.ts`): `jobs.logContact`'s input gains `draft?` (a ref): a follow-up or withdrawal note `for` the role, stamped `sentAt` when `direction` is `sent`; `KIND_BEHAVIOUR.document.readOnlyFields = ['sentAt']`.
 - Task 15 (`kit.ts`): `KIT_REQUEST = 'Prepare applications for my Interested roles'`; `KIT_INSTRUCTIONS`; `MAX_KIT_ROLES = 3`; `KITS_PER_DAY = 6`; `KIT_READ_BUDGET_MS = 15_000`; `kitsAutomatic(): boolean`; `searchOf(graph)`; `waitingRoles(graph: GraphSnapshot, searchId: string): GraphObject[]`; `aiCoverLetters(graph, searchId)`; `kitsToday(graph: GraphSnapshot, searchId: string, now: Date): number`; `prepareKit(job: TaskJob): Promise<string | null>`.
-- Task 16 (`kit.ts`): `nextJobRun(input: NextRunInput): NextRun | null`.
+- Task 16 (`kit.ts`): `nextJobRun(input: NextRunInput): NextRun | null`; (`tasks.ts`) `JOB_SEARCH_TASKS.kit.perDay = KITS_PER_DAY`.
 
 **`apps/mobile`**
 
-- Task 9 (`features/jobs/search-details.ts`): `interface CheckLine { text: string; button: { label: string; action: CapabilityAction } | null }`; `checkLine(search: GraphObject): CheckLine | null`. `features/changes/change-feed.ts` shows `payload.by` as the row's author.
+- Task 9 (`features/jobs/search-details.ts`): `interface CheckLine { text: string; button: { label: string; action: CapabilityAction } | null }`; `checkLine(snapshot: GraphSnapshot, search: GraphObject): CheckLine | null` (null until the plan has started). `features/changes/change-feed.ts` shows `payload.by` as the row's author.
 - Task 13 (`features/workspace/workspace-actions.ts`, exported by its barrel): `WorkspaceAction`'s `ask` becomes `{ type: 'ask'; prompt: string; objectId?: string; about?: string; task?: string; placeholder?: string }`; `type AskAction = Extract<WorkspaceAction, { type: 'ask' }>`; `askParams(intentId: string, action: AskAction): Record<string, string>`. `features/jobs/role-details.ts`: `INTERVIEW_HINT`, `roleName(details: RoleDetails): string`, `askAboutRole(details: RoleDetails): AskAction`, `addInterviewAction(details: RoleDetails): AskAction`.
-- Task 14: `type AfterAsk = { type: 'choice' } | { type: 'plan' } | { type: 'open'; objectId: string; label: string } | null` and `afterAsk(run: Pick<RunRecord, 'id' | 'status' | 'progress'> | undefined, snapshot?: GraphSnapshot): AfterAsk` (`features/compose/run-outcome.ts`); `askIntent(id: string, text: string, extra?: { objectId?: string; task?: string })` (`data/api.ts`); `DraftDetails.sentAt` and `sentAction(role: GraphObject, draft: GraphObject, now?: Date): CapabilityAction` (`features/jobs/draft-details.ts`).
+- Task 14: `type AfterAsk = { type: 'choice' } | { type: 'plan' } | { type: 'open'; objectId: string; label: string } | null` and `afterAsk(run: Pick<RunRecord, 'id' | 'status' | 'progress'> | undefined, snapshot?: GraphSnapshot): AfterAsk` (`features/compose/run-outcome.ts`); `askIntent(id: string, text: string, extra?: { objectId?: string; task?: string })` (`data/api.ts`); `useRun(id, intentId?)`, whose finished run refetches its plan first (`data/queries.ts`); `DraftDetails.sentAt` and `sentAction(role: GraphObject, draft: GraphObject, now?: Date): CapabilityAction` (`features/jobs/draft-details.ts`).
 
 ## Before Task 1: pre-flight
 
@@ -817,7 +821,8 @@ select set_config('request.jwt.claims',
 select public.smoke_job_search('30000000-0000-4000-8000-000000000001',
   '{"timezone":"America/New_York","startedAt":"2026-10-01T12:00:00Z","seen":[],"nextCheckAt":"2000-01-01T00:00:00Z"}');
 -- Started before checks existed (no nextCheckAt), new-role checks paused: a check-in, in Kolkata,
--- 40 minutes past 7 (0xc0ffee00 mod 60: the top bit is set, so the minutes must read unsigned).
+-- 40 minutes past 7 (0xc0ffee00 mod 60: past 0x7fffffff, which a 32-bit read would turn negative;
+-- the read padded to 64 bits stays positive, as TypeScript's parseInt does).
 select public.smoke_job_search('c0ffee00-0000-4000-8000-000000000002',
   '{"timezone":"Asia/Kolkata","startedAt":"2026-10-01T12:00:00Z","seen":[]}', 'active', 'paused');
 -- Never started: never checked.
@@ -1381,7 +1386,7 @@ test('a background run never reaches a model: with no code for its kind it fails
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `node --experimental-strip-types --test tests/run-contracts.test.mjs tests/runs-store.test.mjs tests/run-worker.test.mjs tests/run-executor.test.mjs`
-Expected: FAIL. `run-contracts` and `run-executor` fail to load: `The requested module … does not provide an export named 'isBackgroundRun'` (and `NOTHING_TO_CHECK`). `runs-store` fails `kind` (`null` !== `'in.(create_intent,ask)'`) and the check-in row (`Invalid option: expected one of "create_intent"|"ask"`). `run-worker` fails: the worker opens `['checkin', undefined]`.
+Expected: FAIL. `run-contracts` and `run-executor` fail to load: `The requested module … does not provide an export named 'isBackgroundRun'` (and `NOTHING_TO_CHECK`). `runs-store` fails `kind` (`null` !== `'in.(create_intent,ask)'`) and the check-in row (`Invalid option: expected one of "create_intent"|"ask"`). `run-worker` fails on `opened` (`[]`): before this task `mapRunRow` can't read a check-in row, so `claimRuns` fails the run with `Nexui couldn't finish this.` and the worker opens no session.
 
 - [ ] **Step 3: Give runs their kinds and records**
 
@@ -2757,7 +2762,7 @@ test("a template's background code is keyed by background run kinds, each credit
 - [ ] **Step 3: Run them to see them fail**
 
 Run: `node --experimental-strip-types --test tests/run-background.test.mjs tests/changeset-payload.test.mjs tests/templates.test.mjs`
-Expected: FAIL. `run-background`'s first five tests fail on `NOTHING_TO_CHECK` (the run fails before the code runs, as Task 2 left it); the last passes. `changeset-payload` fails (`by` is dropped: `{ label: 'Checked 4 roles' }`); `templates` fails to load (`does not provide an export named 'RUN_KIND_BY'`).
+Expected: FAIL. `run-background`'s first six tests fail, because Task 2 fails every background run with `NOTHING_TO_CHECK` before its opening step: the code never runs, and `a check stopped before it began` finds the run finished where it expects `finished` to be `null`. The last passes. `changeset-payload` fails (`by` is dropped: `{ label: 'Checked 4 roles' }`); `templates` fails to load (`does not provide an export named 'RUN_KIND_BY'`).
 
 - [ ] **Step 4: Credit a change to who made it**
 
@@ -6584,7 +6589,7 @@ Spec sections 6 (the search sheet's "Checks every morning at 7", **Pause** or **
 **Interfaces:**
 
 - Consumes: PR 2's `jobs.setSearchStatus` (`{ status?: 'active' | 'paused'; roleChecks?: 'on' }`, callable by the user); Task 3's server side of Resume (it sets the coming slot); Task 4's `changesetPayloadSchema.by`.
-- Produces (`features/jobs/search-details.ts`): `interface CheckLine { text: string; button: { label: string; action: CapabilityAction } | null }`; `checkLine(search: GraphObject): CheckLine | null` (null for an object that isn't a search).
+- Produces (`features/jobs/search-details.ts`): `interface CheckLine { text: string; button: { label: string; action: CapabilityAction } | null }`; `checkLine(snapshot: GraphSnapshot, search: GraphObject): CheckLine | null` (null for an object that isn't a search, and for a plan that hasn't started, which is never checked: Departure 4).
 - Produces (`features/changes/change-feed.ts`): a main row's `who` is `payload.by` when the changeset has one.
 
 - [ ] **Step 1: Write the failing tests**
@@ -6611,7 +6616,7 @@ test('the check line says when Nexui checks, with the one button that changes it
   ];
 
   for (const [object, text, label, input] of lines) {
-    const line = checkLine(object);
+    const line = checkLine(snapshot, object);
 
     assert.equal(line.text, text);
     assert.equal(line.button.label, label);
@@ -6627,11 +6632,20 @@ test('the check line says when Nexui checks, with the one button that changes it
     ]);
   }
 
-  assert.deepEqual(checkLine(as({ status: 'hired' })), {
+  assert.deepEqual(checkLine(snapshot, as({ status: 'hired' })), {
     text: 'The search ended with a hire.',
     button: null,
   });
-  assert.equal(checkLine(resume), null);
+  assert.equal(checkLine(snapshot, resume), null);
+});
+
+test("a search whose plan hasn't started has no check line: it is never checked", () => {
+  const waiting = jobSnapshot({
+    search: data,
+    context: { jobs: { timezone: 'Europe/London', seen: [] } },
+  });
+
+  assert.equal(checkLine(waiting, search), null);
 });
 ```
 
@@ -6668,7 +6682,24 @@ Expected: FAIL. `mobile-jobs-search` stops at `SyntaxError: The requested module
 
 - [ ] **Step 3: Write `checkLine`**
 
-In `apps/mobile/src/features/jobs/search-details.ts`, append:
+In `apps/mobile/src/features/jobs/search-details.ts`, replace:
+
+```ts
+import {
+  PASS_REASONS,
+  WORK_MODES,
+```
+
+with:
+
+```ts
+import {
+  jobSearchStarted,
+  PASS_REASONS,
+  WORK_MODES,
+```
+
+and append:
 
 ```ts
 /** The search sheet's line about Nexui's daily checks, and the button that changes them. */
@@ -6699,10 +6730,11 @@ function statusAction(
 /**
  * Where the daily checks stand (job search spec, sections 6 and 8): every morning at 7, with
  * Pause; paused by the user, with Resume; new-role checks paused after a quiet week, with Resume
- * new-role checks; or over after a hire. Null for an object that isn't a search.
+ * new-role checks; or over after a hire. Null for an object that isn't a search, and while the
+ * plan waits at its resume step, since a plan that hasn't started is never checked.
  */
-export function checkLine(search: GraphObject): CheckLine | null {
-  if (search.kind !== 'search') {
+export function checkLine(snapshot: GraphSnapshot, search: GraphObject): CheckLine | null {
+  if (search.kind !== 'search' || !jobSearchStarted(snapshot.intent.context)) {
     return null;
   }
 
@@ -6786,7 +6818,7 @@ with:
 
 ```tsx
   const { search, data } = details;
-  const check = checkLine(search);
+  const check = checkLine(snapshot, search);
   const checkButton = check?.button ?? null;
 ```
 
@@ -7825,7 +7857,7 @@ Dispatch the `docs-keeper` agent with this list, then read its diff. It edits; c
 
 `docs/architecture/mobile.md`:
 
-- **"The object sheet":** the search body's Checks section (`checkLine`, `jobs.setSearchStatus`, optimistic).
+- **"The object sheet":** the search body's Checks section (`checkLine`, shown once the plan has started; `jobs.setSearchStatus`, optimistic).
 - **"Changes":** a row's `who` is `payload.by` when set (`This morning's check`).
 
 - [ ] **Step 2: Run the reviewers**
@@ -7953,7 +7985,7 @@ The body:
 - Left for later, each with its reason.
 - A merge checklist:
   - [ ] The migration PR merged, and the founder ran `pnpm db:push:dev` and `pnpm db:push:prod`.
-  - [ ] The `job-scans` string flag exists in `nexui-api` with `on`, `checkins_only` and `off`: Development `on`, Preview `on`, Production `checkins_only` (`vercel flags set job-scans -e production --variant checkins_only`).
+  - [ ] The `job-scans` string flag exists in `nexui-api` with `on`, `checkins_only` and `off`: Development `on`, Preview `on`, Production `checkins_only` (`vercel flags set job-scans -e production --variant checkins_only`). Without it, every environment logs `[flags] Could not read the job-scans flag; nothing it switches runs.` each minute and queues no check: that line is the symptom to look for in the logs.
   - [ ] After the merge deploys, each started, active job search gets its first check within minutes (10 a minute): check one in Changes.
   - [ ] Founder: run `pnpm eval:jobs` live (Task 10's scan half) on dev; once it passes, `vercel flags set job-scans -e production --variant on`.
   - [ ] `/update-roadmap` to mark PR 4a merged.
@@ -7999,7 +8031,7 @@ Spec section 6, "Asking about one object", Decision 8, and the carried item from
 
 - Consumes (Task 2): `runInputSchema` as the model run's input, `RunRecord` as a union narrowed by `isBackgroundRun`; `createRun` takes a model run's kind and input.
 - Produces, from `@nexui/types`:
-  - `taskNameSchema` (`/^[a-z_]{1,40}$/`). It lives in `primitives.ts`, not `runs.ts` as the plan's Interfaces list it: Task 13's `insightActionSchema` (in `primitives.ts`) needs it, and `primitives.ts` can't import `runs.ts`, which imports it. The barrel exports it either way.
+  - `taskNameSchema` (`/^[a-z_]{1,40}$/`), in `primitives.ts`: Task 13's `insightActionSchema` (in `primitives.ts`) needs it, and `primitives.ts` can't import `runs.ts`, which imports it. The barrel exports it either way.
   - `runInputSchema` gains `task?: string` and `objectId?: string`, and `perception` gains `'code'`.
   - `askRequestSchema` gains `objectId?: string` (an id) and `task?: string`.
 - Produces, from `#lib/templates`:
@@ -9890,7 +9922,25 @@ with:
         <Button label="Ask about this role" onPress={() => onAction(askAboutRole(details))} />
 ```
 
-In the doc comment above `RoleBody`, replace "and the buttons all report capability actions;" with "and the buttons all report actions (Add interview and Ask about this role open + on the role);".
+Replace the doc comment above `RoleBody`:
+
+```tsx
+/**
+ * A role in the object sheet (job search spec, section 6): what it is and where it stands, why
+ * it fits, its posting, and what's for it. Moving it, renaming it and the buttons all report
+ * capability actions; a draft opens in place.
+ */
+```
+
+with:
+
+```tsx
+/**
+ * A role in the object sheet (job search spec, section 6): what it is and where it stands, why
+ * it fits, its posting, and what's for it. Moving it, renaming it and the buttons all report
+ * actions (Add interview and Ask about this role open + on the role); a draft opens in place.
+ */
+```
 
 - [ ] **Step 7: Run the tests**
 
@@ -9945,6 +9995,7 @@ Spec section 6 (the context chip, Add interview's prompt, See the draft, I sent 
 - Produces, in the API: `jobs.logContact`'s input gains `draft?: string` (a ref or id): a follow-up or withdrawal note `for` the role, stamped `sentAt` when `direction` is `sent`; anything else is refused with `<draft> isn't an email for <role>.` `KIND_BEHAVIOUR.document.readOnlyFields = ['sentAt']`.
 - Produces, in `apps/mobile`:
   - `data/api.ts`: `askIntent(id: string, text: string, extra?: { objectId?: string; task?: string }): Promise<AskResponse>`; `useAsk`'s variables gain `objectId?` and `task?`.
+  - `data/queries.ts`: `useRun(id: string | null, intentId?: string | null)`: given the run's plan, a run that has finished refetches the plan before its status lands, so See the draft never shows Back to plan first.
   - `features/compose/run-outcome.ts`: `type AfterAsk = { type: 'choice' } | { type: 'plan' } | { type: 'open'; objectId: string; label: string } | null`; `afterAsk(run: Pick<RunRecord, 'id' | 'status' | 'progress'> | undefined, snapshot?: GraphSnapshot): AfterAsk`.
   - `features/jobs/draft-details.ts`: `DraftDetails.sentAt: string | null`; `sentAction(role: GraphObject, draft: GraphObject, now?: Date): CapabilityAction`.
 
@@ -10420,6 +10471,53 @@ export function useAsk(): UseMutationResult<
       askIntent(intentId, text, { objectId, task }),
 ```
 
+`afterAsk` (Step 6) reads what the run wrote from the plan's snapshot, but the run's query and the plan's are fetched apart: when the run's poll lands `succeeded` before the plan refetches, the + sheet would show Back to plan, then switch to See the draft. So a finished run waits for its plan. Replace:
+
+```ts
+/** A run's status and progress. Realtime refetches it; the poll covers a dropped socket. */
+export function useRun(id: string | null): UseQueryResult<RunRecord, Error> {
+  return useQuery({
+    queryKey: queryKeys.run(id ?? ''),
+    queryFn: ({ signal }) => getRun(id ?? '', signal),
+    enabled: id !== null,
+    refetchInterval: (query) => (isRunActive(query.state.data) ? 3_000 : false),
+  });
+}
+```
+
+with:
+
+```ts
+/**
+ * A run's status and progress. Realtime refetches it; the poll covers a dropped socket. Given
+ * the run's plan, a run that has finished refetches the plan before its status lands, so what
+ * the + sheet offers next (`afterAsk`) reads what the run wrote.
+ */
+export function useRun(
+  id: string | null,
+  intentId: string | null = null,
+): UseQueryResult<RunRecord, Error> {
+  const client = useQueryClient();
+
+  return useQuery({
+    queryKey: queryKeys.run(id ?? ''),
+    queryFn: async ({ signal }) => {
+      const run = await getRun(id ?? '', signal);
+
+      if (intentId && !isRunActive(run)) {
+        await client.invalidateQueries({ queryKey: queryKeys.intent(intentId) });
+      }
+
+      return run;
+    },
+    enabled: id !== null,
+    refetchInterval: (query) => (isRunActive(query.state.data) ? 3_000 : false),
+  });
+}
+```
+
+`invalidateQueries` resolves once the plan's active query has refetched, and never rejects on a failed refetch, so a plan that can't load leaves the run's status to land as before.
+
 - [ ] **Step 6: What the + sheet offers after a run**
 
 Replace `apps/mobile/src/features/compose/run-outcome.ts` with:
@@ -10537,6 +10635,22 @@ with:
     params.objectId ? { objectId: params.objectId, about: params.about ?? null } : null,
   );
   const [task, setTask] = useState<string | null>(params.task ?? null);
+```
+
+Replace:
+
+```ts
+  const run = useRun(sent?.reply.type === 'run' ? sent.reply.runId : null);
+```
+
+with:
+
+```ts
+  // An ask about the plan underneath: its finished run waits for the plan, for See the draft.
+  const run = useRun(
+    sent?.reply.type === 'run' ? sent.reply.runId : null,
+    params.intentId ?? null,
+  );
 ```
 
 Replace:
@@ -11270,6 +11384,8 @@ test('a kit run reads the posting first, and its two drafts land for the role', 
 Run: `node --experimental-strip-types --test tests/jobs-kit.test.mjs`
 Expected: FAIL, `ERR_MODULE_NOT_FOUND` for `apps/api/src/lib/jobs/kit.ts`.
 
+The executor tests pass `userId` to `executeRun` a task before `RunJob` has it (Task 16 adds it, for the kit chain). JavaScript ignores the extra field, so leave it in; don't remove it to match today's `RunJob`.
+
 - [ ] **Step 4: Write the kit's helpers and its preparation**
 
 Create `apps/api/src/lib/jobs/kit.ts`:
@@ -11635,32 +11751,92 @@ git commit -F <message file>
 
 Spec section 6 ("the API also queues an `ask` run with `task: 'kit'` … when it finishes it queues one more if roles are still waiting"), Decision 9 and Review Focus 4.
 
-- A template may name the run its plan wants next (`TemplateDefinition.nextRun`). Job search names a kit while an Interested role waits, within the day's six, and after a kit run only if that run wrote a cover letter, so a kit that fails or writes nothing never queues another.
-- The plan is asked after a user's button press (the capabilities route, which then works the run after its answer) and after every run that succeeds (the executor, whose queued run the sweep claims within a minute).
-- A queue refused because a run is working (`NXU12`) or the user is at the cap (`NXU14`) is dropped quietly: the next run's finish asks again.
+- A template may name the run its plan wants next (`TemplateDefinition.nextRun`). Job search names a kit while an Interested role waits, within the day's six cover letters, and after a kit run only if that run wrote a cover letter, so a kit run that fails or writes nothing doesn't queue the next itself.
+- The plan is asked after a user's button press (the capabilities route, which then works the run after its answer) and after every run that succeeds (the executor, whose queued run the sweep claims within a minute), the morning's check included. Each of these asks again for a role whose kit failed.
+- A task's `perDay` caps the runs with it a plan may have in 24 hours, counted from `runs` however each ended; `queueNextRun` refuses at the cap. The kit's is 6, so a kit that keeps failing stops at six runs a day, however often the user taps.
+- A queue refused because a run is working on the plan (`NXU12`) or the user has 3 runs working (`NXU14`) is dropped quietly: the plan's next press, run or morning check asks again.
 - The pipeline's Interested card reads `Application kit ready` once its cover letter exists.
 
 **Files:**
 
 - Modify: `apps/api/src/lib/templates/types.ts`, `apps/api/src/lib/templates/index.ts`
-- Modify: `apps/api/src/lib/jobs/kit.ts`, `apps/api/src/lib/jobs/template.ts`
+- Modify: `apps/api/src/lib/jobs/kit.ts`, `apps/api/src/lib/jobs/tasks.ts`, `apps/api/src/lib/jobs/template.ts`
 - Create: `apps/api/src/lib/runs/next.ts`
 - Modify: `apps/api/src/lib/runs/{store,worker,execute,index}.ts`
 - Modify: `apps/api/src/lib/orchestrator/{orchestrate,index}.ts`, `apps/api/src/app/api/intents/[id]/capabilities/route.ts`
 - Modify: `apps/mobile/src/features/jobs/pipeline.ts`
+- Modify: `tests/support/graph-db.mjs`
 - Modify: `tests/jobs-kit.test.mjs`, `tests/runs-store.test.mjs`, `tests/capabilities-route.test.mjs`, `tests/orchestrator.test.mjs`, `tests/mobile-jobs-pipeline.test.mjs`
 
 **Interfaces:**
 
 - Consumes: Task 15's `waitingRoles`, `kitsToday`, `aiCoverLetters`, `searchOf`, `kitsAutomatic`, `KIT_REQUEST`, `KITS_PER_DAY`, `JOB_SEARCH_TASKS.kit`; Task 12's `TemplateDefinition.tasks` and `runInputSchema.task`; Task 4's background path in `executeRun` (`runBackground`); `isBackgroundRun` (Task 2); Task 8's `tests/route-durations.test.mjs`, which requires `maxDuration = 300` of a route that calls `runWorker(`.
 - Produces:
-  - `apps/api/src/lib/templates`: `interface NextRunInput { snapshot: GraphSnapshot; now: Date; finished: { task?: string; before: GraphSnapshot } | null }`; `interface NextRun { task: string; text: string }`; `TemplateDefinition.nextRun?: (input: NextRunInput) => NextRun | null`.
-  - `apps/api/src/lib/jobs/kit.ts`: `nextJobRun(input: NextRunInput): NextRun | null`; `JOB_SEARCH_TEMPLATE.nextRun = nextJobRun`.
-  - `apps/api/src/lib/runs`: `ClaimedRun.userId: string`; `RunJob.userId: string`; `interface NextRunRequest { userId: string; intentId: string; template: TemplateDefinition; snapshot: GraphSnapshot; now: Date; finished: NextRunInput['finished'] }`; `queueNextRun(db: SupabaseClient, input: NextRunRequest): Promise<RunRecord | null>` (in the barrel).
-  - `apps/api/src/lib/orchestrator`: `invokeAndQueue(deps: Pick<Orchestrator, 'db' | 'userId' | 'worker'>, intentId: string, request: CapabilityRequest): Promise<CommitResult>` (in the barrel). It takes the three fields it uses, so the route needn't open an AI session; an `Orchestrator` satisfies it.
+  - `apps/api/src/lib/templates`: `interface NextRunInput { snapshot: GraphSnapshot; now: Date; finished: { task?: string; before: GraphSnapshot } | null }`; `interface NextRun { task: string; text: string }`; `TemplateDefinition.nextRun?: (input: NextRunInput) => NextRun | null`; `TemplateTask.perDay?: number` (the most runs with the task a plan may have in 24 hours when code queues one).
+  - `apps/api/src/lib/jobs/kit.ts`: `nextJobRun(input: NextRunInput): NextRun | null`; `JOB_SEARCH_TEMPLATE.nextRun = nextJobRun`. `apps/api/src/lib/jobs/tasks.ts`: `JOB_SEARCH_TASKS.kit.perDay = KITS_PER_DAY`.
+  - `apps/api/src/lib/runs`: `ClaimedRun.userId: string`; `RunJob.userId: string`; `interface NextRunRequest { userId: string; intentId: string; template: TemplateDefinition; snapshot: GraphSnapshot; now: Date; finished: NextRunInput['finished'] }`; `queueNextRun(db: SupabaseClient, input: NextRunRequest): Promise<RunRecord | null>` (in the barrel); `countTaskRuns(db: SupabaseClient, intentId: string, task: string, since: Date, limit: number): Promise<number>` (`store.ts`, used by `next.ts` only, not in the barrel).
+  - `apps/api/src/lib/orchestrator`: `invokeAndQueue(deps: Pick<Orchestrator, 'db' | 'userId' | 'worker'>, intentId: string, request: CapabilityRequest): Promise<CommitResult>` (in the barrel). It takes the three fields it uses, so the route builds no whole `Orchestrator`; an `Orchestrator` satisfies it. `runWorker()` still builds the worker's session opener (`sessionOpener(env)` in `runs/worker.ts`), so the route's tests keep `useMockAi(t)`.
+  - `tests/support/graph-db.mjs`: the option `runs`, what a read of `runs` answers (the one run without it).
   - `POST /api/intents/[id]/capabilities` queues the next run and exports `maxDuration = 300`.
 
 - [ ] **Step 1: Write the failing tests**
+
+First let the fake database answer a read of `runs` with the rows a test gives it. In `tests/support/graph-db.mjs`, in `graphDb`'s doc comment as Task 4 left it, replace:
+
+```js
+ * `activeIntents` is what a read of `intents` answers (the one-search rule). A read of `runs`
+ * answers the one run. `userEvents` is what a read of `events` answers (a plan's newest user
+ * change); each read's filters land in `state.eventQueries`.
+```
+
+with:
+
+```js
+ * `activeIntents` is what a read of `intents` answers (the one-search rule). A read of `runs`
+ * answers `runs`, or the one run without it; its filters land in `state.runQueries`.
+ * `userEvents` is what a read of `events` answers (a plan's newest user change); each read's
+ * filters land in `state.eventQueries`.
+```
+
+Replace:
+
+```js
+    activeIntents = [],
+    userEvents = [],
+  } = {},
+```
+
+with:
+
+```js
+    activeIntents = [],
+    userEvents = [],
+    runs = null,
+  } = {},
+```
+
+and replace:
+
+```js
+    // The build run `start` consults (Decision 20); the filters are recorded, not applied.
+    'table:runs': (url) => {
+      state.runQueries.push(Object.fromEntries(url.searchParams));
+
+      return [state.run];
+    },
+```
+
+with:
+
+```js
+    // The build run `start` consults (Decision 20), and a task's runs in a day (`queueNextRun`);
+    // the filters are recorded, not applied.
+    'table:runs': (url) => {
+      state.runQueries.push(Object.fromEntries(url.searchParams));
+
+      return runs ?? [state.run];
+    },
+```
 
 In `tests/jobs-kit.test.mjs`, add `nextJobRun` to the import from `kit.ts`:
 
@@ -11722,6 +11898,8 @@ test('a plan with an Interested role waiting asks for its kit, a task the templa
   assert.deepEqual(asked(kitPlan()), kit);
   assert.equal(TEMPLATES.job_search.nextRun, nextJobRun);
   assert.equal(TEMPLATES.job_search.tasks.kit.fromApp, false);
+  // Six kit runs a day, however each ends (Decision 9), held by `queueNextRun`.
+  assert.equal(TEMPLATES.job_search.tasks.kit.perDay, 6);
 });
 
 test('no kit when nothing waits, the day is used up, or the search is paused or hired', () => {
@@ -11841,6 +12019,7 @@ import { graphDb, toSnapshotRow } from './support/graph-db.mjs';
 import {
   eventRow,
   INTENT_ID,
+  runRow,
   snapshotRow,
   TOKYO_ID,
   tokyoData,
@@ -11924,6 +12103,32 @@ test('a kit that cannot be queued yet still answers with the press', async (t) =
 
   assert.equal(response.status, 200);
   assert.equal(fake.state.applied.length, 1);
+  assert.equal(tasks.length, 0);
+});
+
+// Six kit runs in the last day that wrote nothing: each press would ask again, so the runs cap it.
+test('kits that keep failing stop at six runs a day, however often the user presses', async (t) => {
+  const failedKit = runRow({
+    kind: 'ask',
+    status: 'failed',
+    input: {
+      text: 'Prepare applications for my Interested roles',
+      route: 'reasoning',
+      template: 'job_search',
+      perception: 'code',
+      task: 'kit',
+    },
+  });
+  const fake = jobPlan(t, { runs: Array.from({ length: 6 }, () => failedKit) });
+  const tasks = captureRuns(t);
+  const response = await press(interested);
+  const [counted] = fake.state.runQueries;
+
+  assert.equal(response.status, 200);
+  assert.equal(fake.state.applied.length, 1);
+  assert.equal(counted.intent_id, `eq.${INTENT_ID}`);
+  assert.equal(counted['input->>task'], 'eq.kit');
+  assert.equal(fake.state.createdRun, null);
   assert.equal(tasks.length, 0);
 });
 ```
@@ -12049,7 +12254,7 @@ test("an Interested role reads Application kit ready once its cover letter exist
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `node --experimental-strip-types --test tests/jobs-kit.test.mjs tests/runs-store.test.mjs tests/capabilities-route.test.mjs tests/orchestrator.test.mjs tests/mobile-jobs-pipeline.test.mjs`
-Expected: FAIL. `jobs-kit` and `orchestrator` with `SyntaxError: The requested module … does not provide an export named 'nextJobRun'` (and `'invokeAndQueue'`); `runs-store` on `claimed[0].userId` (`undefined`); `capabilities-route` on `fake.state.createdRun.p_kind` (`createdRun` is `null`); `mobile-jobs-pipeline` with `['', '']`.
+Expected: FAIL. `jobs-kit` and `orchestrator` with `SyntaxError: The requested module … does not provide an export named 'nextJobRun'` (and `'invokeAndQueue'`); `runs-store` on `claimed[0].userId` (`undefined`); `capabilities-route` on `fake.state.createdRun.p_kind` (`createdRun` is `null`), and the six-a-day test with a `TypeError` reading `counted.intent_id` (nothing reads `runs` yet); `mobile-jobs-pipeline` with `['', '']`.
 
 - [ ] **Step 3: The template field**
 
@@ -12090,10 +12295,31 @@ with:
   /**
    * The run the plan wants next, such as job search's next application kit, or null. Asked
    * after a user's button press and after every run that succeeds (`queueNextRun`); it must
-   * name one of `tasks`, and must not ask again for work a run just failed to do.
+   * name one of `tasks`, and must not ask again for work a run just failed to do. The task's
+   * `perDay` caps how often it is queued, whatever the runs did.
    */
   nextRun?: (input: NextRunInput) => NextRun | null;
 }
+```
+
+In `TemplateTask` (Task 12), replace:
+
+```ts
+  /** True when `POST /api/intents/[id]/ask` may name it; false for one only code queues. */
+  fromApp: boolean;
+```
+
+with:
+
+```ts
+  /** True when `POST /api/intents/[id]/ask` may name it; false for one only code queues. */
+  fromApp: boolean;
+  /**
+   * The most runs with this task a plan may have in 24 hours when code queues one
+   * (`queueNextRun`), counted from `runs` however each ended, so work that keeps failing can't
+   * keep queueing. No cap without it.
+   */
+  perDay?: number;
 ```
 
 In `apps/api/src/lib/templates/index.ts`, add `NextRun` and `NextRunInput` to the `export type { … } from './types.ts';` list, in alphabetical order.
@@ -12118,8 +12344,9 @@ and append:
 /**
  * Job search's `nextRun` (spec section 6, Decision 9): a kit while kits are automatic, the
  * search is active, an Interested role waits for its cover letter, and the plan has had fewer
- * than six kits today. After a kit run, only if that run wrote a cover letter, so a kit that
- * failed or wrote nothing never queues another.
+ * than six kits today. After a kit run, only if that run wrote a cover letter, so a kit run that
+ * failed or wrote nothing doesn't queue the next itself; the plan's next press, run or morning
+ * check asks again, and the kit task's `perDay` stops a kit that keeps failing at six runs a day.
  *
  * @example
  * nextJobRun({ snapshot, now, finished: null }) // { task: 'kit', text: 'Prepare applications for my Interested roles' }
@@ -12171,6 +12398,44 @@ with:
   nextRun: nextJobRun,
 ```
 
+In `apps/api/src/lib/jobs/tasks.ts`, replace the import Task 15 added:
+
+```ts
+import { KIT_INSTRUCTIONS, prepareKit } from './kit.ts';
+```
+
+with:
+
+```ts
+import { KIT_INSTRUCTIONS, KITS_PER_DAY, prepareKit } from './kit.ts';
+```
+
+and replace the kit's entry:
+
+```ts
+  // Queued by code when a role becomes Interested (Task 16), never by the app.
+  kit: {
+    route: 'reasoning',
+    fromApp: false,
+    instructions: KIT_INSTRUCTIONS,
+    prepare: prepareKit,
+  },
+```
+
+with:
+
+```ts
+  // Queued by code when a role becomes Interested, never by the app, and at most six runs a day
+  // however each ends (Decision 9).
+  kit: {
+    route: 'reasoning',
+    fromApp: false,
+    perDay: KITS_PER_DAY,
+    instructions: KIT_INSTRUCTIONS,
+    prepare: prepareKit,
+  },
+```
+
 - [ ] **Step 5: Queue the next run**
 
 Create `apps/api/src/lib/runs/next.ts`:
@@ -12183,7 +12448,9 @@ import type { GraphSnapshot, RunRecord } from '@nexui/types';
 import { ChangesetConflictError, logLine } from '#lib/graph';
 import type { NextRunInput, TemplateDefinition } from '#lib/templates';
 
-import { createRun } from './store.ts';
+import { countTaskRuns, createRun } from './store.ts';
+
+const DAY_MS = 86_400_000;
 
 /** What `queueNextRun` asks the plan's template, and for whom it queues. */
 export interface NextRunRequest {
@@ -12198,8 +12465,10 @@ export interface NextRunRequest {
 /**
  * Queues the run the plan's template wants next (`TemplateDefinition.nextRun`), such as job
  * search's next application kit, as an ask with that task: its route, and `perception: 'code'`,
- * since no Jev read it (Decision 8). A refusal because a run is working on the plan (`NXU12`)
- * or the user is at the cap (`NXU14`) is dropped quietly: the next run's finish asks again.
+ * since no Jev read it (Decision 8). A task with `perDay` is queued only while the plan has had
+ * fewer runs with it in the last 24 hours, however they ended, so work that keeps failing stops
+ * there (Decision 9). A refusal because a run is working on the plan (`NXU12`) or the user is at
+ * the cap (`NXU14`) is dropped quietly: the plan's next press, run or morning check asks again.
  * Never throws; anything else is logged with its code at most.
  */
 export async function queueNextRun(
@@ -12226,6 +12495,15 @@ export async function queueNextRun(
   }
 
   try {
+    if (task.perDay !== undefined) {
+      const since = new Date(input.now.getTime() - DAY_MS);
+      const today = await countTaskRuns(db, input.intentId, next.task, since, task.perDay);
+
+      if (today >= task.perDay) {
+        return null;
+      }
+    }
+
     return await createRun(db, {
       userId: input.userId,
       intentId: input.intentId,
@@ -12292,6 +12570,39 @@ with:
 ```ts
       claimed.push({ run: mapRunRow(row), leaseId, userId: String(row.user_id) });
 ```
+
+After `latestBuildRun`, add the count `queueNextRun` holds a task's `perDay` to. It reads `runs_intent_idx` (`intent_id, created_at desc`), and stops counting at the cap:
+
+```ts
+/**
+ * How many of the plan's asks with this task were queued since `since`, however each ended,
+ * counting up to `limit`: what `queueNextRun` holds to a task's `perDay`.
+ */
+export async function countTaskRuns(
+  db: SupabaseClient,
+  intentId: string,
+  task: string,
+  since: Date,
+  limit: number,
+): Promise<number> {
+  const { data, error } = await db
+    .from('runs')
+    .select('id')
+    .eq('intent_id', intentId)
+    .eq('kind', 'ask')
+    .eq('input->>task', task)
+    .gte('created_at', since.toISOString())
+    .limit(limit);
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  return (data ?? []).length;
+}
+```
+
+A read that fails throws into `queueNextRun`'s `catch`, which logs it and queues nothing.
 
 In `apps/api/src/lib/runs/worker.ts`'s `execute` (Task 2 changed only its `session` line), replace:
 
@@ -12527,8 +12838,9 @@ import { applyCapability, invokeCapability } from '#lib/staging';
  * A button press (`POST /api/intents/[id]/capabilities`): runs the user-callable capability as
  * the user and commits it, then queues the run the plan's template wants next, such as the
  * application kit for a role just marked Interested (job search spec, section 6), which the
- * worker claims after the answer. A run that can't be queued yet is left for the next run's
- * finish to ask for again; the press stands either way.
+ * worker claims after the answer. A run that can't be queued now (a run is working, the user is
+ * at the cap, or the task's day is used) is asked for again by the plan's next press, run or
+ * morning check; the press stands either way.
  */
 export async function invokeAndQueue(
   deps: Pick<Orchestrator, 'db' | 'userId' | 'worker'>,
@@ -12749,7 +13061,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ```
 
 ```bash
-git add apps/api/src/lib/templates apps/api/src/lib/jobs/kit.ts apps/api/src/lib/jobs/template.ts apps/api/src/lib/runs apps/api/src/lib/orchestrator "apps/api/src/app/api/intents/[id]/capabilities/route.ts" apps/mobile/src/features/jobs/pipeline.ts tests/jobs-kit.test.mjs tests/runs-store.test.mjs tests/capabilities-route.test.mjs tests/orchestrator.test.mjs tests/mobile-jobs-pipeline.test.mjs
+git add apps/api/src/lib/templates apps/api/src/lib/jobs/kit.ts apps/api/src/lib/jobs/tasks.ts apps/api/src/lib/jobs/template.ts apps/api/src/lib/runs apps/api/src/lib/orchestrator "apps/api/src/app/api/intents/[id]/capabilities/route.ts" apps/mobile/src/features/jobs/pipeline.ts tests/support/graph-db.mjs tests/jobs-kit.test.mjs tests/runs-store.test.mjs tests/capabilities-route.test.mjs tests/orchestrator.test.mjs tests/mobile-jobs-pipeline.test.mjs
 git commit -F <message file>
 ```
 
@@ -13151,18 +13463,18 @@ Dispatch the `docs-keeper` agent with this list, then read its diff. It edits; c
 
 `docs/architecture/intent-graph.md`:
 
-- **"Templates" table:** rows for `tasks` (a named ask: its route, instructions added to the run's task line, whether the app may ask for it, and optional preparation in code; read by `startAsk` and `executeRun`) and `nextRun` (the run the plan wants next; asked by `invokeAndQueue` after a button press and by `executeRun` after every run that succeeds, through `queueNextRun`).
+- **"Templates" table:** rows for `tasks` (a named ask: its route, instructions added to the run's task line, whether the app may ask for it, optional preparation in code, and `perDay`, the most runs with it code may queue on a plan in 24 hours; read by `startAsk`, `executeRun` and `queueNextRun`) and `nextRun` (the run the plan wants next; asked by `invokeAndQueue` after a button press and by `executeRun` after every run that succeeds, through `queueNextRun`).
 - **"AI runs":**
   - an ask may carry `objectId` (the object reaches the model as escaped JSON inside `<focus>`, which the standing rule names) and `task` (it skips Jev, records `perception: 'code'` and takes the task's route);
   - an ask on a plan whose intake hasn't started is a 409 `Start this plan first.`;
   - a task's preparation runs before the model's steps, and a task with nothing to prepare ends `succeeded` with no model call;
-  - after a run succeeds, `queueNextRun` asks the template for the next run and queues it for the sweep; `NXU12` and `NXU14` refusals are dropped quietly.
+  - after a run succeeds, `queueNextRun` asks the template for the next run and queues it for the sweep, within the task's `perDay` (the plan's runs with that task in the last 24 hours, counted from `runs` however each ended); `NXU12` and `NXU14` refusals are dropped quietly, and the plan's next press, run or morning check asks again.
 - **The capabilities route** now queues the run a press leaves wanted and works it in `after()`; it exports `maxDuration` 300 (`tests/route-durations.test.mjs` pins every route that calls `runWorker(`).
 - **`CardSpec.made`** (`See the draft`) and how the + sheet opens what a run made.
 
 `docs/architecture/job-search.md`: a new section, **"Application work"**, after "The scan":
 
-- **Kits:** marking a role Interested queues a kit (`task: 'kit'`, reasoning, no Jev). Its preparation takes up to 3 Interested roles without a cover letter, oldest first, within 6 a plan a day (cover letters Nexui wrote in the last 24 hours), reads each posting from its board in code (15 seconds) and fences it in `<posting>`; a role with no board is kitted from its own data. The model writes a cover letter of about 250 words and an application brief per role through `jobs.draft`, with at most one web search per role. The run that finishes queues the next kit while roles wait, but only when it wrote a cover letter, so a failed or empty kit stops the chain. `kitsAutomatic()` is the paywall's switch.
+- **Kits:** marking a role Interested queues a kit (`task: 'kit'`, reasoning, no Jev). Its preparation takes up to 3 Interested roles without a cover letter, oldest first, within 6 a plan a day (cover letters Nexui wrote in the last 24 hours), reads each posting from its board in code (15 seconds) and fences it in `<posting>`; a role with no board is kitted from its own data. The model writes a cover letter of about 250 words and an application brief per role through `jobs.draft`, with at most one web search per role. The run that finishes queues the next kit while roles wait, but only when it wrote a cover letter, so a failed or empty kit doesn't queue the next itself; the plan's next button press, run or morning check asks again. At most 6 kit runs a plan a day are queued, however each ended (the kit task's `perDay`), so a kit that keeps failing costs at most six reasoning runs a day. `kitsAutomatic()` is the paywall's switch.
 - **Follow-ups, interviews and prep:** Draft a follow-up (`follow_up`, fast), Add interview (`interview`, fast) and Prep me (`prep`, reasoning) are app tasks naming their object; See the draft opens what the run wrote; I sent it logs the contact.
 - **Asking about one object:** the + sheet's chip (`Asking about <role> at <company>`) and `objectId`.
 - **Privacy:** add that a posting's text reaches the model only inside `<posting>`, and the object an ask names only inside `<focus>`, both as escaped JSON; drafts never reach a log.
@@ -13186,7 +13498,7 @@ Dispatch, in parallel, each with the branch's diff from PR 4a's merge (tell each
   - task names from the app (only `fromApp` tasks; `kit` refused);
   - `objectId` from the app (only an object in this plan) and the `<focus>` fence;
   - the kit's posting text in `<posting>`, and nothing about postings, drafts or the resume in a log line;
-  - the kit chain's guard and caps (no run loop a failing model can drive).
+  - the kit chain's guard and caps (no run loop a failing model can drive; six kit runs a plan a day, counted from `runs`, however often the user taps).
 
 Fix every Critical and Important finding in its own commit. Note anything deferred, with its reason, for the PR body.
 
@@ -13273,7 +13585,7 @@ Run against the spec, the handoff and the two earlier plans after writing:
   - 5.4, the scan on a schedule: the check-in first, then PR 2's scan with a 7-day window (Task 7).
   - 5.5: lookups were PR 2's; the new fences are `<focus>` (Task 12) and the kit's `<posting>` (Task 15). The usage counts are Task 5's.
 - **Spec section 6:** the kit and its queueing on Interested (Tasks 15, 16) with `Application kit ready` (Task 16); follow-ups, See the draft and I sent it (Tasks 12–14); Add interview and Prep me (Tasks 12–14); asking about one object and the + sheet's chip (Tasks 12–14). **Prepare my application** is the paywall's ("Not in this plan").
-- **Spec section 8:** Hired stops checks because `enqueue_job_checks` reads only active searches on open plans (Task 1); Declined is PR 3's; Pause and Resume (Tasks 3, 9); the automatic pause (Task 6); Delete's 409 during a background run (unchanged, Departure 10). Guards: one background run a day (Tasks 1, 3), the scan's caps (PR 2, Task 7), kits' 3 a run and 6 a day (Tasks 15, 16), the asks' lookup caps (PR 2), the kill switch (Task 8), usage counts (Tasks 1, 5).
+- **Spec section 8:** Hired stops checks because `enqueue_job_checks` reads only active searches on open plans (Task 1); Declined is PR 3's; Pause and Resume (Tasks 3, 9); the automatic pause (Task 6); Delete's 409 during a background run (unchanged, Departure 10). Guards: one background run a day (Tasks 1, 3), the scan's caps (PR 2, Task 7), kits' 3 a run and 6 a day, and 6 kit runs a day however each ends (Tasks 15, 16), the asks' lookup caps (PR 2), the kill switch (Task 8), usage counts (Tasks 1, 5).
 - **Spec section 9:** Part B's scan step (Task 10) and kit step (Task 17); one runner for both evals (Task 10, readiness 3.12). Part C and the two live passes are the founder's (week 5).
 - **Spec section 10, PR 4's row:** due times spread across the hour (Tasks 1, 3); `maxDuration` on every route that queues a run, pinned by a test (Tasks 8, 16); the sweep's ceiling written down (Task 11); one eval runner (Task 10).
 - **The handoff's list:** the run-kinds migration with `enqueue_job_checks` and the usage counts (Task 1, Decision 2); the cron hook (Task 8); the check-in and scan with `context.jobs.scan` and `nextCheckAt` (Tasks 3, 6, 7); lookups, capabilities and prompts (Tasks 6, 12, 15); ending, limits and cost guards (Tasks 3, 6, 8, 9, 15, 16); the application work (Tasks 12–16); the eval's halves (Tasks 10, 17); the readiness items (Tasks 8, 10, 11, 16).
